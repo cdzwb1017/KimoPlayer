@@ -1,0 +1,39 @@
+/* ══ 沉浸全屏模式 ══ */
+
+/* 内容区过渡动画 */
+.app-container.immersive-mode {
+  animation: immersive-content-in 0.35s ease-out;
+}
+
+.app-container:not(.immersive-mode).immersive-exiting {
+  animation: immersive-content-out 0.3s ease-in;
+}
+
+@keyframes immersive-content-in {
+  from { opacity: 0.6; }
+  to { opacity: 1; }
+}
+
+@keyframes immersive-content-out {
+  from { opacity: 0.6; }
+  to { opacity: 1; }
+}
+
+/* 标题栏过渡动画 */
+.app-container .titlebar {
+  transition: height 0.3s ease, min-height 0.3s ease, opacity 0.3s ease;
+}
+
+/* 沉浸模式隐藏标题栏按钮（根据设置控制） */
+.app-container.immersive-hide-titlebar .titlebar {
+  height: 0 !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+/* 侧边栏保持不变 */
+/* 内容区域保持不变 */
+/* 歌词面板保持不变 */
+/* 播放栏保持不变 */

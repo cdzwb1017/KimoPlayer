@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>编辑歌曲元数据与高保真歌词</title>
+    <link rel="stylesheet" href="/src/styles.css" />
+  </head>
+  <body class="standalone-editor theme-dark" oncontextmenu="event.preventDefault()">
+    <!-- 🌟 全屏多物理页面编辑器 DOM 结构 🌟 -->
+    <div id="metadata-editor-modal" class="modal-overlay">
+      <div class="modal-content glassmorphism wide-modal">
+        <div class="modal-header">
+          <div class="metadata-window-drag-region" data-tauri-drag-region aria-hidden="true"></div>
+          <div class="modal-header-title-group">
+            <h3>编辑歌曲元数据与高保真歌词</h3>
+            <span id="edit-metadata-filename-tip" class="filename-tip"></span>
+          </div>
+          <button id="metadata-editor-close" class="modal-close-btn">&times;</button>
+        </div>
+        
+        <div class="modal-workspace">
+          <!-- Left Column: Audio Metadata -->
+          <div class="modal-workspace-left scrollable-column">
+            <input type="hidden" id="edit-metadata-path" />
+            <input type="hidden" id="edit-metadata-cover-path" />
+            <input type="hidden" id="edit-metadata-remove-cover" value="false" />
+
+            <!-- 封面图操作区 -->
+            <div class="cover-edit-section">
+              <img id="edit-metadata-cover-preview" class="cover-preview-img" src="" alt="封面预览" />
+              <div class="cover-edit-buttons">
+                <button id="edit-metadata-change-cover" class="btn-secondary">选择图片封面</button>
+                <button id="edit-metadata-delete-cover" class="btn-secondary btn-danger">移除图片封面</button>
+              </div>
+            </div>
+
+            <!-- 元数据表单列表 -->
+            <div class="metadata-form-list">
+              <div class="form-group">
+                <label for="edit-metadata-title">歌曲标题</label>
+                <input type="text" id="edit-metadata-title" class="form-input" placeholder="请输入歌曲标题" />
+              </div>
+              <div class="form-group">
+                <label for="edit-metadata-artist">歌手</label>
+                <input type="text" id="edit-metadata-artist" class="form-input" placeholder="请输入歌手名称" />
+              </div>
+              <div class="form-group">
+                <label for="edit-metadata-album">专辑</label>
+                <input type="text" id="edit-metadata-album" class="form-input" placeholder="请输入专辑名称" />
+              </div>
+              <div class="form-row-2">
+                <div class="form-group">
+                  <label for="edit-metadata-year">年份</label>
+                  <input type="number" id="edit-metadata-year" class="form-input" placeholder="年份" />
+                </div>
+                <div class="form-group">
+                  <label for="edit-metadata-genre">流派风格</label>
+                  <input type="text" id="edit-metadata-genre" class="form-input" placeholder="流派风格" />
+                </div>
+              </div>
+              <div class="form-row-2">
+                <div class="form-group">
+                  <label for="edit-metadata-track">音轨号</label>
+                  <input type="number" id="edit-metadata-track" class="form-input" placeholder="音轨" />
+                </div>
+                <div class="form-group">
+                  <label for="edit-metadata-disc">碟号</label>
+                  <input type="number" id="edit-metadata-disc" class="form-input" placeholder="碟号" />
+                </div>
+              </div>
+              <div class="form-group">
+                <label for="edit-metadata-album-artist">专辑艺术家</label>
+                <input type="text" id="edit-metadata-album-artist" class="form-input" placeholder="专辑艺术家" />
+              </div>
+              <div class="form-group">
+                <label for="edit-metadata-composer">作曲人</label>
+                <input type="text" id="edit-metadata-composer" class="form-input" placeholder="作曲人" />
+              </div>
+              <div class="form-group">
+                <label for="edit-metadata-lyricist">作词人</label>
+                <input type="text" id="edit-metadata-lyricist" class="form-input" placeholder="作词人" />
+              </div>
+              <div class="form-group">
+                <label for="edit-metadata-comment">备注描述</label>
+                <input type="text" id="edit-metadata-comment" class="form-input" placeholder="备注描述" />
+              </div>
+            </div>
+          </div>
+
+          <!-- Right Column: Lyrics & High Precision Timeline -->
+          <div class="modal-workspace-right">
+            <!-- 歌词操作工具栏 -->
+            <div class="lyrics-edit-toolbar">
+              <div class="toolbar-left">
+                <button id="btn-lyrics-import" class="btn-secondary">导入歌词文件</button>
+                <button id="btn-lyrics-raw-toggle" class="btn-secondary">切换纯文本编辑</button>
+              </div>
+              <div class="toolbar-right">
+                <button id="btn-lyrics-add-line" class="btn-secondary" style="display: none;">添加歌词行</button>
+              </div>
+            </div>
+
+            <!-- 图形化交互式时间轴主工作台 -->
+            <div id="lyrics-editor-viewport" class="lyrics-editor-viewport">
+              <div id="lyrics-editor-timeline-container" class="lyrics-editor-timeline-container">
+                <!-- 动态生成的高保真歌词行交互卡片 -->
+              </div>
+            </div>
+
+            <!-- 纯文本原始编辑大文本域 -->
+            <div id="lyrics-editor-raw-container" class="lyrics-editor-raw-container" style="display: none;">
+              <textarea id="edit-metadata-lyrics" class="lyrics-raw-textarea" placeholder="在此处粘贴或修改普通 LRC 歌词文本..."></textarea>
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button id="metadata-editor-cancel" class="btn-secondary">取消</button>
+          <button id="metadata-editor-save" class="btn-primary">保存修改</button>
+        </div>
+      </div>
+    </div>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
