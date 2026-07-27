@@ -24,8 +24,14 @@ upx.exe
 fix_*.cjs
 
 # Editor directories and files
-.vscode/*
-!.vscode/extensions.json
+.vscode/
+
+# Changelog files (managed in docs/changelog/)
+CHANGELOG-*.md
+
+# Build & version scripts (local use only)
+build-opt.ps1
+bump-version.ps1
 .idea
 .DS_Store
 *.suo
