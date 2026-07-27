@@ -2868,6 +2868,44 @@ fn show_main_window(app: tauri::AppHandle) -> Result<(), String> {
     Ok(())
 }
 
+/// 下载安装包并静默安装
+#[tauri::command]
+async fn download_and_install_update(url: String, app: tauri::AppHandle) -> Result<(), String> {
+    use std::fs;
+
+    // 获取临时目录
+    let temp_dir = std::env::temp_dir();
+    let file_name = url.split('/').last().unwrap_or("update.exe");
+    let download_path = temp_dir.join(file_name);
+
+    // 下载文件
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(300))
+        .build()
+        .map_err(|e| format!("创建下载客户端失败: {}", e))?;
+
+    let resp = client.get(&url).send().await.map_err(|e| format!("下载请求失败: {}", e))?;
+    if !resp.status().is_success() {
+        return Err(format!("下载失败: HTTP {}", resp.status()));
+    }
+
+    let bytes = resp.bytes().await.map_err(|e| format!("读取下载数据失败: {}", e))?;
+    fs::write(&download_path, &bytes).map_err(|e| format!("写入文件失败: {}", e))?;
+
+    // 静默安装（NSIS 支持 /S 静默模式）
+    #[cfg(target_os = "windows")]
+    {
+        std::process::Command::new(&download_path)
+            .args(["/S"])
+            .spawn()
+            .map_err(|e| format!("启动安装程序失败: {}", e))?;
+    }
+
+    // 关闭当前应用
+    app.exit(0);
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -2964,7 +3002,8 @@ pub fn run() {
             search_qq_song_id,
             fetch_multi_platform_comments,
             update_tray_info,
-            show_main_window
+            show_main_window,
+            download_and_install_update
         ])
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {

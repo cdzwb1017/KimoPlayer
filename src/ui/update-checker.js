@@ -2,6 +2,8 @@
 // 软件更新检测 — 支持正式版 / 测试版双通道
 // ═══════════════════════════════════════════════════════════════
 
+import { invoke } from '@tauri-apps/api/core';
+
 const REPO = 'kiomosu/KimoPlayer';
 const CURRENT_VERSION = '1.4.6-beta01';
 export const BETA_KEY = 'KimoBeta2026';
@@ -109,17 +111,49 @@ function showUpdateNotification(info) {
       </div>
       ${info.body ? `<div style="padding:16px 24px;font-size:12px;color:var(--text-secondary);line-height:1.6;max-height:200px;overflow-y:auto;white-space:pre-wrap;">${info.body.slice(0, 500)}</div>` : ''}
       <div style="padding:14px 24px 20px;display:flex;gap:10px;">
-        <button id="update-ok-btn" style="flex:1;padding:10px;font-size:14px;font-weight:600;border:none;border-radius:8px;background:rgb(var(--dynamic-color,16,185,129));color:#fff;cursor:pointer;">前往下载</button>
+        <button id="update-ok-btn" style="flex:1;padding:10px;font-size:14px;font-weight:600;border:none;border-radius:8px;background:rgb(var(--dynamic-color,16,185,129));color:#fff;cursor:pointer;">下载并安装</button>
         <button id="update-later-btn" style="flex:1;padding:10px;font-size:14px;font-weight:600;border:1px solid var(--glass-border);border-radius:8px;background:transparent;color:var(--text-secondary);cursor:pointer;">稍后再说</button>
+      </div>
+      <div id="update-progress" style="display:none;padding:0 24px 16px;">
+        <div style="height:4px;background:rgba(255,255,255,0.1);border-radius:2px;overflow:hidden;">
+          <div id="update-progress-bar" style="height:100%;width:0%;background:rgb(var(--dynamic-color,16,185,129));transition:width 0.3s;border-radius:2px;"></div>
+        </div>
+        <div id="update-progress-text" style="font-size:11px;color:var(--text-secondary);margin-top:6px;text-align:center;">正在下载...</div>
       </div>
     </div>
   `;
 
   document.body.appendChild(overlay);
 
-  overlay.querySelector('#update-ok-btn').addEventListener('click', () => {
-    window.open(info.url, '_blank');
-    overlay.remove();
+  // 查找 .exe 安装包
+  const exeAsset = info.assets.find(a => a.name.endsWith('.exe') && !a.name.includes('safe'));
+  const downloadUrl = exeAsset ? exeAsset.downloadUrl : null;
+
+  overlay.querySelector('#update-ok-btn').addEventListener('click', async () => {
+    if (!downloadUrl) {
+      window.open(info.url, '_blank');
+      overlay.remove();
+      return;
+    }
+
+    const btn = overlay.querySelector('#update-ok-btn');
+    const progress = overlay.querySelector('#update-progress');
+    const progressBar = overlay.querySelector('#update-progress-bar');
+    const progressText = overlay.querySelector('#update-progress-text');
+
+    btn.disabled = true;
+    btn.textContent = '下载中...';
+    progress.style.display = 'block';
+
+    try {
+      await invoke('download_and_install_update', { url: downloadUrl });
+    } catch (err) {
+      console.error('[UpdateChecker] Download failed:', err);
+      btn.disabled = false;
+      btn.textContent = '重试';
+      progressText.textContent = '下载失败: ' + err;
+      progressBar.style.width = '0%';
+    }
   });
 
   overlay.querySelector('#update-later-btn').addEventListener('click', () => {
