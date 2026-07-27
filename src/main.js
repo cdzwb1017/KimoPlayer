@@ -112,6 +112,7 @@ import {
   initializeLyricsSettingsToolbar,
 } from './ui/lyrics-controls.js';
 import { showStartupUpdateAnnouncement } from './ui/update-announcement.js';
+import { startupUpdateCheck } from './ui/update-checker.js';
 import { getCoverSrc } from './utils/cover.js';
 import { extractDominantColor } from './utils/color.js';
 import { transitionContent } from './ui/transitions.js';
@@ -2247,6 +2248,9 @@ document.addEventListener('DOMContentLoaded', () => {
   applyMiniLyricsTranslationSetting();
 
   showStartupUpdateAnnouncement();
+
+  // 启动时延迟检查更新
+  startupUpdateCheck();
 
   const closeStandaloneWindow = async () => {
     try {

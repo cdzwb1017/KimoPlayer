@@ -4,6 +4,7 @@ import {
   getStoredInterfaceFont,
   INTERFACE_FONT_PRESETS,
 } from '../ui/interface-font.js';
+import { checkForUpdates, setBetaKey, getBetaStatus, BETA_KEY } from '../ui/update-checker.js';
 
 export const createSettingsPage = ({
   player,
@@ -572,6 +573,27 @@ export const createSettingsPage = ({
           </div>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-tertiary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
         </div>
+
+        <div style="width: 100%; height: 1px; background: var(--glass-border); margin: 8px 0;"></div>
+
+        <div id="settings-check-update-btn" class="setting-row" style="cursor: pointer; margin: 0; padding: 10px 14px; border-radius: 10px; transition: background 0.2s;">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            <span style="font-size: 13px; color: var(--text-primary);">检查更新</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            ${getBetaStatus() ? '<span style="font-size:11px;background:rgba(var(--dynamic-color,0,240,255),0.15);color:rgb(var(--dynamic-color,0,240,255));padding:2px 8px;border-radius:10px;">测试版</span>' : ''}
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-tertiary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+          </div>
+        </div>
+
+        <div id="settings-beta-key-row" class="setting-row" style="margin: 0; padding: 10px 14px; border-radius: 10px;">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
+            <span style="font-size: 13px; color: var(--text-primary);">测试版密钥</span>
+          </div>
+          <input id="settings-beta-key" type="password" placeholder="${getBetaStatus() ? '已激活' : '输入密钥激活测试版'}" value="${getBetaStatus() ? BETA_KEY : ''}" style="width: 140px; padding: 6px 10px; font-size: 12px; border: 1px solid var(--glass-border); border-radius: 6px; background: rgba(255,255,255,0.03); color: var(--text-primary); outline: none;" ${getBetaStatus() ? 'disabled' : ''} />
+        </div>
       </div>
     `;
     container.appendChild(aboutCard);
@@ -744,6 +766,48 @@ export const createSettingsPage = ({
 
     // 绑定点击事件
     aboutCard.querySelector('#settings-changelog-btn').addEventListener('click', showChangelogModal);
+
+    // 检查更新
+    aboutCard.querySelector('#settings-check-update-btn')?.addEventListener('click', async () => {
+      const btn = aboutCard.querySelector('#settings-check-update-btn');
+      const label = btn.querySelector('span');
+      const origText = label.textContent;
+      label.textContent = '检查中...';
+      const result = await checkForUpdates(false);
+      if (result) {
+        label.textContent = origText;
+        // update-checker 内部会弹窗
+      } else {
+        label.textContent = '已是最新版本';
+        setTimeout(() => { label.textContent = origText; }, 2000);
+      }
+    });
+
+    // 测试版密钥
+    aboutCard.querySelector('#settings-beta-key')?.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        const input = e.target;
+        const key = input.value.trim();
+        if (setBetaKey(key)) {
+          input.disabled = true;
+          input.value = '';
+          input.placeholder = '已激活';
+          // 更新测试版标签
+          const badge = aboutCard.querySelector('#settings-check-update-btn span:last-child');
+          if (badge && !badge.querySelector('span')) {
+            const tag = document.createElement('span');
+            tag.style.cssText = 'font-size:11px;background:rgba(var(--dynamic-color,0,240,255),0.15);color:rgb(var(--dynamic-color,0,240,255));padding:2px 8px;border-radius:10px;';
+            tag.textContent = '测试版';
+            badge.prepend(tag);
+          }
+          showToast('已激活测试版更新通道');
+        } else {
+          showToast('密钥无效');
+          input.value = '';
+        }
+      }
+    });
+
     listEl.appendChild(container);
 
     lyricCard.querySelectorAll('#settings-stagger-group .setting-radio-btn').forEach((btn, idx) => {
