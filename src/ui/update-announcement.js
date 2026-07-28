@@ -8,25 +8,34 @@ export function showStartupUpdateAnnouncement() {
 
   const sections = [
     {
-      title: '🚀 一键在线升级，无需手动下载',
+      title: '📂 系统文件关联，双击即播',
       items: [
-        ['软件内即可直接一键检查并更新到最新版本'],
-        ['新增清晰的下载进度条与 MB 大小显示，进度随时掌握'],
-        ['下载完成后自动启动安装，听歌更新两不误'],
+        ['安装后在操作系统中双击音频文件，直接用 KiomPlayer 打开播放'],
+        ['支持 mp3、flac、wav、ogg、m4a、aac、wma、opus、ape、aiff 共 10 种格式'],
+        ['应用已运行时自动追加到播放列表，未运行时启动后自动加载'],
       ],
     },
     {
-      title: '🔑 专属内测通道上线',
+      title: '🌌 背景样式与 UI 风格体系',
       items: [
-        ['设置中新增【内测 Key】功能'],
-        ['输入内测密钥即可抢先体验最新的测试版功能'],
+        ['新增三种背景模式：去除背景、静态背景、动态背景（可调旋转速率）'],
+        ['四种 UI 风格：默认效果、亚克力、高斯模糊、液态玻璃，按视觉复杂度递增'],
+        ['评论区、右键菜单、Toast 提示全面适配四种 UI 风格'],
       ],
     },
     {
-      title: '🎨 视觉动效与细节体验优化',
+      title: '🎛️ 歌词弹出框重新设计',
       items: [
-        ['全新重构的更新提示框与设置页面，动画更自然细腻'],
-        ['优化网络连接与错误重试，播放体验更稳定'],
+        ['滑块弹出框改为现代玻璃胶囊风格，跟随歌词页面主题自动切换深浅色'],
+        ['滑块轨道新增进度填充效果，已调节部分以动态主题色高亮'],
+        ['所有滑块统一支持鼠标滚轮调整，修复字号与抬起幅度上限不匹配的问题'],
+      ],
+    },
+    {
+      title: '🔧 体验优化与修复',
+      items: [
+        ['设置页 GitHub 仓库链接、更新检查器、评论区图片跳转修复，改用系统浏览器打开'],
+        ['历史更新记录新增 1.5.1 和 1.5.0 版本条目'],
       ],
     },
   ];
@@ -49,7 +58,7 @@ export function showStartupUpdateAnnouncement() {
     <div class="kimo-modal-card" style="max-width:460px;width:92%;padding:0;text-align:left;overflow:hidden;">
       <div style="padding:22px 24px 16px;border-bottom:1px solid rgba(255,255,255,0.08);">
         <div style="font-size:18px;font-weight:700;color:var(--text-primary);margin-bottom:4px;">KimoPlayer ${APP_VERSION}</div>
-        <div style="font-size:12px;color:var(--text-secondary);">2026.07.28 在线自动更新与系统重构</div>
+        <div style="font-size:12px;color:var(--text-secondary);">2026.07.29 系统文件关联与 UI 风格体系</div>
       </div>
       <div style="padding:18px 24px 4px;">${sectionsHTML}</div>
       <div style="padding:14px 24px 20px;">
