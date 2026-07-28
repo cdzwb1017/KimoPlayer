@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "KiomPlayer",
-  "version": "1.4.6-beta01",
+  "version": "1.5.1",
   "identifier": "com.kiomosu.kiomplayer",
   "build": {
     "beforeDevCommand": "npm run dev",
@@ -37,6 +37,13 @@
   "bundle": {
     "active": true,
     "targets": "all",
+    "fileAssociations": [
+      {
+        "name": "KiomPlayer Audio",
+        "ext": ["mp3", "flac", "wav", "ogg", "m4a", "aac", "wma", "opus", "ape", "aiff"],
+        "description": "Audio File"
+      }
+    ],
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",

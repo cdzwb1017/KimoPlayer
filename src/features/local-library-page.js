@@ -7,6 +7,7 @@ export const createLocalLibraryPage = ({
   getCurrentTab,
   renderRecentPlaysTab,
   showToast,
+  switchTab,
 }) => {
   let currentSubTab = 'all'; // 'all', 'album', 'artist', 'genre'
   let currentDetailFilter = null; // null or { type: 'album'|'artist'|'genre', name: 'xxx' }
@@ -185,8 +186,23 @@ export const createLocalLibraryPage = ({
         <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 60px; color: var(--text-secondary); gap: 16px;">
           <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
           <div style="font-size: 14px; font-weight: 500;">您的本地音乐库为空，请在设置中"添加扫描文件夹"后点击扫描</div>
+          <button id="empty-goto-settings-btn" style="padding:9px 24px;font-size:13px;font-weight:600;border:none;border-radius:10px;background:rgb(var(--dynamic-color,16,185,129));color:#fff;cursor:pointer;transition:opacity 0.2s;">去添加</button>
         </div>
       `;
+      listEl.querySelector('#empty-goto-settings-btn')?.addEventListener('click', () => {
+        if (switchTab) switchTab('settings');
+        // 延迟等待设置页渲染完成后滚动定位到扫描文件夹卡片
+        setTimeout(() => {
+          const scanCard = document.getElementById('settings-scan-card');
+          if (scanCard) {
+            scanCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            // 短暂高亮提示
+            scanCard.style.transition = 'box-shadow 0.3s ease';
+            scanCard.style.boxShadow = '0 0 0 2px rgb(var(--dynamic-color,16,185,129))';
+            setTimeout(() => { scanCard.style.boxShadow = ''; }, 2000);
+          }
+        }, 100);
+      });
       return;
     }
 

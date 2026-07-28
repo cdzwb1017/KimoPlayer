@@ -143,6 +143,43 @@ export function cycleTheme() {
   applyTheme(nextTheme, savedOpacity);
 }
 
+export function applyUiStyle(uiStyle) {
+  const container = document.querySelector('.app-container');
+  if (!container) return;
+
+  // 移除所有 UI 风格类（同时加在 app-container 和 body 上，确保 body 级元素如 toast 也能生效）
+  container.classList.remove('ui-style-acrylic', 'ui-style-gaussian', 'ui-style-liquid', 'ui-style-solid');
+  document.body.classList.remove('ui-style-acrylic', 'ui-style-gaussian', 'ui-style-liquid', 'ui-style-solid');
+
+  // 添加当前风格类
+  if (uiStyle) {
+    container.classList.add(`ui-style-${uiStyle}`);
+    document.body.classList.add(`ui-style-${uiStyle}`);
+  }
+
+  localStorage.setItem('kimo-ui-style', uiStyle);
+}
+
+export function applyBackgroundStyle(bgStyle) {
+  const container = document.querySelector('.app-container');
+  if (!container) return;
+
+  // 移除所有背景样式类
+  container.classList.remove('bg-style-none', 'bg-style-static', 'bg-style-dynamic');
+
+  // 读取百分比速率并转换为持续时长：100% → 10s, 50% → 20s, 10% → 100s
+  const rotatePct = parseFloat(localStorage.getItem('kimo-bg-rotate-speed')) || 50;
+  const rotateDuration = Math.round(1000 / rotatePct);
+  document.documentElement.style.setProperty('--bg-rotate-duration', `${rotateDuration}s`);
+  document.documentElement.style.setProperty('--bg-rotate-play-state', 'running');
+
+  if (bgStyle) {
+    container.classList.add(`bg-style-${bgStyle}`);
+  }
+
+  localStorage.setItem('kimo-bg-style', bgStyle);
+}
+
 export function applyLyricsTheme(lyricsTheme) {
   const lyricsPanel = document.getElementById('lyrics-panel');
   if (!lyricsPanel) return;

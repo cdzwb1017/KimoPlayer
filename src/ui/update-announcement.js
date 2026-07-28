@@ -1,30 +1,32 @@
-const UPDATE_SEEN_KEY = 'kimo-update-seen-146b01';
+import { APP_VERSION } from './update-checker.js';
+
+// 版本号唯一来源：package.json → Vite __APP_VERSION__ → update-checker.js APP_VERSION
+const UPDATE_SEEN_KEY = `kimo-update-seen-${APP_VERSION}`;
 
 export function showStartupUpdateAnnouncement() {
   if (localStorage.getItem(UPDATE_SEEN_KEY) === 'true') return;
 
   const sections = [
     {
-      title: '右键菜单玻璃材质统一',
+      title: '🚀 一键在线升级，无需手动下载',
       items: [
-        ['所有右键菜单改为和评论区一致的玻璃材质'],
-        ['支持深色/浅色/灰色三套主题自动适配'],
-        ['歌词界面右键菜单跟随歌词深浅色主题'],
+        ['软件内即可直接一键检查并更新到最新版本'],
+        ['新增清晰的下载进度条与 MB 大小显示，进度随时掌握'],
+        ['下载完成后自动启动安装，听歌更新两不误'],
       ],
     },
     {
-      title: '歌词面板控制按钮',
+      title: '🔑 专属内测通道上线',
       items: [
-        ['标题栏按钮、歌词控件按钮统一为玻璃材质'],
-        ['弹出框移到 body 下避免被裁剪'],
-        ['移除歌词面板内控制按钮的原生 tooltip'],
+        ['设置中新增【内测 Key】功能'],
+        ['输入内测密钥即可抢先体验最新的测试版功能'],
       ],
     },
     {
-      title: '右键菜单精简',
+      title: '🎨 视觉动效与细节体验优化',
       items: [
-        ['移除空白区域默认右键菜单'],
-        ['封面右键菜单仅在歌词页大封面触发'],
+        ['全新重构的更新提示框与设置页面，动画更自然细腻'],
+        ['优化网络连接与错误重试，播放体验更稳定'],
       ],
     },
   ];
@@ -46,8 +48,8 @@ export function showStartupUpdateAnnouncement() {
   overlay.innerHTML = `
     <div class="kimo-modal-card" style="max-width:460px;width:92%;padding:0;text-align:left;overflow:hidden;">
       <div style="padding:22px 24px 16px;border-bottom:1px solid rgba(255,255,255,0.08);">
-        <div style="font-size:18px;font-weight:700;color:var(--text-primary);margin-bottom:4px;">KimoPlayer 1.4.6-beta01</div>
-        <div style="font-size:12px;color:var(--text-secondary);">2026.07.26 右键菜单重构</div>
+        <div style="font-size:18px;font-weight:700;color:var(--text-primary);margin-bottom:4px;">KimoPlayer ${APP_VERSION}</div>
+        <div style="font-size:12px;color:var(--text-secondary);">2026.07.28 在线自动更新与系统重构</div>
       </div>
       <div style="padding:18px 24px 4px;">${sectionsHTML}</div>
       <div style="padding:14px 24px 20px;">

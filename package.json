@@ -1,7 +1,7 @@
 {
   "name": "kimo-player",
   "private": true,
-  "version": "1.4.6-beta01",
+  "version": "1.5.1",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -11,7 +11,8 @@
   },
   "dependencies": {
     "@tauri-apps/api": "^2",
-    "@tauri-apps/plugin-dialog": "^2"
+    "@tauri-apps/plugin-dialog": "^2",
+    "@tauri-apps/plugin-opener": "^2.5.4"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2",

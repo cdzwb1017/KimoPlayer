@@ -1,3 +1,13 @@
+/** Update the CSS --slider-fill variable so the track gradient shows progress. */
+function updateSliderFill(slider) {
+  if (!slider) return;
+  const min = parseFloat(slider.min) || 0;
+  const max = parseFloat(slider.max) || 100;
+  const val = parseFloat(slider.value);
+  const pct = ((val - min) / (max - min)) * 100;
+  slider.style.setProperty('--slider-fill', `${pct}%`);
+}
+
 export function initializeLyricsPreferencesControls(player) {
   let currentFontSize = parseFloat(localStorage.getItem('kimo-lyrics-font-size')) || 22;
   const fontSizeSlider = document.getElementById('slider-font-size');
@@ -18,6 +28,7 @@ export function initializeLyricsPreferencesControls(player) {
     document.documentElement.style.setProperty('--lyrics-font-size', `${currentFontSize}px`);
     if (fontSizeSlider) fontSizeSlider.value = currentFontSize;
     if (fontSizeValue) fontSizeValue.innerText = `字号: ${currentFontSize.toFixed(1)}px`;
+    updateSliderFill(fontSizeSlider);
     resetLyricsAlignment();
   };
 
@@ -66,6 +77,7 @@ export function initializeLyricsPreferencesControls(player) {
     document.documentElement.style.setProperty('--lyrics-font-weight', currentFontWeight);
     if (fontWeightSlider) fontWeightSlider.value = currentFontWeight;
     if (fontWeightValue) fontWeightValue.innerText = `字重: ${getWeightLabel(currentFontWeight)} (${currentFontWeight})`;
+    updateSliderFill(fontWeightSlider);
     resetLyricsAlignment();
   };
 
@@ -133,6 +145,7 @@ export function initializeLyricsPreferencesControls(player) {
     } else {
       lyricOffsetValue.innerText = `提前 ${val.toFixed(1)}s`;
     }
+    updateSliderFill(lyricOffsetSlider);
   };
 
   if (lyricOffsetSlider) {
@@ -179,6 +192,7 @@ export function initializeLyricsPreferencesControls(player) {
     } else {
       lyricAlignValue.innerText = `偏下 (${percentage}%)`;
     }
+    updateSliderFill(lyricAlignSlider);
   };
 
   if (lyricAlignSlider) {
@@ -215,6 +229,7 @@ export function initializeLyricsPreferencesControls(player) {
   const updateLiftLabel = (val) => {
     if (!lyricLiftValue) return;
     lyricLiftValue.innerText = `抬起: ${val.toFixed(1)}px`;
+    updateSliderFill(lyricLiftSlider);
   };
 
   if (lyricLiftSlider) {
@@ -235,7 +250,7 @@ export function initializeLyricsPreferencesControls(player) {
       e.preventDefault();
       const delta = e.deltaY < 0 ? 0.5 : -0.5;
       const min = parseFloat(lyricLiftSlider.min) || 0.0;
-      const max = parseFloat(lyricLiftSlider.max) || 15.0;
+      const max = parseFloat(lyricLiftSlider.max) || 40.0;
       const nextVal = Math.max(min, Math.min(max, currentLiftAmp + delta));
       lyricLiftSlider.value = nextVal;
       applyLift(nextVal);

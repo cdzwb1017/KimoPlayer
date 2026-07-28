@@ -120,6 +120,8 @@ import {
   applyDynamicColor,
   applyTheme,
   applyLyricsTheme,
+  applyUiStyle,
+  applyBackgroundStyle,
   initLyricsTheme,
   configureThemePlayer,
   configureThemeDesktopLyrics,
@@ -1250,6 +1252,12 @@ document.addEventListener('DOMContentLoaded', () => {
   let savedOp = isCustom ? localStorage.getItem('kimo-overlay-opacity') : null;
     applyTheme(savedTheme, savedOp);
   initLyricsTheme();
+  // 加载已保存的 UI 风格
+  const savedUiStyle = localStorage.getItem('kimo-ui-style') || 'solid';
+  applyUiStyle(savedUiStyle);
+  // 加载已保存的背景样式
+  const savedBgStyle = localStorage.getItem('kimo-bg-style') || 'static';
+  applyBackgroundStyle(savedBgStyle);
   applyStoredInterfaceFont();
 
   if (localStorage.getItem('kimo-performance-mode') === 'true') {
@@ -1502,6 +1510,7 @@ document.addEventListener('DOMContentLoaded', () => {
     getCurrentTab: () => currentTab,
     renderRecentPlaysTab: () => renderRecentPlaysTab(),
     showToast,
+    switchTab: tabName => switchTab(tabName),
   });
 
   // Custom dialogs replace native prompt/confirm UI inside the WebView.
@@ -1633,6 +1642,8 @@ document.addEventListener('DOMContentLoaded', () => {
     applyMiniLyricsTranslationSetting,
     applyTheme,
     applyLyricsTheme,
+    applyUiStyle,
+    applyBackgroundStyle,
     getCurrentTheme: () => currentTheme,
     customConfirm,
     clearLyricsDB,
@@ -1998,6 +2009,27 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   } catch (e) {
     console.error('[Drag Drop] Failed to listen to tauri drag-drop events:', e);
+  }
+
+  // OS 文件关联：监听单实例模式下双击音频文件打开的事件
+  listen('open-file', (event) => {
+    const filePath = event.payload;
+    if (filePath) {
+      console.log('[File Assoc] Opening file via OS association:', filePath);
+      playDroppedFile(filePath);
+    }
+  }).catch(() => {});
+
+  // OS 文件关联：首次启动时检查是否通过双击音频文件启动
+  if (window.__TAURI_INTERNALS__) {
+    invoke('take_pending_file').then((pendingFile) => {
+      if (pendingFile) {
+        console.log('[File Assoc] Launching with pending file:', pendingFile);
+        playDroppedFile(pendingFile);
+      }
+    }).catch((err) => {
+      console.warn('[File Assoc] Failed to check pending file:', err);
+    });
   }
 
   // Custom context menu for song list, album cards, etc.

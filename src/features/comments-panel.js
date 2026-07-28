@@ -3,6 +3,7 @@
 // ═══════════════════════════════════════════════════════════════
 
 import { invoke } from '@tauri-apps/api/core';
+import { openUrl } from '@tauri-apps/plugin-opener';
 import { listen } from '@tauri-apps/api/event';
 import { getCoverSrc } from '../utils/cover.js';
 import { showToast } from '../ui/toast.js';
@@ -741,7 +742,7 @@ function createCommentElement(comment) {
       img.src = imgUrl;
       img.loading = 'lazy';
       img.addEventListener('click', () => {
-        window.open(imgUrl, '_blank');
+        openUrl(imgUrl).catch(() => { window.open(imgUrl, '_blank'); });
       });
       imagesContainer.appendChild(img);
     }

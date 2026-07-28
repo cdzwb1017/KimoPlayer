@@ -2868,17 +2868,25 @@ fn show_main_window(app: tauri::AppHandle) -> Result<(), String> {
     Ok(())
 }
 
-/// 下载安装包并静默安装
+/// 下载进度事件 payload
+#[derive(Clone, serde::Serialize)]
+struct DownloadProgress {
+    downloaded: u64,
+    total: u64,
+    percent: f64,
+}
+
+/// 下载安装包并静默安装（流式下载 + 进度推送）
 #[tauri::command]
 async fn download_and_install_update(url: String, app: tauri::AppHandle) -> Result<(), String> {
-    use std::fs;
+    use std::io::Write;
 
     // 获取临时目录
     let temp_dir = std::env::temp_dir();
     let file_name = url.split('/').last().unwrap_or("update.exe");
     let download_path = temp_dir.join(file_name);
 
-    // 下载文件
+    // 创建下载客户端
     let client = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(300))
         .build()
@@ -2889,8 +2897,35 @@ async fn download_and_install_update(url: String, app: tauri::AppHandle) -> Resu
         return Err(format!("下载失败: HTTP {}", resp.status()));
     }
 
-    let bytes = resp.bytes().await.map_err(|e| format!("读取下载数据失败: {}", e))?;
-    fs::write(&download_path, &bytes).map_err(|e| format!("写入文件失败: {}", e))?;
+    // 从 Content-Length 获取文件总大小
+    let total = resp.content_length().unwrap_or(0);
+
+    // 流式下载并写入文件
+    let mut file = std::fs::File::create(&download_path)
+        .map_err(|e| format!("创建临时文件失败: {}", e))?;
+
+    let mut downloaded: u64 = 0;
+    let mut resp = resp;
+
+    while let Some(chunk) = resp.chunk().await.map_err(|e| format!("读取数据失败: {}", e))? {
+        file.write_all(&chunk).map_err(|e| format!("写入文件失败: {}", e))?;
+        downloaded += chunk.len() as u64;
+
+        // 推送下载进度到前端
+        let percent = if total > 0 {
+            (downloaded as f64 / total as f64) * 100.0
+        } else {
+            0.0
+        };
+        let _ = app.emit("update-download-progress", DownloadProgress {
+            downloaded,
+            total,
+            percent,
+        });
+    }
+
+    file.flush().map_err(|e| format!("刷新文件失败: {}", e))?;
+    drop(file);
 
     // 静默安装（NSIS 支持 /S 静默模式）
     #[cfg(target_os = "windows")]
@@ -2901,9 +2936,43 @@ async fn download_and_install_update(url: String, app: tauri::AppHandle) -> Resu
             .map_err(|e| format!("启动安装程序失败: {}", e))?;
     }
 
-    // 关闭当前应用
+    // 关闭当前应用，让安装程序接管
     app.exit(0);
     Ok(())
+}
+
+/// Supported audio file extensions for OS file association
+const MUSIC_EXTENSIONS: [&str; 10] = [
+    ".mp3", ".flac", ".wav", ".ogg", ".m4a", ".aac", ".wma", ".opus", ".ape", ".aiff",
+];
+
+/// Check if a command-line argument looks like a supported audio file path
+fn extract_music_file_arg(args: &[String]) -> Option<String> {
+    for arg in args {
+        // Skip flags like --protocol or -t
+        if arg.starts_with('-') {
+            continue;
+        }
+        let lower = arg.to_lowercase();
+        if MUSIC_EXTENSIONS.iter().any(|ext| lower.ends_with(ext)) {
+            // Basic sanity check: the path should exist as a file
+            let path = std::path::Path::new(arg);
+            if path.is_file() {
+                return Some(arg.clone());
+            }
+        }
+    }
+    None
+}
+
+/// State holding a file path passed at launch (before the frontend was ready to listen)
+struct PendingFile(Mutex<Option<String>>);
+
+/// Tauri command: frontend calls this on startup to retrieve a file that was
+/// passed as a command-line argument when the app was launched by the OS.
+#[tauri::command]
+fn take_pending_file(state: tauri::State<'_, PendingFile>) -> Option<String> {
+    state.0.lock().unwrap().take()
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -2912,15 +2981,27 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_window_state::Builder::default().build())
-        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
-            // 第二实例尝试启动时触发：把已有的主窗口显示并聚焦，而不是再开一个进程
+        .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
+            // 第二实例尝试启动时触发：把已有的主窗口显示并聚焦
             if let Some(window) = app.get_webview_window("main") {
                 let _ = window.show();
                 let _ = window.unminimize();
                 let _ = window.set_focus();
             }
+            // 检查是否通过文件关联打开（双击音频文件）
+            if let Some(file_path) = extract_music_file_arg(&args) {
+                let _ = app.emit("open-file", file_path);
+            }
         }))
+        .manage(PendingFile(Mutex::new(None)))
         .setup(|app| {
+            // 检查是否通过文件关联启动（首次启动时前端还未注册监听器）
+            let launch_args: Vec<String> = std::env::args().collect();
+            if let Some(file_path) = extract_music_file_arg(&launch_args) {
+                let state = app.state::<PendingFile>();
+                *state.0.lock().unwrap() = Some(file_path);
+            }
+
             if let Some(icon) = app.default_window_icon() {
                 let menu = build_tray_menu(app.handle())?;
 
@@ -3003,7 +3084,8 @@ pub fn run() {
             fetch_multi_platform_comments,
             update_tray_info,
             show_main_window,
-            download_and_install_update
+            download_and_install_update,
+            take_pending_file
         ])
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {

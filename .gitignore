@@ -15,6 +15,7 @@ dist-ssr
 # Generated desktop artifacts
 /src-tauri/target/
 /dist-exe/
+/dist-installer/
 /KiomPlayer.exe
 
 # Binary tools

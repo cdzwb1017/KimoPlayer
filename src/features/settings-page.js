@@ -4,7 +4,8 @@ import {
   getStoredInterfaceFont,
   INTERFACE_FONT_PRESETS,
 } from '../ui/interface-font.js';
-import { checkForUpdates, setBetaKey, getBetaStatus, BETA_KEY } from '../ui/update-checker.js';
+import { checkForUpdates, setBetaKey, getBetaStatus, BETA_KEY, APP_VERSION } from '../ui/update-checker.js';
+import { openUrl } from '@tauri-apps/plugin-opener';
 
 export const createSettingsPage = ({
   player,
@@ -12,6 +13,8 @@ export const createSettingsPage = ({
   applyMiniLyricsTranslationSetting,
   applyTheme,
   applyLyricsTheme,
+  applyUiStyle,
+  applyBackgroundStyle,
   getCurrentTheme,
   customConfirm,
   clearLyricsDB,
@@ -296,6 +299,9 @@ export const createSettingsPage = ({
     const themeCard = document.createElement('div');
     themeCard.className = 'settings-card';
     const themeVal = localStorage.getItem('kimo-theme') || 'light';
+    const uiStyleVal = localStorage.getItem('kimo-ui-style') || 'solid';
+    const bgStyleVal = localStorage.getItem('kimo-bg-style') || 'static';
+    const bgRotatePct = parseFloat(localStorage.getItem('kimo-bg-rotate-speed')) || 50;
     const isCustom = localStorage.getItem('kimo-overlay-opacity-custom') === 'true';
     const savedOpVal = isCustom ? localStorage.getItem('kimo-overlay-opacity') : null;
     const opacityNum = savedOpVal !== null ? Math.round(parseFloat(savedOpVal) * 100) : (themeVal === 'light' ? 72 : (themeVal === 'grey' ? 65 : 62));
@@ -327,6 +333,44 @@ export const createSettingsPage = ({
           <button class="setting-radio-btn ${themeVal === 'light' ? 'active' : ''}" data-val="light">浅色遮罩</button>
           <button class="setting-radio-btn ${themeVal === 'grey' ? 'active' : ''}" data-val="grey">雅致灰色</button>
           <button class="setting-radio-btn ${themeVal === 'dark' ? 'active' : ''}" data-val="dark">深色遮罩</button>
+        </div>
+      </div>
+
+      <div class="setting-row">
+        <div class="setting-info">
+          <div class="setting-label">UI 风格</div>
+          <div class="setting-desc">选择界面玻璃材质效果，从默认纯色到液态玻璃逐级增强视觉质感。默认效果性能最佳。</div>
+        </div>
+        <div class="setting-radio-group" id="settings-ui-style-group" data-active-idx="${uiStyleVal === 'solid' ? '0' : (uiStyleVal === 'acrylic' ? '1' : (uiStyleVal === 'gaussian' ? '2' : '3'))}">
+          <div class="setting-radio-active-bg"></div>
+          <button class="setting-radio-btn ${uiStyleVal === 'solid' ? 'active' : ''}" data-val="solid">默认效果</button>
+          <button class="setting-radio-btn ${uiStyleVal === 'acrylic' ? 'active' : ''}" data-val="acrylic">亚克力</button>
+          <button class="setting-radio-btn ${uiStyleVal === 'gaussian' ? 'active' : ''}" data-val="gaussian">高斯模糊</button>
+          <button class="setting-radio-btn ${uiStyleVal === 'liquid' ? 'active' : ''}" data-val="liquid">液态玻璃</button>
+        </div>
+      </div>
+
+      <div class="setting-row">
+        <div class="setting-info">
+          <div class="setting-label">背景样式</div>
+          <div class="setting-desc">选择播放器背景的展示方式。动态背景会将专辑封面扭曲后围绕窗口中心旋转，营造沉浸式视觉体验。</div>
+        </div>
+        <div class="setting-radio-group" id="settings-bg-style-group" data-active-idx="${bgStyleVal === 'none' ? '0' : (bgStyleVal === 'static' ? '1' : '2')}">
+          <div class="setting-radio-active-bg"></div>
+          <button class="setting-radio-btn ${bgStyleVal === 'none' ? 'active' : ''}" data-val="none">去除背景</button>
+          <button class="setting-radio-btn ${bgStyleVal === 'static' ? 'active' : ''}" data-val="static">静态背景</button>
+          <button class="setting-radio-btn ${bgStyleVal === 'dynamic' ? 'active' : ''}" data-val="dynamic">动态背景</button>
+        </div>
+      </div>
+
+      <div class="setting-row" id="settings-bg-rotate-speed-row" style="display: ${bgStyleVal === 'dynamic' ? 'flex' : 'none'};">
+        <div class="setting-info">
+          <div class="setting-label">动态背景旋转速率</div>
+          <div class="setting-desc">调整专辑封面背景的旋转速度，百分比越高旋转越快。拖动时暂停旋转，释放后生效。</div>
+        </div>
+        <div class="setting-slider-wrapper">
+          <input type="range" class="setting-slider" id="settings-slider-bg-rotate-speed" min="10" max="100" step="5" value="${bgRotatePct}">
+          <div class="setting-value-display" id="settings-bg-rotate-speed-val">${bgRotatePct}%</div>
         </div>
       </div>
 
@@ -475,6 +519,7 @@ export const createSettingsPage = ({
 
     const scanCard = document.createElement('div');
     scanCard.className = 'settings-card';
+    scanCard.id = 'settings-scan-card';
     
     let pathsHtml = '';
     if (scannedDirs.length === 0) {
@@ -524,9 +569,15 @@ export const createSettingsPage = ({
           <div class="about-logo" style="width: 48px; height: 48px; border-radius: 12px; background: linear-gradient(135deg, rgb(16, 185, 129), rgb(5, 150, 105)); display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);">
             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
           </div>
-          <div>
-            <div style="font-size: 18px; font-weight: 700; color: var(--text-primary); letter-spacing: 0.5px;">KimoPlayer</div>
-                                                <div style="font-size: 13px; color: var(--text-secondary); margin-top: 2px;">版本: 1.4.6-beta01</div>
+          <div style="flex:1;">
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span style="font-size: 18px; font-weight: 700; color: var(--text-primary); letter-spacing: 0.5px;">KimoPlayer</span>
+              <span style="font-size:10px;font-weight:600;padding:2px 7px;border-radius:10px;background:rgba(16,185,129,0.12);color:rgb(16,185,129);border:1px solid rgba(16,185,129,0.2);">开源</span>
+            </div>
+            <div style="font-size: 13px; color: var(--text-secondary); margin-top: 2px;">版本: ${APP_VERSION}</div>
+          </div>
+          <div id="settings-github-link" style="cursor:pointer;width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,0.05);border:1px solid var(--glass-border);transition:all 0.2s;" title="GitHub 仓库">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" style="color:var(--text-secondary);"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
           </div>
         </div>
         
@@ -558,6 +609,10 @@ export const createSettingsPage = ({
               </span>
             </div>
           </div>
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <span>开源仓库</span>
+            <span style="color: var(--text-secondary);cursor:pointer;" id="settings-github-text">github.com/kiomosu/KimoPlayer</span>
+          </div>
           <div style="display: flex; justify-content: space-between;">
             <span>版权所有</span>
             <span style="color: var(--text-secondary);">© 2026 KimoPlayer. 保留所有权。</span>
@@ -566,33 +621,25 @@ export const createSettingsPage = ({
 
         <div style="width: 100%; height: 1px; background: var(--glass-border); margin: 8px 0;"></div>
 
-        <div id="settings-changelog-btn" class="setting-row" style="cursor: pointer; margin: 0; padding: 10px 14px; border-radius: 10px; transition: background 0.2s;">
-          <div style="display: flex; align-items: center; gap: 10px;">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
-            <span style="font-size: 13px; color: var(--text-primary);">查看历史更新</span>
-          </div>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-tertiary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
-        </div>
-
-        <div style="width: 100%; height: 1px; background: var(--glass-border); margin: 8px 0;"></div>
-
-        <div id="settings-check-update-btn" class="setting-row" style="cursor: pointer; margin: 0; padding: 10px 14px; border-radius: 10px; transition: background 0.2s;">
-          <div style="display: flex; align-items: center; gap: 10px;">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-            <span style="font-size: 13px; color: var(--text-primary);">检查更新</span>
-          </div>
-          <div style="display: flex; align-items: center; gap: 8px;">
-            ${getBetaStatus() ? '<span style="font-size:11px;background:rgba(var(--dynamic-color,0,240,255),0.15);color:rgb(var(--dynamic-color,0,240,255));padding:2px 8px;border-radius:10px;">测试版</span>' : ''}
+        <div style="display:flex;flex-direction:column;gap:6px;width:100%;">
+          <div id="settings-changelog-btn" class="setting-row" style="cursor: pointer; margin: 0; padding: 10px 14px; border-radius: 10px; transition: background 0.2s;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+              <span style="font-size: 13px; color: var(--text-primary);">查看历史更新</span>
+            </div>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-tertiary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
           </div>
-        </div>
 
-        <div id="settings-beta-key-row" class="setting-row" style="margin: 0; padding: 10px 14px; border-radius: 10px;">
-          <div style="display: flex; align-items: center; gap: 10px;">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
-            <span style="font-size: 13px; color: var(--text-primary);">测试版密钥</span>
+          <div style="display:flex;gap:8px;padding:4px 14px 2px;">
+            <button id="settings-check-update-btn" style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:9px 12px;font-size:12px;font-weight:600;border:1px solid var(--glass-border);border-radius:10px;background:rgba(255,255,255,0.03);color:var(--text-primary);cursor:pointer;white-space:nowrap;transition:all 0.2s;">
+              <svg id="check-update-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              <span id="check-update-text">检查更新</span>
+            </button>
+            <button id="settings-beta-btn" style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:9px 12px;font-size:12px;font-weight:600;border:1px solid var(--glass-border);border-radius:10px;${getBetaStatus() ? 'background:rgba(16,185,129,0.1);border-color:rgba(16,185,129,0.3);color:rgb(16,185,129);' : 'background:rgba(255,255,255,0.03);color:var(--text-primary);'}cursor:pointer;white-space:nowrap;transition:all 0.2s;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
+              <span>${getBetaStatus() ? '已加入测试' : '加入测试'}</span>
+            </button>
           </div>
-          <input id="settings-beta-key" type="password" placeholder="${getBetaStatus() ? '已激活' : '输入密钥激活测试版'}" value="${getBetaStatus() ? BETA_KEY : ''}" style="width: 140px; padding: 6px 10px; font-size: 12px; border: 1px solid var(--glass-border); border-radius: 6px; background: rgba(255,255,255,0.03); color: var(--text-primary); outline: none;" ${getBetaStatus() ? 'disabled' : ''} />
         </div>
       </div>
     `;
@@ -600,6 +647,27 @@ export const createSettingsPage = ({
 
         // 历史更新公告数据
         const changelogData = [
+      {
+        version: '1.5.1',
+        date: '2026.07.29',
+        type: '功能与体验优化',
+        sections: [
+          { title: '系统文件关联', items: ['安装后可在操作系统中双击音频文件直接使用播放器打开播放，支持 mp3、flac、wav、ogg、m4a、aac、wma、opus、ape、aiff 共 10 种格式', '应用已运行时双击文件自动追加到播放列表并播放，应用未运行时启动后自动加载'] },
+          { title: '背景样式设置', items: ['新增三种背景模式：去除背景、静态背景、动态背景', '动态背景模式下专辑封面以模糊旋转效果展示，可在设置中调节旋转速率（10%~100%）', '拖动滑块时暂停旋转，释放后立即生效'] },
+          { title: 'UI 风格体系完善', items: ['新增四种 UI 风格：默认效果、亚克力、高斯模糊、液态玻璃，按视觉复杂度递增排列', '亚克力模式主内容区 60% 透明度 + 设置卡片 70% 透明度，呈现微妙层次感', '液态玻璃模式使用评论区同款材质参数，保留侧边栏与播放栏液态边框', '评论区窗口、右键菜单、Toast 提示全面适配四种 UI 风格', '深色主题下亚克力模式使用半透明黑色，浅色/灰色主题使用半透明白色'] },
+          { title: '歌词弹出框重新设计', items: ['歌词控制栏滑块弹出框改为现代玻璃胶囊风格，增大模糊半径与饱和度', '滑块轨道新增进度填充效果，已调节部分以动态主题色高亮显示', '弹出框跟随歌词页面主题设置（深色/浅色/跟随软件），与右键菜单机制统一', '增大滑块圆点尺寸，优化悬停与拖动时的缩放反馈'] },
+          { title: '滑块交互优化', items: ['所有设置页滑块与歌词弹出框滑块统一支持鼠标滚轮调整', '修复弹出框字号上限（36→48px）与抬起幅度上限（15→40px）未跟随设置页同步的问题', '动态背景旋转速率滑块滚轮调整后立即生效并恢复旋转'] },
+          { title: '应用内更新功能', items: ['新增应用内更新检查器，自动从 GitHub Releases 获取最新版本', '支持优先选择 NSIS 安装包而非便携版', '测试版用户可输入密钥访问预发布版本', '更新下载进度实时显示，下载完成后一键安装'] },
+        ],
+      },
+      {
+        version: '1.5.0',
+        date: '2026.07.28',
+        type: '开源版本',
+        sections: [
+          { title: '开源发布', items: ['KiomPlayer 正式开源，源代码托管于 GitHub', '基于 Tauri + Rust + Vite 技术栈构建'] },
+        ],
+      },
       {
         version: '1.4.6-beta01',
         date: '2026.07.26',
@@ -767,45 +835,128 @@ export const createSettingsPage = ({
     // 绑定点击事件
     aboutCard.querySelector('#settings-changelog-btn').addEventListener('click', showChangelogModal);
 
-    // 检查更新
+    // GitHub 仓库链接
+    const openGithub = () => {
+      openUrl('https://github.com/kiomosu/KimoPlayer').catch(() => {
+        window.open('https://github.com/kiomosu/KimoPlayer', '_blank');
+      });
+    };
+    aboutCard.querySelector('#settings-github-link')?.addEventListener('click', openGithub);
+    aboutCard.querySelector('#settings-github-text')?.addEventListener('click', openGithub);
+
+    // 测试版密钥弹窗
+    const showBetaKeyModal = (card) => {
+      // 移除已有弹窗
+      const existing = document.getElementById('kimo-beta-key-modal');
+      if (existing) existing.remove();
+
+      const overlay = document.createElement('div');
+      overlay.id = 'kimo-beta-key-modal';
+      overlay.className = 'kimo-modal-overlay';
+      overlay.innerHTML = `
+        <div class="kimo-modal-card" style="max-width:360px;width:90%;padding:0;text-align:left;overflow:hidden;">
+          <div style="padding:22px 24px 16px;border-bottom:1px solid rgba(255,255,255,0.08);">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="rgb(16,185,129)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
+              <span style="font-size:16px;font-weight:700;color:var(--text-primary);">加入测试版</span>
+            </div>
+            <div style="font-size:12px;color:var(--text-secondary);line-height:1.5;">输入测试版密钥以解锁预览版本更新通道</div>
+          </div>
+          <div style="padding:20px 24px;">
+            <input id="beta-key-input" type="password" placeholder="请输入密钥" autofocus style="width:100%;box-sizing:border-box;padding:10px 14px;font-size:13px;border:1px solid var(--glass-border);border-radius:8px;background:rgba(255,255,255,0.03);color:var(--text-primary);outline:none;transition:border-color 0.2s;" onfocus="this.style.borderColor='rgb(16,185,129)'" onblur="this.style.borderColor='var(--glass-border)'" />
+            <div id="beta-key-error" style="display:none;margin-top:8px;font-size:11px;color:#f87171;">密钥无效，请重新输入</div>
+          </div>
+          <div style="padding:0 24px 20px;display:flex;gap:10px;">
+            <button id="beta-key-cancel" style="flex:1;padding:10px;font-size:13px;font-weight:600;border:1px solid var(--glass-border);border-radius:8px;background:transparent;color:var(--text-secondary);cursor:pointer;">取消</button>
+            <button id="beta-key-confirm" style="flex:1;padding:10px;font-size:13px;font-weight:600;border:none;border-radius:8px;background:rgb(16,185,129);color:#fff;cursor:pointer;">激活</button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(overlay);
+
+      const input = overlay.querySelector('#beta-key-input');
+      const errTip = overlay.querySelector('#beta-key-error');
+      const close = () => overlay.remove();
+
+      const confirm = () => {
+        const key = input.value.trim();
+        if (setBetaKey(key)) {
+          // 更新按钮状态为"已加入测试"
+          const betaBtn = card.querySelector('#settings-beta-btn');
+          if (betaBtn) {
+            betaBtn.style.background = 'rgba(16,185,129,0.1)';
+            betaBtn.style.borderColor = 'rgba(16,185,129,0.3)';
+            betaBtn.style.color = 'rgb(16,185,129)';
+            const label = betaBtn.querySelector('span');
+            if (label) label.textContent = '已加入测试';
+          }
+          showToast('已激活测试版更新通道');
+          close();
+        } else {
+          errTip.style.display = 'block';
+          input.value = '';
+          input.focus();
+        }
+      };
+
+      overlay.querySelector('#beta-key-cancel').addEventListener('click', close);
+      overlay.querySelector('#beta-key-confirm').addEventListener('click', confirm);
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') confirm();
+        if (e.key === 'Escape') close();
+      });
+      overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) close();
+      });
+      // 隐藏错误提示当用户重新输入
+      input.addEventListener('input', () => { errTip.style.display = 'none'; });
+      setTimeout(() => input.focus(), 50);
+    };
+
+    // 检查更新 — 按钮带加载动画
     aboutCard.querySelector('#settings-check-update-btn')?.addEventListener('click', async () => {
       const btn = aboutCard.querySelector('#settings-check-update-btn');
-      const label = btn.querySelector('span');
-      const origText = label.textContent;
-      label.textContent = '检查中...';
-      const result = await checkForUpdates(false);
-      if (result) {
-        label.textContent = origText;
-        // update-checker 内部会弹窗
-      } else {
-        label.textContent = '已是最新版本';
-        setTimeout(() => { label.textContent = origText; }, 2000);
+      const textEl = aboutCard.querySelector('#check-update-text');
+      const iconEl = aboutCard.querySelector('#check-update-icon');
+      const origText = textEl.textContent;
+
+      // 切换到加载状态
+      btn.disabled = true;
+      btn.style.opacity = '0.6';
+      textEl.textContent = '检查中...';
+      iconEl.outerHTML = '<svg id="check-update-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" style="animation:kimo-btn-spin 0.8s linear infinite;"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2.5" stroke-dasharray="40 20" stroke-linecap="round"/></svg>';
+
+      try {
+        const result = await checkForUpdates(true);
+        if (result) {
+          // 找到更新，弹窗已由 checkForUpdates 内部弹出
+          resetBtn();
+        } else {
+          textEl.textContent = '已是最新';
+          setTimeout(resetBtn, 2000);
+        }
+      } catch (err) {
+        textEl.textContent = '检查失败';
+        setTimeout(resetBtn, 2000);
+        showToast('检查更新失败，请检查网络连接');
+      }
+
+      function resetBtn() {
+        btn.disabled = false;
+        btn.style.opacity = '1';
+        textEl.textContent = origText;
+        const cur = aboutCard.querySelector('#check-update-icon');
+        if (cur) cur.outerHTML = '<svg id="check-update-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>';
       }
     });
 
-    // 测试版密钥
-    aboutCard.querySelector('#settings-beta-key')?.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') {
-        const input = e.target;
-        const key = input.value.trim();
-        if (setBetaKey(key)) {
-          input.disabled = true;
-          input.value = '';
-          input.placeholder = '已激活';
-          // 更新测试版标签
-          const badge = aboutCard.querySelector('#settings-check-update-btn span:last-child');
-          if (badge && !badge.querySelector('span')) {
-            const tag = document.createElement('span');
-            tag.style.cssText = 'font-size:11px;background:rgba(var(--dynamic-color,0,240,255),0.15);color:rgb(var(--dynamic-color,0,240,255));padding:2px 8px;border-radius:10px;';
-            tag.textContent = '测试版';
-            badge.prepend(tag);
-          }
-          showToast('已激活测试版更新通道');
-        } else {
-          showToast('密钥无效');
-          input.value = '';
-        }
+    // 加入测试 — 弹窗输入密钥
+    aboutCard.querySelector('#settings-beta-btn')?.addEventListener('click', () => {
+      if (getBetaStatus()) {
+        showToast('已激活测试版更新通道');
+        return;
       }
+      showBetaKeyModal(aboutCard);
     });
 
     listEl.appendChild(container);
@@ -872,6 +1023,26 @@ export const createSettingsPage = ({
 
     desktopLyricCard.querySelector('#settings-desktop-lyrics-size')?.addEventListener('input', syncDesktopLyricsStyle);
     desktopLyricCard.querySelector('#settings-desktop-lyrics-opacity')?.addEventListener('input', syncDesktopLyricsStyle);
+
+    // 桌面歌词字号滑块滚轮支持
+    desktopLyricCard.querySelector('#settings-desktop-lyrics-size')?.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      const slider = e.target;
+      const delta = e.deltaY < 0 ? 1 : -1;
+      const nextVal = Math.max(12, Math.min(56, parseInt(slider.value) + delta));
+      slider.value = nextVal;
+      syncDesktopLyricsStyle();
+    }, { passive: false });
+
+    // 桌面歌词透明度滑块滚轮支持
+    desktopLyricCard.querySelector('#settings-desktop-lyrics-opacity')?.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      const slider = e.target;
+      const delta = e.deltaY < 0 ? 0.05 : -0.05;
+      const nextVal = Math.max(0.25, Math.min(1, parseFloat(slider.value) + delta));
+      slider.value = nextVal;
+      syncDesktopLyricsStyle();
+    }, { passive: false });
     desktopLyricCard.querySelector('#settings-desktop-lyrics-word-by-word')?.addEventListener('change', (e) => {
       syncDesktopLyricsStyle();
       showToast(`桌面歌词逐字动画: ${e.target.checked ? '开启' : '关闭'}`);
@@ -947,6 +1118,75 @@ export const createSettingsPage = ({
         showToast(`歌词页面主题已切换至: ${val === 'follow' ? '自动' : (val === 'light' ? '浅色' : '深色')}`);
       });
     });
+
+    // UI 风格分段钮组事件监听
+    themeCard.querySelectorAll('#settings-ui-style-group .setting-radio-btn').forEach((btn, idx) => {
+      btn.addEventListener('click', () => {
+        themeCard.querySelectorAll('#settings-ui-style-group .setting-radio-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        themeCard.querySelector('#settings-ui-style-group').setAttribute('data-active-idx', idx.toString());
+        const val = btn.getAttribute('data-val');
+        localStorage.setItem('kimo-ui-style', val);
+        applyUiStyle(val);
+        const styleNames = { acrylic: '亚克力', gaussian: '高斯模糊', liquid: '液态玻璃', solid: '默认效果' };
+        showToast(`UI 风格已切换至: ${styleNames[val] || val}`);
+      });
+    });
+
+    // 背景样式分段钮组事件监听
+    themeCard.querySelectorAll('#settings-bg-style-group .setting-radio-btn').forEach((btn, idx) => {
+      btn.addEventListener('click', () => {
+        themeCard.querySelectorAll('#settings-bg-style-group .setting-radio-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        themeCard.querySelector('#settings-bg-style-group').setAttribute('data-active-idx', idx.toString());
+        const val = btn.getAttribute('data-val');
+        localStorage.setItem('kimo-bg-style', val);
+        applyBackgroundStyle(val);
+        // 显示/隐藏旋转速率滑块
+        const speedRow = themeCard.querySelector('#settings-bg-rotate-speed-row');
+        if (speedRow) speedRow.style.display = val === 'dynamic' ? 'flex' : 'none';
+        const bgNames = { none: '去除背景', static: '静态背景', dynamic: '动态背景' };
+        showToast(`背景样式已切换至: ${bgNames[val] || val}`);
+      });
+    });
+
+    // 动态背景旋转速率滑块
+    const bgRotateSpeedSlider = themeCard.querySelector('#settings-slider-bg-rotate-speed');
+    if (bgRotateSpeedSlider) {
+      // 拖动时：暂停旋转，仅更新百分比显示
+      bgRotateSpeedSlider.addEventListener('input', (e) => {
+        const val = parseInt(e.target.value, 10);
+        const display = themeCard.querySelector('#settings-bg-rotate-speed-val');
+        if (display) display.textContent = `${val}%`;
+        // 暂停旋转动画
+        document.documentElement.style.setProperty('--bg-rotate-play-state', 'paused');
+      });
+      // 释放后：保存设置，恢复旋转并应用新速率
+      bgRotateSpeedSlider.addEventListener('change', (e) => {
+        const val = parseInt(e.target.value, 10);
+        localStorage.setItem('kimo-bg-rotate-speed', String(val));
+        // 百分比转持续时长：100% → 10s, 50% → 20s, 10% → 100s
+        const duration = Math.round(1000 / val);
+        document.documentElement.style.setProperty('--bg-rotate-duration', `${duration}s`);
+        // 恢复旋转动画
+        document.documentElement.style.setProperty('--bg-rotate-play-state', 'running');
+      });
+
+      // 滚轮支持
+      bgRotateSpeedSlider.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        const delta = e.deltaY < 0 ? 5 : -5;
+        const nextVal = Math.max(10, Math.min(100, parseInt(bgRotateSpeedSlider.value) + delta));
+        bgRotateSpeedSlider.value = nextVal;
+        const display = themeCard.querySelector('#settings-bg-rotate-speed-val');
+        if (display) display.textContent = `${nextVal}%`;
+        // 立即应用并恢复旋转
+        localStorage.setItem('kimo-bg-rotate-speed', String(nextVal));
+        const duration = Math.round(1000 / nextVal);
+        document.documentElement.style.setProperty('--bg-rotate-duration', `${duration}s`);
+        document.documentElement.style.setProperty('--bg-rotate-play-state', 'running');
+      }, { passive: false });
+    }
 
     const interfaceFontSelect = themeCard.querySelector('#settings-interface-font');
     const customFontButton = themeCard.querySelector('#settings-custom-font-btn');
