@@ -52,6 +52,70 @@ function isNewer(latest, current) {
 }
 
 /**
+ * 轻量 Markdown → HTML 渲染器（专为更新公告设计）
+ * 支持: ## 标题, - 列表, **粗体**, --- 分割线, 段落
+ */
+function renderMarkdown(md) {
+  const lines = md.split('\n');
+  let html = '';
+  let inList = false;
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+
+    // 空行
+    if (!trimmed) {
+      if (inList) { html += '</ul>'; inList = false; }
+      continue;
+    }
+
+    // 分割线
+    if (/^-{3,}$/.test(trimmed)) {
+      if (inList) { html += '</ul>'; inList = false; }
+      html += '<hr style="border:none;border-top:1px solid rgba(128,128,128,0.15);margin:10px 0;">';
+      continue;
+    }
+
+    // 标题 ## / ###
+    const hMatch = trimmed.match(/^#{2,3}\s+(.+)/);
+    if (hMatch) {
+      if (inList) { html += '</ul>'; inList = false; }
+      html += `<div style="font-size:13px;font-weight:600;color:var(--text-primary);margin:12px 0 4px;">${hMatch[1]}</div>`;
+      continue;
+    }
+
+    // 一级标题 #
+    const h1Match = trimmed.match(/^#\s+(.+)/);
+    if (h1Match) {
+      if (inList) { html += '</ul>'; inList = false; }
+      html += `<div style="font-size:14px;font-weight:700;color:var(--text-primary);margin:12px 0 4px;">${h1Match[1]}</div>`;
+      continue;
+    }
+
+    // 列表项 - / *
+    const liMatch = trimmed.match(/^[-*]\s+(.+)/);
+    if (liMatch) {
+      if (!inList) { html += '<ul style="margin:0;padding-left:16px;">'; inList = true; }
+      html += `<li style="margin-bottom:3px;">${liMatch[1]}</li>`;
+      continue;
+    }
+
+    // 普通段落
+    if (inList) { html += '</ul>'; inList = false; }
+    html += `<div style="margin-bottom:4px;">${trimmed}</div>`;
+  }
+
+  if (inList) html += '</ul>';
+
+  // 粗体 **text**
+  html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+  // 行内代码 `code`
+  html = html.replace(/`(.+?)`/g, '<code style="background:rgba(128,128,128,0.12);padding:1px 4px;border-radius:3px;font-size:11px;">$1</code>');
+
+  return html;
+}
+
+/**
  * 从 release assets 中选择最佳安装包：
  * 1. 优先 NSIS 正规安装版（-setup.exe / -installer.exe）
  * 2. 其次任何非便携标记的 .exe（排除 -safe / -ultra）
@@ -148,7 +212,7 @@ function showUpdateNotification(info) {
         </div>
         <div style="font-size:13px;color:var(--text-secondary);">v${info.version} · ${new Date(info.publishedAt).toLocaleDateString('zh-CN')}</div>
       </div>
-      ${info.body ? `<div style="padding:16px 24px;font-size:12px;color:var(--text-secondary);line-height:1.6;max-height:200px;overflow-y:auto;white-space:pre-wrap;">${info.body.slice(0, 500)}</div>` : ''}
+      ${info.body ? `<div style="padding:16px 24px;font-size:12px;color:var(--text-secondary);line-height:1.6;max-height:240px;overflow-y:auto;">${renderMarkdown(info.body.slice(0, 800))}</div>` : ''}
       <div id="update-actions" style="padding:14px 24px 20px;display:flex;gap:10px;">
         <button id="update-ok-btn" style="flex:1;padding:10px;font-size:14px;font-weight:600;border:none;border-radius:8px;background:rgb(var(--dynamic-color,16,185,129));color:#fff;cursor:pointer;">下载并安装</button>
         <button id="update-later-btn" style="flex:1;padding:10px;font-size:14px;font-weight:600;border:1px solid var(--glass-border);border-radius:8px;background:transparent;color:var(--text-secondary);cursor:pointer;">稍后再说</button>

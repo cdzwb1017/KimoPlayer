@@ -1,4 +1,5 @@
 import { getCoverSrc } from '../utils/cover.js';
+import { getColorExtractionSettings, readjustColor } from '../utils/color.js';
 
 let activeBackgroundLayer = 'a';
 let getPlayer = () => null;
@@ -10,6 +11,52 @@ document.documentElement.style.setProperty('--dynamic-color-b', '40, 40, 60');
 
 export function configureThemePlayer(playerGetter) {
   getPlayer = typeof playerGetter === 'function' ? playerGetter : () => null;
+}
+
+/**
+ * 获取当前取色设置（供外部调用方在 extractDominantColor 时传入 options）
+ */
+export function getColorOptions() {
+  const settings = getColorExtractionSettings();
+  if (!settings.enabled) {
+    // 取色关闭：使用默认颜色逻辑
+    return null;
+  }
+  return {
+    mode: settings.mode,
+    intensity: settings.intensity,
+    theme: currentTheme === 'light' ? 'light' : 'dark',
+  };
+}
+
+/**
+ * 对当前缓存的动态颜色重新应用取色模式调整
+ * 用于设置页调整滑块/开关时实时预览，无需重新提取封面
+ */
+export function reapplyCurrentColor() {
+  const settings = getColorExtractionSettings();
+  // 优先使用原始提取颜色（未经过亮度调整），避免反复调整导致亮度叠加
+  const rawColorStr = localStorage.getItem('kimo-last-raw-color');
+  const cachedColorStr = localStorage.getItem('kimo-last-dynamic-color');
+  const sourceColorStr = rawColorStr || cachedColorStr;
+  if (!sourceColorStr) return;
+
+  const [r, g, b] = sourceColorStr.split(',').map(Number);
+  if (isNaN(r) || isNaN(g) || isNaN(b)) return;
+
+  if (!settings.enabled) {
+    // 取色关闭：使用默认颜色
+    const def = getDefaultDynamicColor();
+    applyDynamicColor(def.r, def.g, def.b, localStorage.getItem('kimo-last-cover-src'));
+    return;
+  }
+
+  const adjusted = readjustColor(r, g, b, {
+    mode: settings.mode,
+    intensity: settings.intensity,
+    theme: currentTheme === 'light' ? 'light' : 'dark',
+  });
+  applyDynamicColor(adjusted.r, adjusted.g, adjusted.b, localStorage.getItem('kimo-last-cover-src'));
 }
 
 export function applyDynamicColor(r, g, b, coverSrc) {

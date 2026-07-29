@@ -128,6 +128,8 @@ import {
   currentTheme,
   cycleTheme,
   getDefaultDynamicColor,
+  getColorOptions,
+  reapplyCurrentColor,
 } from './ui/theme.js';
 
 // ══ Early Shell Window Controls (Rust-Command Driven) ══
@@ -1162,7 +1164,11 @@ class LyricsController {
 
   show() {
     const panel = document.getElementById('lyrics-panel');
-    if (panel) panel.classList.add('active');
+    if (panel) {
+      // 清除内联 transform，让 CSS .active 类的 transform: translateY(0) 生效
+      panel.style.transform = '';
+      panel.classList.add('active');
+    }
     this.isVisible = true;
 
     // Lazily load the heavy large cover art only when the panel is shown
@@ -1188,7 +1194,11 @@ class LyricsController {
 
   hide() {
     const panel = document.getElementById('lyrics-panel');
-    if (panel) panel.classList.remove('active');
+    if (panel) {
+      panel.classList.remove('active');
+      // 恢复内联 transform 确保面板隐藏（防止 CSS 缓存残留）
+      panel.style.transform = 'translateY(100%)';
+    }
     this.isVisible = false;
   }
 
@@ -1235,7 +1245,7 @@ document.addEventListener('DOMContentLoaded', () => {
       splash.classList.add('fade-out');
       setTimeout(() => splash.remove(), 500);
     }
-  }, 100);
+  }, 600);
 
   // Restore default lyric lift amplitude to 4.0 on version 1.2.2 launch (word lift animation)
   if (localStorage.getItem('kimo-lyrics-lift-amplitude-migrated-122') !== 'true') {
@@ -1461,7 +1471,7 @@ document.addEventListener('DOMContentLoaded', () => {
               // Update the active player UI covers if this song happens to be the active one
               if (index === player.currentIndex) {
                 player.updateUI(song);
-                extractDominantColor(getCoverSrc(song.cover_image)).then(color => {
+                extractDominantColor(getCoverSrc(song.cover_image), getColorOptions()).then(color => {
                   song.dominant_color = color;
                   if (index === player.currentIndex) {
                     applyDynamicColor(color.r, color.g, color.b, getCoverSrc(song.cover_image));
@@ -1551,6 +1561,7 @@ document.addEventListener('DOMContentLoaded', () => {
       extractDominantColor,
       applyDynamicColor,
       getDefaultDynamicColor,
+      getColorOptions,
     });
   }
 
@@ -1659,6 +1670,7 @@ document.addEventListener('DOMContentLoaded', () => {
     backgroundLoadCovers,
     desktopLyrics,
     switchTab: tabName => switchTab(tabName),
+    reapplyCurrentColor,
   });
 
   const renderRecentPlaysTab = createRecentPlaysRenderer({
@@ -1921,7 +1933,7 @@ document.addEventListener('DOMContentLoaded', () => {
           const [r, g, b] = cachedColorStr.split(',').map(Number);
           applyDynamicColor(r, g, b, cachedCoverSrc);
         } else {
-          extractDominantColor(getCoverSrc(song.cover_image)).then(color => {
+          extractDominantColor(getCoverSrc(song.cover_image), getColorOptions()).then(color => {
             song.dominant_color = color;
             if (player.currentIndex === index) {
               applyDynamicColor(color.r, color.g, color.b, getCoverSrc(song.cover_image));
@@ -2241,7 +2253,7 @@ document.addEventListener('DOMContentLoaded', () => {
           }
 
           if (updatedSong.cover_image) {
-            extractDominantColor(getCoverSrc(updatedSong.cover_image)).then(color => {
+            extractDominantColor(getCoverSrc(updatedSong.cover_image), getColorOptions()).then(color => {
               updatedSong.dominant_color = color;
               if (player.currentIndex === songIdx) {
                 applyDynamicColor(color.r, color.g, color.b, getCoverSrc(updatedSong.cover_image));

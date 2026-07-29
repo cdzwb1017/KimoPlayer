@@ -1,6 +1,10 @@
-# KiomPlayer
+<p align="center">
+  <img src="public/logo.png" width="128" alt="KimoPlayer" />
+</p>
 
-基于 Tauri 2 的 Windows 本地音乐播放器。前端使用原生 HTML/CSS/JS，后端由 Rust 提供文件扫描、音频元数据、歌词匹配和系统集成功能。
+<h1 align="center">KimoPlayer</h1>
+
+<p align="center">基于 Tauri 2 的 Windows 本地音乐播放器。前端使用原生 HTML/CSS/JS，后端由 Rust 提供文件扫描、音频元数据、歌词匹配和系统集成功能。</p>
 
 ## 功能特性
 

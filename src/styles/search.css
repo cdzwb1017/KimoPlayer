@@ -1,0 +1,278 @@
+/* ── Premium Search System ── */
+.search-container {
+  padding: 10px 0 24px 0;
+  display: flex;
+  justify-content: center;
+  position: relative;
+  background: transparent;
+}
+
+.search-box {
+  width: 100%;
+  max-width: 800px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 28px;
+  padding: 0 18px;
+  height: 48px;
+  box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.25), 0 8px 24px rgba(0, 0, 0, 0.12);
+  backdrop-filter: blur(12px) saturate(140%);
+  -webkit-backdrop-filter: blur(12px) saturate(140%);
+  transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.app-container.theme-light .search-box {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(0, 0, 0, 0.05);
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.45), 0 8px 24px rgba(0, 0, 0, 0.03);
+}
+
+.search-box:focus-within {
+  border-color: rgba(var(--dynamic-color, 0, 240, 255), 0.4);
+  background: rgba(255, 255, 255, 0.08);
+  box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.35), 0 10px 25px rgba(var(--dynamic-color, 0, 240, 255), 0.22);
+  transform: translateY(-1px);
+}
+
+.app-container.theme-light .search-box:focus-within {
+  background: rgba(255, 255, 255, 0.4);
+  border-color: rgba(var(--dynamic-color, 0, 136, 204), 0.25);
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.75), 0 10px 25px rgba(var(--dynamic-color, 0, 136, 204), 0.1);
+}
+
+.search-box-icon {
+  color: var(--text-secondary);
+  margin-right: 12px;
+  flex-shrink: 0;
+  transition: color 0.3s;
+}
+
+.search-box:focus-within .search-box-icon {
+  color: rgb(var(--dynamic-color, 0, 240, 255));
+}
+
+.app-container.theme-light .search-box:focus-within .search-box-icon {
+  color: rgb(var(--dynamic-color, 0, 136, 204));
+}
+
+.search-box input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  font-family: inherit;
+  font-size: 14.5px;
+  font-weight: 500;
+  color: var(--text-primary);
+  width: 100%;
+}
+
+.search-box input::placeholder {
+  color: var(--text-secondary);
+  opacity: 0.65;
+}
+
+.search-clear-btn {
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  border-radius: 50%;
+  transition: all 0.2s;
+  opacity: 0.7;
+}
+
+.search-clear-btn:hover {
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-primary);
+}
+
+.app-container.theme-light .search-clear-btn:hover {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.search-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 80px 20px;
+  color: var(--text-secondary);
+  gap: 16px;
+  text-align: center;
+  animation: fadeInUp 0.45s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.search-empty-state svg {
+  opacity: 0.4;
+  color: var(--text-secondary);
+}
+
+.search-results {
+  width: 100%;
+}
+
+/* ── Left Group: Info + Controls + Progress ── */
+.player-left-group {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  width: 380px;
+  flex-shrink: 0;
+}
+
+.player-controls-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+}
+
+/* ── Center: Simple Lyrics Display ── */
+.player-center-lyrics {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 0 24px;
+  overflow: hidden;
+  min-width: 0;
+  cursor: pointer;
+  user-select: none;
+}
+
+.bar-lyric-line {
+  width: 100%;
+  text-align: center;
+  white-space: normal;
+  overflow: visible;
+  height: auto;
+  min-height: 20px;
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+.bar-lyric-active {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text-primary);
+  transition: opacity 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes mini-lyric-enter {
+  from {
+    opacity: 0.3;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.bar-lyric-active.mini-lyric-enter {
+  animation: mini-lyric-enter 220ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bar-lyric-active.mini-lyric-enter {
+    animation-duration: 1ms;
+  }
+}
+
+/* 🌟 迷你歌词专用逐字高光与唱词渐变：彻底解决单字切割断层与脏色问题 🌟 */
+.bar-lyric-line .lyrics-word {
+  display: inline-block;
+  position: relative;
+  transition: color 0.15s ease, opacity 0.15s ease;
+}
+
+.bar-lyric-line .lyrics-word.word-singing {
+  background-size: 100% 100% !important;
+  background-position: 0px 0px !important;
+  background-image: linear-gradient(
+    to right,
+    var(--filled-color, rgb(var(--dynamic-color, 244, 114, 182))) var(--char-fill, 0%),
+    var(--unfilled-color, rgba(255, 255, 255, 0.45)) var(--char-fill, 0%)
+  ) !important;
+  -webkit-background-clip: text !important;
+  background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  clip-path: inset(0) !important;
+  -webkit-clip-path: inset(0) !important;
+}
+
+.bar-lyric-line .lyrics-word.word-active {
+  background-image: none !important;
+  -webkit-text-fill-color: var(--filled-color, rgb(var(--dynamic-color, 244, 114, 182))) !important;
+  color: var(--filled-color, rgb(var(--dynamic-color, 244, 114, 182))) !important;
+}
+
+.bar-lyric-next {
+  display: none !important;
+}
+
+.song-item.is-selected {
+  background: rgba(var(--dynamic-color, 16, 185, 129), 0.16) !important;
+  box-shadow: inset 3px 0 0 rgb(var(--dynamic-color, 16, 185, 129));
+}
+
+.local-selection-bar {
+  position: sticky;
+  top: 8px;
+  z-index: 5;
+  display: none;
+  align-items: center;
+  gap: 8px;
+  margin: 10px 0;
+  padding: 9px 11px;
+  border: 1px solid rgba(var(--dynamic-color, 16, 185, 129), 0.35);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--glass-bg) 88%, transparent);
+  backdrop-filter: blur(14px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
+.local-selection-bar.is-visible { display: flex; }
+.local-selection-bar span { flex: 1; color: var(--text-primary); font-size: 13px; font-weight: 600; }
+.local-selection-bar button { border: 0; border-radius: 8px; padding: 6px 10px; cursor: pointer; color: var(--text-primary); background: var(--surface-hover); }
+.local-selection-bar #local-selection-add { color: #fff; background: rgb(var(--dynamic-color, 16, 185, 129)); }
+
+/* 添加到歌单弹层：全部从当前主题变量取色，避免浅色主题出现深色默认背景。 */
+.playlist-picker-overlay {
+  background: rgba(0, 0, 0, 0.28) !important;
+  backdrop-filter: none;
+}
+
+.playlist-picker-menu {
+  color: var(--text-primary);
+  backdrop-filter: blur(18px);
+}
+
+.playlist-picker-item:hover {
+  background: var(--surface-hover);
+}
+
+.app-container.theme-light .playlist-picker-overlay,
+body.theme-light .playlist-picker-overlay,
+.app-container.theme-grey .playlist-picker-overlay,
+body.theme-grey .playlist-picker-overlay {
+  background: rgba(20, 24, 30, 0.16) !important;
+}
+
+.player-center-lyrics:hover .bar-lyric-next {
+  display: none !important;
+}

@@ -1,0 +1,904 @@
+/* ── Discover/Home Tab Aesthetics ── */
+.discover-section {
+  margin-bottom: 30px;
+}
+
+.section-title {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  letter-spacing: 0.5px;
+}
+
+.view-all-btn {
+  font-size: 12px;
+  font-weight: 600;
+  color: rgb(var(--dynamic-color, 0, 240, 255));
+  cursor: pointer;
+  opacity: 0.8;
+  transition: var(--transition-smooth);
+}
+
+.view-all-btn:hover {
+  opacity: 1;
+  text-shadow: 0 0 8px rgba(var(--dynamic-color, 0, 240, 255), 0.4);
+}
+
+.recommendations-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+}
+
+.recommend-card {
+  display: flex;
+  align-items: center;
+  padding: 14px;
+  border-radius: 16px;
+  background: transparent;
+  border: 1px solid transparent;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1),
+              background 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.recommend-card:hover {
+  background: var(--card-hover);
+  border-color: var(--card-border-hover);
+  transform: translateY(-3px);
+}
+
+.recommend-cover {
+  width: 54px;
+  height: 54px;
+  border-radius: 12px;
+  object-fit: cover;
+  margin-right: 14px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  transition: var(--transition-smooth);
+}
+
+.recommend-card:hover .recommend-cover {
+  transform: scale(1.05);
+}
+
+.recommend-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.recommend-title {
+  font-size: 14.5px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.recommend-artist {
+  font-size: 11.5px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.recommend-play-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: rgb(var(--dynamic-color, 0, 240, 255));
+  border: none;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transform: scale(0.8);
+  transition: var(--transition-smooth);
+  box-shadow: 0 4px 10px rgba(var(--dynamic-color, 0, 240, 255), 0.3);
+}
+
+.recommend-card:hover .recommend-play-btn {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.empty-recommend {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 30px;
+  background: var(--card-bg);
+  border: 1px dashed var(--card-border);
+  border-radius: 16px;
+  color: var(--text-secondary);
+  gap: 12px;
+  text-align: center;
+}
+
+.empty-recommend span {
+  font-size: 13px;
+}
+
+/* Discover Split Layout */
+.discover-row {
+  display: flex;
+  gap: 24px;
+  margin-top: 10px;
+}
+
+.discover-col {
+  flex: 1;
+  min-width: 0;
+}
+
+.recents-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.recent-item {
+  display: flex;
+  align-items: center;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: transparent;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: var(--transition-smooth);
+}
+
+.recent-item:hover {
+  background: var(--card-hover);
+  border-color: var(--card-border-hover);
+  transform: translateX(4px);
+}
+
+.recent-cover {
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  object-fit: cover;
+  margin-right: 12px;
+}
+
+.recent-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.recent-title {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.recent-artist {
+  font-size: 11px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.recent-play-icon {
+  color: var(--text-secondary);
+  opacity: 0;
+  transition: var(--transition-smooth);
+}
+
+.recent-item:hover .recent-play-icon {
+  opacity: 0.8;
+  color: rgb(var(--dynamic-color, 0, 240, 255));
+}
+
+.empty-recents {
+  padding: 24px;
+  background: transparent;
+  border: 1px dashed var(--card-border);
+  border-radius: 12px;
+  color: var(--text-secondary);
+  text-align: center;
+  font-size: 12px;
+}
+
+/* Scene Grid */
+.scene-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.scene-card {
+  height: 84px;
+  border-radius: 14px;
+  position: relative;
+  overflow: hidden;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  cursor: pointer;
+  transition: var(--transition-smooth);
+  border: 1px solid rgba(255,255,255,0.08);
+}
+
+.scene-card:hover {
+  transform: scale(1.02);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.18);
+  border-color: rgba(255,255,255,0.15);
+}
+
+.scene-overlay-bg {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to top, rgba(0,0,0,0.45) 0%, rgba(0,0,0,0.05) 100%);
+  z-index: 1;
+}
+
+.scene-tag {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.7);
+  letter-spacing: 0.8px;
+  z-index: 2;
+  background: rgba(255, 255, 255, 0.1);
+  padding: 2px 6px;
+  border-radius: 4px;
+  backdrop-filter: blur(4px);
+}
+
+.scene-name {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #fff;
+  z-index: 2;
+  letter-spacing: 0.5px;
+}
+
+/* Scene background presets */
+/* 柔和渐变 — 与播放器主色协调 */
+.scene-1 { background-image: linear-gradient(135deg, rgba(var(--dynamic-color, 16,185,129), 0.35) 0%, rgba(var(--dynamic-color, 16,185,129), 0.08) 100%); }
+.scene-2 { background-image: linear-gradient(135deg, rgba(168,130,255,0.30) 0%, rgba(168,130,255,0.06) 100%); }
+.scene-3 { background-image: linear-gradient(135deg, rgba(59,130,246,0.30) 0%, rgba(59,130,246,0.06) 100%); }
+.scene-4 { background-image: linear-gradient(135deg, rgba(251,191,36,0.28) 0%, rgba(251,191,36,0.06) 100%); }
+
+.app-container.theme-light .scene-name {
+  color: #fff; /* Keep white on gradient */
+}
+
+.app-container.theme-light .scene-card {
+  border-color: rgba(0,0,0,0.06);
+}
+
+.app-container.theme-light .scene-card:hover {
+  border-color: rgba(0,0,0,0.12);
+}
+
+.app-container.theme-light .view-all-btn {
+  color: rgb(var(--dynamic-color, 0, 136, 204));
+}
+
+/* ── 月度听歌统计 ── */
+.monthly-stats-section {
+  margin-bottom: 8px;
+}
+
+.stats-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.stats-header .section-title {
+  margin-bottom: 0;
+}
+
+.stats-month-nav {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.stats-month-btn {
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 8px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.stats-month-btn:hover:not(.disabled) {
+  background: rgba(255,255,255,0.12);
+  color: var(--text-primary);
+}
+
+.stats-month-btn.disabled {
+  opacity: 0.25;
+  cursor: default;
+}
+
+.stats-month-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  min-width: 80px;
+  text-align: center;
+}
+
+.stats-summary-cards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.stats-card {
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 12px;
+  padding: 14px 12px;
+  text-align: center;
+  transition: var(--transition-smooth);
+}
+
+.stats-card:hover {
+  background: rgba(255,255,255,0.06);
+  border-color: rgba(255,255,255,0.1);
+}
+
+.stats-card-value {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1.2;
+  margin-bottom: 4px;
+}
+
+.stats-card-label {
+  font-size: 11px;
+    color: var(--text-secondary);
+  font-weight: 500;
+}
+
+/* ── 排行榜 + 日历并排 ── */
+.stats-body {
+  display: flex;
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.stats-body .stats-ranking {
+  flex: 1;
+  min-width: 0;
+}
+
+.stats-body .stats-calendar {
+  flex: 1;
+  min-width: 0;
+  margin-top: 0;
+}
+
+.stats-ranking {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+    max-height: 290px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,255,255,0.15) transparent;
+}
+
+.stats-ranking::-webkit-scrollbar {
+  width: 4px;
+}
+
+.stats-ranking::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.stats-ranking::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.15);
+  border-radius: 2px;
+}
+
+.stats-rank-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.stats-rank-item:hover {
+  background: rgba(255,255,255,0.05);
+}
+
+.stats-rank-pos {
+  width: 24px;
+  text-align: center;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.rank-num {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.stats-rank-cover {
+  width: 36px;
+  height: 36px;
+  border-radius: 6px;
+  object-fit: cover;
+  background: rgba(255,255,255,0.06);
+  flex-shrink: 0;
+}
+
+.stats-rank-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.stats-rank-title {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.stats-rank-artist {
+  font-size: 11px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.stats-rank-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  flex-shrink: 0;
+  gap: 1px;
+}
+
+.stats-rank-count {
+  font-size: 12px;
+  font-weight: 600;
+  color: rgb(var(--dynamic-color, 16,185,129));
+}
+
+.stats-rank-duration {
+  font-size: 10px;
+  color: var(--text-secondary);
+}
+
+.stats-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 32px 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+/* ── 日历热力图 ── */
+.stats-calendar {
+  margin-top: 12px;
+  padding: 10px;
+  background: rgba(255,255,255,0.02);
+  border: 1px solid rgba(255,255,255,0.05);
+  border-radius: 10px;
+}
+
+.calendar-weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+  margin-bottom: 6px;
+}
+
+.calendar-weekday {
+  text-align: center;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  padding: 2px 0;
+}
+
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 3px;
+}
+
+.calendar-day {
+  aspect-ratio: 1;
+  border-radius: 6px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  cursor: default;
+  transition: all 0.15s ease;
+  position: relative;
+  max-height: 42px;
+}
+
+.calendar-day:not(.empty):hover {
+  transform: scale(1.1);
+  z-index: 1;
+}
+
+.calendar-day.empty {
+  background: transparent;
+}
+
+/* 热力等级 */
+.calendar-day.level-0 {
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.04);
+}
+
+.calendar-day.level-1 {
+  background: rgba(var(--dynamic-color, 16,185,129), 0.15);
+  border: 1px solid rgba(var(--dynamic-color, 16,185,129), 0.2);
+}
+
+.calendar-day.level-2 {
+  background: rgba(var(--dynamic-color, 16,185,129), 0.30);
+  border: 1px solid rgba(var(--dynamic-color, 16,185,129), 0.35);
+}
+
+.calendar-day.level-3 {
+  background: rgba(var(--dynamic-color, 16,185,129), 0.50);
+  border: 1px solid rgba(var(--dynamic-color, 16,185,129), 0.55);
+}
+
+.calendar-day.level-4 {
+  background: rgba(var(--dynamic-color, 16,185,129), 0.75);
+  border: 1px solid rgba(var(--dynamic-color, 16,185,129), 0.8);
+}
+
+.calendar-day.is-today {
+  outline: 2px solid rgb(var(--dynamic-color, 16,185,129));
+  outline-offset: 1px;
+}
+
+.day-num {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-primary);
+  line-height: 1;
+}
+
+.calendar-day.level-3 .day-num,
+.calendar-day.level-4 .day-num {
+  color: #fff;
+}
+
+.day-count {
+  font-size: 9px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  line-height: 1;
+}
+
+.calendar-day.level-3 .day-count,
+.calendar-day.level-4 .day-count {
+  color: rgba(255,255,255,0.85);
+}
+
+/* 图例 */
+.calendar-legend {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.legend-label {
+  font-size: 10px;
+  color: var(--text-secondary);
+}
+
+.legend-scale {
+  display: flex;
+  gap: 3px;
+}
+
+.legend-box {
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+}
+
+.legend-box.level-0 { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); }
+.legend-box.level-1 { background: rgba(var(--dynamic-color, 16,185,129), 0.15); }
+.legend-box.level-2 { background: rgba(var(--dynamic-color, 16,185,129), 0.30); }
+.legend-box.level-3 { background: rgba(var(--dynamic-color, 16,185,129), 0.50); }
+.legend-box.level-4 { background: rgba(var(--dynamic-color, 16,185,129), 0.75); }
+
+/* Light theme overrides */
+.app-container.theme-light .stats-card {
+  background: rgba(0,0,0,0.02);
+  border-color: rgba(0,0,0,0.06);
+}
+
+.app-container.theme-light .stats-card:hover {
+  background: rgba(0,0,0,0.04);
+}
+
+.app-container.theme-light .stats-month-btn {
+  background: rgba(0,0,0,0.04);
+  border-color: rgba(0,0,0,0.08);
+}
+
+.app-container.theme-light .stats-month-btn:hover:not(.disabled) {
+  background: rgba(0,0,0,0.08);
+}
+
+.app-container.theme-light .stats-rank-item:hover {
+  background: rgba(0,0,0,0.04);
+}
+
+/* Light theme calendar */
+.app-container.theme-light .stats-calendar {
+  background: rgba(0,0,0,0.02);
+  border-color: rgba(0,0,0,0.06);
+}
+
+.app-container.theme-light .stats-ranking::-webkit-scrollbar-thumb {
+  background: rgba(0,0,0,0.12);
+}
+
+.app-container.theme-light .calendar-day.level-0 {
+  background: rgba(0,0,0,0.03);
+  border-color: rgba(0,0,0,0.06);
+}
+
+.app-container.theme-light .legend-box.level-0 {
+  background: rgba(0,0,0,0.03);
+  border: 1px solid rgba(0,0,0,0.08);
+}
+
+/* ── Floating Action Buttons ── */
+.floating-actions {
+  position: absolute;
+  right: 30px;
+  bottom: 30px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  z-index: 90;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(15px);
+  transition: opacity 0.3s cubic-bezier(0.16, 1, 0.3, 1), transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.floating-actions.visible {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+.standalone-editor .floating-actions,
+.metadata-editor-open .floating-actions,
+#metadata-editor-modal.active ~ .floating-actions {
+  display: none !important;
+}
+
+.float-btn {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  /* Extreme crystal glass: Pure water-like transparent base */
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.9);
+  /* Lower blur to 12px for maximum optical transmission while maintaining scatter */
+  backdrop-filter: blur(12px) saturate(140%);
+  -webkit-backdrop-filter: blur(12px) saturate(140%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  /* Crystal specular edge highlight only, zero muddy dark shadows */
+  box-shadow: 
+    inset 0 1px 2px rgba(255, 255, 255, 0.25), 
+    0 8px 24px rgba(0, 0, 0, 0.12);
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.app-container.theme-light .float-btn {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(0, 0, 0, 0.05);
+  color: rgba(0, 0, 0, 0.65);
+  box-shadow: 
+    inset 0 1px 1px rgba(255, 255, 255, 0.45), 
+    0 8px 24px rgba(0, 0, 0, 0.03);
+}
+
+.float-btn:hover {
+  transform: scale(1.1) translateY(-3px);
+  color: #ffffff;
+  /* Retain high clarity on hover, only slight bump to 0.08 */
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(var(--dynamic-color, 255, 255, 255), 0.4);
+  box-shadow: 
+    inset 0 1px 2px rgba(255, 255, 255, 0.35),
+    0 10px 25px rgba(var(--dynamic-color, 0, 240, 255), 0.22);
+}
+
+.app-container.theme-light .float-btn:hover {
+  background: rgba(255, 255, 255, 0.4);
+  color: #000000;
+  border-color: rgba(var(--dynamic-color, 0, 136, 204), 0.25);
+  box-shadow: 
+    inset 0 1px 1px rgba(255, 255, 255, 0.75),
+    0 10px 25px rgba(var(--dynamic-color, 0, 136, 204), 0.1);
+}
+
+.float-btn:active {
+  transform: scale(0.94) translateY(-1px);
+}
+
+/* ── Fluid Tab Page Transitions ── */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 12px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+.fade-in-up {
+  animation: fadeInUp 0.5s ease both;
+  will-change: transform, opacity;
+}
+
+/* ── Enhanced Discover Page Animations ── */
+/* Unified float-up keyframe: slow, gentle rise with fade */
+@keyframes floatUp {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 28px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+/* Page container: soft float-up */
+#music-list.page-enter {
+  animation: floatUp 0.6s cubic-bezier(0.25, 0.1, 0.25, 1) both;
+}
+
+/* Section stagger entrance - unified float-up */
+.discover-section {
+  opacity: 0;
+  animation: floatUp 0.9s cubic-bezier(0.25, 0.1, 0.25, 1) both;
+}
+
+/* Stagger delays: generous spacing for gradual feel */
+.discover-section:nth-child(1) { animation-delay: 0.12s; }
+.discover-section:nth-child(2) { animation-delay: 0.28s; }
+.discover-section:nth-child(3) { animation-delay: 0.44s; }
+.discover-section:nth-child(4) { animation-delay: 0.60s; }
+.discover-section:nth-child(5) { animation-delay: 0.76s; }
+
+/* Stats cards: float-up with stagger */
+.monthly-stats-section .stats-card {
+  opacity: 0;
+  animation: floatUp 0.85s cubic-bezier(0.25, 0.1, 0.25, 1) both;
+}
+
+.monthly-stats-section .stats-card:nth-child(1) { animation-delay: 0.22s; }
+.monthly-stats-section .stats-card:nth-child(2) { animation-delay: 0.32s; }
+.monthly-stats-section .stats-card:nth-child(3) { animation-delay: 0.42s; }
+
+/* Stats numbers: gentle glow pulse */
+@keyframes numberGlow {
+  0% { text-shadow: 0 0 0 transparent; }
+  50% { text-shadow: 0 0 14px rgba(var(--dynamic-color, 0, 240, 255), 0.3); }
+  100% { text-shadow: 0 0 0 transparent; }
+}
+
+.monthly-stats-section .stats-card-value {
+  animation: numberGlow 1s ease 0.5s both;
+}
+
+/* Recommendation cards: float-up with stagger */
+.recommendations-grid .recommend-card {
+  opacity: 0;
+  animation: floatUp 0.85s cubic-bezier(0.25, 0.1, 0.25, 1) both;
+}
+
+.recommendations-grid .recommend-card:nth-child(1) { animation-delay: 0.36s; }
+.recommendations-grid .recommend-card:nth-child(2) { animation-delay: 0.46s; }
+.recommendations-grid .recommend-card:nth-child(3) { animation-delay: 0.56s; }
+
+/* Scene cards: float-up with stagger */
+.scene-grid .scene-card {
+  opacity: 0;
+  animation: floatUp 0.85s cubic-bezier(0.25, 0.1, 0.25, 1) both;
+}
+
+.scene-grid .scene-card:nth-child(1) { animation-delay: 0.50s; }
+.scene-grid .scene-card:nth-child(2) { animation-delay: 0.58s; }
+.scene-grid .scene-card:nth-child(3) { animation-delay: 0.66s; }
+.scene-grid .scene-card:nth-child(4) { animation-delay: 0.74s; }
+
+/* Ranking list items: cascade float-up */
+.monthly-stats-section .ranking-item {
+  opacity: 0;
+  animation: floatUp 0.7s cubic-bezier(0.25, 0.1, 0.25, 1) both;
+}
+
+.monthly-stats-section .ranking-item:nth-child(1) { animation-delay: 0.20s; }
+.monthly-stats-section .ranking-item:nth-child(2) { animation-delay: 0.25s; }
+.monthly-stats-section .ranking-item:nth-child(3) { animation-delay: 0.30s; }
+.monthly-stats-section .ranking-item:nth-child(4) { animation-delay: 0.35s; }
+.monthly-stats-section .ranking-item:nth-child(5) { animation-delay: 0.40s; }
+.monthly-stats-section .ranking-item:nth-child(6) { animation-delay: 0.45s; }
+.monthly-stats-section .ranking-item:nth-child(7) { animation-delay: 0.50s; }
+.monthly-stats-section .ranking-item:nth-child(8) { animation-delay: 0.55s; }
+.monthly-stats-section .ranking-item:nth-child(9) { animation-delay: 0.60s; }
+.monthly-stats-section .ranking-item:nth-child(10) { animation-delay: 0.65s; }
+
+/* Recent plays list items: float-up */
+.col-recents .recent-item {
+  opacity: 0;
+  animation: floatUp 0.75s cubic-bezier(0.25, 0.1, 0.25, 1) both;
+}
+
+.col-recents .recent-item:nth-child(1) { animation-delay: 0.44s; }
+.col-recents .recent-item:nth-child(2) { animation-delay: 0.52s; }
+.col-recents .recent-item:nth-child(3) { animation-delay: 0.60s; }
+.col-recents .recent-item:nth-child(4) { animation-delay: 0.68s; }
+
+/* Calendar heatmap: gentle float-up */
+.monthly-stats-section .stats-calendar {
+  opacity: 0;
+  animation: floatUp 0.85s cubic-bezier(0.25, 0.1, 0.25, 1) 0.35s both;
+}

@@ -26,6 +26,7 @@ export const createSettingsPage = ({
   backgroundLoadCovers,
   desktopLyrics,
   switchTab,
+  reapplyCurrentColor,
 }) => {
   const renderSettingsTab = () => {
     const listEl = document.getElementById('music-list');
@@ -317,6 +318,11 @@ export const createSettingsPage = ({
       `<option value="${preset.value}" ${interfaceFont.mode === preset.value ? 'selected' : ''}>${preset.label}</option>`
     ).join('');
 
+    // 取色设置
+    const colorEnabled = localStorage.getItem('kimo-color-extraction') !== 'off';
+    const colorMode = localStorage.getItem('kimo-color-mode') || 'smart';
+    const colorIntensity = parseInt(localStorage.getItem('kimo-color-intensity'), 10) || 0;
+
     themeCard.innerHTML = `
       <div class="settings-card-title">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2a7 7 0 1 0 10 10"/></svg>
@@ -410,6 +416,40 @@ export const createSettingsPage = ({
         <div class="setting-slider-wrapper">
           <input type="range" class="setting-slider" id="settings-slider-opacity" min="0" max="100" step="1" value="${opacityNum}">
           <div class="setting-value-display" id="settings-opacity-val">${opacityNum}%</div>
+        </div>
+      </div>
+
+      <div class="setting-row">
+        <div class="setting-info">
+          <div class="setting-label">专辑封面取色</div>
+          <div class="setting-desc">从专辑封面提取主题色并应用到播放器界面。关闭后使用默认蓝色主题。</div>
+        </div>
+        <label class="setting-toggle" title="切换专辑封面取色">
+          <input type="checkbox" id="settings-color-extraction-toggle" ${colorEnabled ? 'checked' : ''} />
+          <span class="setting-toggle-track" aria-hidden="true"></span>
+        </label>
+      </div>
+
+      <div class="setting-row" id="settings-color-mode-row" style="display: ${colorEnabled ? 'flex' : 'none'};">
+        <div class="setting-info">
+          <div class="setting-label">取色模式</div>
+          <div class="setting-desc">智能模式根据当前主题自动适配最佳亮度，保证可读性。手动模式可自由调节取色深浅。</div>
+        </div>
+        <div class="setting-radio-group" id="settings-color-mode-group" data-active-idx="${colorMode === 'smart' ? '0' : '1'}">
+          <div class="setting-radio-active-bg"></div>
+          <button class="setting-radio-btn ${colorMode === 'smart' ? 'active' : ''}" data-val="smart">智能取色</button>
+          <button class="setting-radio-btn ${colorMode === 'manual' ? 'active' : ''}" data-val="manual">手动调节</button>
+        </div>
+      </div>
+
+      <div class="setting-row" id="settings-color-intensity-row" style="display: ${colorEnabled && colorMode === 'manual' ? 'flex' : 'none'};">
+        <div class="setting-info">
+          <div class="setting-label">取色深浅</div>
+          <div class="setting-desc">向左偏深，向右偏浅。中间为平衡值。</div>
+        </div>
+        <div class="setting-slider-wrapper">
+          <input type="range" class="setting-slider" id="settings-slider-color-intensity" min="-50" max="50" step="1" value="${colorIntensity}">
+          <div class="setting-value-display" id="settings-color-intensity-val">${colorIntensity > 0 ? '+' : ''}${colorIntensity}</div>
         </div>
       </div>
 
@@ -566,8 +606,8 @@ export const createSettingsPage = ({
       
       <div class="setting-row" style="flex-direction: column; align-items: flex-start; gap: 12px;">
         <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 4px;">
-          <div class="about-logo" style="width: 48px; height: 48px; border-radius: 12px; background: linear-gradient(135deg, rgb(16, 185, 129), rgb(5, 150, 105)); display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);">
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+          <div class="about-logo" style="width: 48px; height: 48px; border-radius: 12px; overflow: hidden; display: flex; align-items: center; justify-content: center;">
+            <img src="/logo.png" alt="KimoPlayer" style="width: 100%; height: 100%; object-fit: cover; display: block;" />
           </div>
           <div style="flex:1;">
             <div style="display:flex;align-items:center;gap:8px;">
@@ -647,6 +687,16 @@ export const createSettingsPage = ({
 
         // 历史更新公告数据
         const changelogData = [
+      {
+        version: '1.5.2',
+        date: '2026.07.30',
+        type: '取色与界面优化',
+        sections: [
+          { title: '专辑封面取色设置', items: ['新增取色开关，可一键开启或关闭专辑封面取色功能，关闭后使用默认蓝色主题', '新增智能取色模式，根据当前主题（深色/浅色/灰色）自动适配最佳亮度，保证可读性', '新增手动调节模式，可自由调整取色深浅（-50 偏深 ~ +50 偏浅），拖动滑块实时预览'] },
+          { title: '歌词面板修复', items: ['修复歌词面板无法进入的问题，清除内联 transform 样式让 CSS active 类正常生效', '歌词面板与控制栏弹出框不受 UI 缩放比例影响，始终保持原始尺寸'] },
+          { title: '启动画面与图标优化', items: ['移除启动画面 logo 的阴影效果，呈现更简洁的视觉风格', '移除关于页面 logo 的阴影效果', 'GitHub 仓库主页 README 新增 KimoPlayer logo 图标展示'] },
+        ],
+      },
       {
         version: '1.5.1',
         date: '2026.07.29',
@@ -1308,6 +1358,69 @@ export const createSettingsPage = ({
         player.updateUI(player.playlist[player.currentIndex]);
       }
     });
+
+    // ══ 专辑封面取色设置 ══
+    // 取色开关
+    const colorToggle = themeCard.querySelector('#settings-color-extraction-toggle');
+    colorToggle?.addEventListener('change', (e) => {
+      const enabled = e.target.checked;
+      localStorage.setItem('kimo-color-extraction', enabled ? 'on' : 'off');
+      // 显示/隐藏取色模式行
+      const modeRow = themeCard.querySelector('#settings-color-mode-row');
+      if (modeRow) modeRow.style.display = enabled ? 'flex' : 'none';
+      // 隐藏手动模式下的深浅滑块行
+      if (!enabled) {
+        const intensityRow = themeCard.querySelector('#settings-color-intensity-row');
+        if (intensityRow) intensityRow.style.display = 'none';
+      } else {
+        // 恢复显示（取决于当前模式）
+        const currentMode = localStorage.getItem('kimo-color-mode') || 'smart';
+        const intensityRow = themeCard.querySelector('#settings-color-intensity-row');
+        if (intensityRow) intensityRow.style.display = currentMode === 'manual' ? 'flex' : 'none';
+      }
+      reapplyCurrentColor();
+      showToast(enabled ? '已开启专辑封面取色' : '已关闭专辑封面取色，使用默认主题色');
+    });
+
+    // 取色模式分段按钮组
+    themeCard.querySelectorAll('#settings-color-mode-group .setting-radio-btn').forEach((btn, idx) => {
+      btn.addEventListener('click', () => {
+        themeCard.querySelectorAll('#settings-color-mode-group .setting-radio-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        themeCard.querySelector('#settings-color-mode-group').setAttribute('data-active-idx', idx.toString());
+        const mode = btn.getAttribute('data-val');
+        localStorage.setItem('kimo-color-mode', mode);
+        // 显示/隐藏深浅滑块行
+        const intensityRow = themeCard.querySelector('#settings-color-intensity-row');
+        if (intensityRow) intensityRow.style.display = mode === 'manual' ? 'flex' : 'none';
+        reapplyCurrentColor();
+        const modeNames = { smart: '智能取色', manual: '手动调节' };
+        showToast(`取色模式已切换至: ${modeNames[mode] || mode}`);
+      });
+    });
+
+    // 取色深浅滑块
+    const colorIntensityInput = themeCard.querySelector('#settings-slider-color-intensity');
+    const colorIntensityDisplay = themeCard.querySelector('#settings-color-intensity-val');
+    if (colorIntensityInput) {
+      // 拖动时实时更新显示和预览
+      colorIntensityInput.addEventListener('input', (e) => {
+        const val = parseInt(e.target.value, 10);
+        if (colorIntensityDisplay) colorIntensityDisplay.textContent = val > 0 ? `+${val}` : `${val}`;
+        localStorage.setItem('kimo-color-intensity', val);
+        reapplyCurrentColor();
+      });
+      // 滚轮支持
+      colorIntensityInput.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        const delta = e.deltaY < 0 ? 1 : -1;
+        const nextVal = Math.max(-50, Math.min(50, parseInt(colorIntensityInput.value) + delta));
+        colorIntensityInput.value = nextVal;
+        if (colorIntensityDisplay) colorIntensityDisplay.textContent = nextVal > 0 ? `+${nextVal}` : `${nextVal}`;
+        localStorage.setItem('kimo-color-intensity', nextVal);
+        reapplyCurrentColor();
+      }, { passive: false });
+    }
 
     const fsInput = lyricCard.querySelector('#settings-slider-font-size');
     const fsDisplay = lyricCard.querySelector('#settings-font-size-val');

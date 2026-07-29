@@ -1,5 +1,5 @@
 import { convertFileSrc, invoke } from '@tauri-apps/api/core';
-import { applyDynamicColor, getDefaultDynamicColor } from '../ui/theme.js';
+import { applyDynamicColor, getDefaultDynamicColor, getColorOptions } from '../ui/theme.js';
 import { transitionContent } from '../ui/transitions.js';
 import { extractDominantColor } from '../utils/color.js';
 import { getCoverSrc } from '../utils/cover.js';
@@ -185,7 +185,7 @@ export class PlaybackController {
           }
 
           // Asynchronously extract and cache color
-          extractDominantColor(getCoverSrc(song.cover_image)).then(color => {
+          extractDominantColor(getCoverSrc(song.cover_image), getColorOptions()).then(color => {
             song.dominant_color = color;
             if (index === this.currentIndex) {
               applyDynamicColor(color.r, color.g, color.b, getCoverSrc(song.cover_image));
@@ -201,7 +201,7 @@ export class PlaybackController {
     if (song.dominant_color) {
       applyDynamicColor(song.dominant_color.r, song.dominant_color.g, song.dominant_color.b, getCoverSrc(song.cover_image));
     } else if (song.cover_image) {
-      extractDominantColor(getCoverSrc(song.cover_image)).then(color => {
+      extractDominantColor(getCoverSrc(song.cover_image), getColorOptions()).then(color => {
         song.dominant_color = color;
         if (index === this.currentIndex) {
           applyDynamicColor(color.r, color.g, color.b, getCoverSrc(song.cover_image));

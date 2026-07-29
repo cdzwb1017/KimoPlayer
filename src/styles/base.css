@@ -1,0 +1,58 @@
+/* 🌟 Houdini GPU-Accelerated Property Registrations for Butter-Smooth Lyrics Flow 🌟 */
+@property --line-percent {
+  syntax: '<percentage>';
+  inherits: true;
+  initial-value: 0%;
+}
+@property --char-fill {
+  syntax: '<percentage>';
+  inherits: true;
+  initial-value: 0%;
+}
+
+:root {
+  /* Border Radius Calibration (Outer = 12px, 1px Border, Inner = 11px) */
+  --app-radius-outer: 12px;
+  --app-border-width: 1px;
+  --app-radius-inner: calc(var(--app-radius-outer) - var(--app-border-width));
+
+  /* Colors - Dark mode & Neon cyan */
+  --bg-color: transparent; 
+  --glass-bg: rgba(10, 10, 13, 0.96);
+  --glass-border: rgba(255, 255, 255, 0.05);
+  --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+  
+  --surface-color: rgba(255, 255, 255, 0.03);
+  --surface-hover: rgba(255, 255, 255, 0.08);
+  --text-primary: #ffffff;
+  --text-secondary: rgba(255, 255, 255, 0.92);
+  --text-tertiary: rgba(255, 255, 255, 0.78);
+  --accent-color: #00f0ff;
+  --dynamic-color: 0, 180, 216; /* R,G,B - updated by JS (default premium sky blue) */
+  --overlay-opacity: 0.35;
+  --sticky-header-bg: rgba(13, 13, 16, 0.25);
+  
+  /* Typography - 🌟 High-Fidelity Font Chain with multi-weight variable-grade local support */
+  --font-family: 'MiSans', 'Outfit', 'Inter', -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei UI", "Microsoft YaHei", "Segoe UI", system-ui, sans-serif;
+  
+  /* Layout */
+  --sidebar-width: 230px;
+  --player-bar-height: 90px;
+  --titlebar-height: 40px;
+  --lyrics-cover-size: clamp(180px, 22vw, 320px);
+
+  /* Effects */
+  --glass-blur: blur(20px);
+  --ui-blur: 20px;
+  --ui-saturate: 140%;
+  --ui-glass-alpha: 0.96;
+  --transition-smooth: transform 0.25s cubic-bezier(0.25, 0.8, 0.25, 1), opacity 0.25s cubic-bezier(0.25, 0.8, 0.25, 1), background 0.25s cubic-bezier(0.25, 0.8, 0.25, 1), border-color 0.25s cubic-bezier(0.25, 0.8, 0.25, 1), box-shadow 0.25s cubic-bezier(0.25, 0.8, 0.25, 1), filter 0.25s cubic-bezier(0.25, 0.8, 0.25, 1);
+  --transition-spring: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.2), opacity 0.4s ease, filter 0.4s ease;
+
+  /* Card Colors */
+  --sidebar-bg: transparent;
+  --card-bg: rgba(255, 255, 255, 0.02);
+  --card-hover: rgba(255, 255, 255, 0.05);
+  --card-border: rgba(255, 255, 255, 0.03);
+  --card-border-hover: rgba(255, 255, 255, 0.08);
+}

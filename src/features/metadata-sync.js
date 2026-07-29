@@ -10,6 +10,7 @@ export function initializeMetadataSavedSync({
   extractDominantColor,
   applyDynamicColor,
   getDefaultDynamicColor,
+  getColorOptions,
 }) {
   listen('metadata-saved', async (event) => {
     const { filePath, title, artist, album, coverPath, removeCover } = event.payload;
@@ -44,7 +45,7 @@ export function initializeMetadataSavedSync({
             }
 
             if (updatedSong.cover_image) {
-              extractDominantColor(getCoverSrc(updatedSong.cover_image)).then(color => {
+              extractDominantColor(getCoverSrc(updatedSong.cover_image), getColorOptions ? getColorOptions() : undefined).then(color => {
                 updatedSong.dominant_color = color;
                 if (player.currentIndex === songIdx) {
                   applyDynamicColor(color.r, color.g, color.b, getCoverSrc(updatedSong.cover_image));

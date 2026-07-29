@@ -3,6 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" type="image/png" href="/favicon-32.png" />
     <title>KiomPlayer</title>
     <style>
       html, body {
@@ -54,7 +55,10 @@
       <div id="app-splash-screen" class="app-splash-screen">
         <div class="splash-loader-container">
           <div class="splash-logo-glow"></div>
-          <div class="splash-logo">KimoPlayer</div>
+          <div class="splash-logo-wrap">
+            <img class="splash-logo-img" src="/logo.png" alt="KimoPlayer" />
+          </div>
+          <div class="splash-app-name">KimoPlayer</div>
           <div class="splash-spinner">
             <div class="spinner-circle"></div>
           </div>
@@ -152,7 +156,7 @@
       </div>
 
       <!-- FULL SCREEN IMMERSIVE LYRICS PANEL -->
-      <div id="lyrics-panel" class="lyrics-panel">
+      <div id="lyrics-panel" class="lyrics-panel" style="transform: translateY(100%);">
         <!-- Header area for metadata & back button -->
         <div class="lyrics-header">
           <button id="lyrics-back-btn" class="lyrics-back-btn" title="收起歌词">

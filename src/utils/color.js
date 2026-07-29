@@ -63,14 +63,42 @@ function hslToRgb(h, s, l) {
   };
 }
 
-function adjustColorSaturationAndContrast(r, g, b) {
+/**
+ * 根据取色模式调整颜色的亮度
+ * @param {number} r - Red 0-255
+ * @param {number} g - Green 0-255
+ * @param {number} b - Blue 0-255
+ * @param {object} options - { mode: 'smart'|'manual', intensity: -50~50, theme: 'light'|'dark' }
+ * @returns {{r,g,b}}
+ */
+function adjustColorByMode(r, g, b, options = {}) {
   const hsl = rgbToHsl(r, g, b);
-  hsl.s = Math.max(60, Math.min(100, hsl.s * 1.4));
-  hsl.l = Math.max(35, Math.min(65, hsl.l));
+  const mode = options.mode || 'smart';
+  const intensity = options.intensity || 0; // -50 (偏深) ~ +50 (偏浅)
+  const theme = options.theme || 'dark';
+
+  // 饱和度增强（保持鲜艳）
+  hsl.s = Math.max(50, Math.min(100, hsl.s * 1.35));
+
+  if (mode === 'smart') {
+    // 智能模式：根据主题自动适配亮度，保证可读性
+    // 深色主题：取色偏亮（l: 45-65），在暗背景上更醒目
+    // 浅色主题：取色偏深（l: 35-55），在亮背景上更清晰
+    if (theme === 'light') {
+      hsl.l = Math.max(35, Math.min(55, hsl.l));
+    } else {
+      hsl.l = Math.max(45, Math.min(65, hsl.l));
+    }
+  } else {
+    // 手动模式：以 50 为中心，intensity 正值偏浅，负值偏深
+    const targetL = 50 + intensity * 0.3; // -50→35, 0→50, +50→65
+    hsl.l = Math.max(20, Math.min(80, targetL));
+  }
+
   return hslToRgb(hsl.h, hsl.s, hsl.l);
 }
 
-export function extractDominantColor(imgSrc) {
+export function extractDominantColor(imgSrc, options = {}) {
   return new Promise((resolve) => {
     const img = new Image();
     img.crossOrigin = 'anonymous';
@@ -118,10 +146,38 @@ export function extractDominantColor(imgSrc) {
         b = 60;
       }
 
-      resolve(adjustColorSaturationAndContrast(r, g, b));
+      // 取色关闭时（options 为 null）返回原始颜色，不做亮度调整
+      if (!options) {
+        resolve({ r, g, b });
+      } else {
+        // 缓存原始提取颜色，供设置页实时预览重新调整时使用
+        try {
+          localStorage.setItem('kimo-last-raw-color', `${r},${g},${b}`);
+        } catch (_) {}
+        resolve(adjustColorByMode(r, g, b, options));
+      }
     };
 
     img.onerror = () => resolve({ r: 40, g: 40, b: 60 });
     img.src = imgSrc;
   });
+}
+
+/**
+ * 读取取色设置
+ * @returns {{enabled: boolean, mode: 'smart'|'manual', intensity: number}}
+ */
+export function getColorExtractionSettings() {
+  const enabled = localStorage.getItem('kimo-color-extraction') !== 'off'; // 默认开启
+  const mode = localStorage.getItem('kimo-color-mode') || 'smart'; // 'smart' | 'manual'
+  const intensity = parseInt(localStorage.getItem('kimo-color-intensity'), 10) || 0; // -50 ~ 50
+  return { enabled, mode, intensity };
+}
+
+/**
+ * 对已有 RGB 颜色重新应用取色模式调整（无需重新提取）
+ * 用于设置页调整滑块时实时预览
+ */
+export function readjustColor(r, g, b, options = {}) {
+  return adjustColorByMode(r, g, b, options);
 }

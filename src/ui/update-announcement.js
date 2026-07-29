@@ -8,34 +8,25 @@ export function showStartupUpdateAnnouncement() {
 
   const sections = [
     {
-      title: '📂 系统文件关联，双击即播',
+      title: '🎨 专辑封面取色设置',
       items: [
-        ['安装后在操作系统中双击音频文件，直接用 KiomPlayer 打开播放'],
-        ['支持 mp3、flac、wav、ogg、m4a、aac、wma、opus、ape、aiff 共 10 种格式'],
-        ['应用已运行时自动追加到播放列表，未运行时启动后自动加载'],
+        ['新增取色开关，可一键开启或关闭专辑封面取色，关闭后使用默认蓝色主题'],
+        ['智能取色模式：根据当前主题自动适配最佳亮度，保证界面可读性'],
+        ['手动调节模式：自由调整取色深浅（-50 偏深 ~ +50 偏浅），实时预览'],
       ],
     },
     {
-      title: '🌌 背景样式与 UI 风格体系',
+      title: '🎵 歌词面板修复',
       items: [
-        ['新增三种背景模式：去除背景、静态背景、动态背景（可调旋转速率）'],
-        ['四种 UI 风格：默认效果、亚克力、高斯模糊、液态玻璃，按视觉复杂度递增'],
-        ['评论区、右键菜单、Toast 提示全面适配四种 UI 风格'],
+        ['修复歌词面板无法进入的问题，恢复正常滑入动画'],
+        ['歌词面板与控制栏弹出框不受 UI 缩放比例影响，始终保持原始尺寸'],
       ],
     },
     {
-      title: '🎛️ 歌词弹出框重新设计',
+      title: '✨ 界面细节优化',
       items: [
-        ['滑块弹出框改为现代玻璃胶囊风格，跟随歌词页面主题自动切换深浅色'],
-        ['滑块轨道新增进度填充效果，已调节部分以动态主题色高亮'],
-        ['所有滑块统一支持鼠标滚轮调整，修复字号与抬起幅度上限不匹配的问题'],
-      ],
-    },
-    {
-      title: '🔧 体验优化与修复',
-      items: [
-        ['设置页 GitHub 仓库链接、更新检查器、评论区图片跳转修复，改用系统浏览器打开'],
-        ['历史更新记录新增 1.5.1 和 1.5.0 版本条目'],
+        ['移除启动画面与关于页面 logo 的阴影效果，视觉更简洁'],
+        ['GitHub 仓库主页 README 新增 KimoPlayer logo 图标展示'],
       ],
     },
   ];
@@ -58,7 +49,7 @@ export function showStartupUpdateAnnouncement() {
     <div class="kimo-modal-card" style="max-width:460px;width:92%;padding:0;text-align:left;overflow:hidden;">
       <div style="padding:22px 24px 16px;border-bottom:1px solid rgba(255,255,255,0.08);">
         <div style="font-size:18px;font-weight:700;color:var(--text-primary);margin-bottom:4px;">KimoPlayer ${APP_VERSION}</div>
-        <div style="font-size:12px;color:var(--text-secondary);">2026.07.29 系统文件关联与 UI 风格体系</div>
+        <div style="font-size:12px;color:var(--text-secondary);">2026.07.30 取色与界面优化</div>
       </div>
       <div style="padding:18px 24px 4px;">${sectionsHTML}</div>
       <div style="padding:14px 24px 20px;">

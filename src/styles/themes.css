@@ -1,0 +1,159 @@
+/* Unified Premium Light Theme System */
+.app-container.theme-light,
+body.theme-light {
+  --glass-bg: rgba(255, 255, 255, 0.95);
+  --glass-border: rgba(0, 0, 0, 0.08);
+  --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.06);
+  
+  --surface-color: rgba(0, 0, 0, 0.02);
+  --surface-hover: rgba(0, 0, 0, 0.05);
+  --text-primary: #1d1d1f;          /* Apple Obsidian Black */
+  --text-secondary: rgba(0, 0, 0, 0.55);
+  --text-tertiary: rgba(0, 0, 0, 0.38);
+  --accent-color: #0088cc;          /* Soft ocean blue accent */
+  
+  --sidebar-bg: transparent;
+  --card-bg: rgba(0, 0, 0, 0.015);
+  --card-hover: rgba(0, 0, 0, 0.04);
+  --card-border: rgba(0, 0, 0, 0.05);
+  --card-border-hover: rgba(0, 0, 0, 0.1);
+  --sticky-header-bg: rgba(255, 255, 255, 0.25);
+  
+  background: linear-gradient(135deg, #f5f5f7 0%, #ffffff 50%, #f0f0f3 100%);
+}
+
+.app-container.theme-grey,
+body.theme-grey {
+  --glass-bg: rgba(255, 255, 255, 0.76);
+  --glass-border: rgba(0, 0, 0, 0.08);
+  --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.05);
+  
+  --surface-color: rgba(0, 0, 0, 0.02);
+  --surface-hover: rgba(0, 0, 0, 0.05);
+  --text-primary: #1d1d1f;          /* Apple Obsidian Black */
+  --text-secondary: rgba(0, 0, 0, 0.55);
+  --text-tertiary: rgba(0, 0, 0, 0.38);
+  --accent-color: #0088cc;          /* Soft ocean blue accent */
+  
+  --sidebar-bg: transparent;
+  --card-bg: rgba(255, 255, 255, 0.45);
+  --card-hover: rgba(255, 255, 255, 0.7);
+  --card-border: rgba(0, 0, 0, 0.05);
+  --card-border-hover: rgba(0, 0, 0, 0.09);
+  --sticky-header-bg: rgba(227, 227, 232, 0.25);
+  
+  background: linear-gradient(135deg, #e3e3e8 0%, #edeef2 50%, #e3e3e8 100%) !important;
+}
+
+/* Smooth theme toggling transitions */
+.app-container,
+.sidebar,
+.titlebar,
+.player-bar,
+.content-area,
+.nav-item,
+.song-item,
+.kimo-modal-card {
+  transition: background 0.8s ease, background-color 0.8s ease, border-color 0.8s ease, color 0.8s ease, box-shadow 0.8s ease;
+}
+
+.app-container.theme-light .sidebar h2,
+.app-container.theme-grey .sidebar h2 {
+  color: rgba(0, 0, 0, 0.55) !important;
+  font-weight: 700;
+}
+
+.app-container.theme-light .nav-item,
+.app-container.theme-grey .nav-item {
+  color: rgba(15, 23, 42, 0.72);
+  font-weight: 500;
+}
+
+.app-container.theme-light .nav-item svg,
+.app-container.theme-grey .nav-item svg {
+  color: rgba(15, 23, 42, 0.65);
+  opacity: 0.9;
+}
+
+.app-container.theme-light .nav-item:hover,
+.app-container.theme-grey .nav-item:hover {
+  background: rgba(0, 0, 0, 0.05);
+  color: #0f172a;
+}
+
+.app-container.theme-light .nav-item:hover svg,
+.app-container.theme-grey .nav-item:hover svg {
+  color: #0f172a;
+  opacity: 1;
+}
+
+.app-container.theme-light .nav-item.active,
+.app-container.theme-grey .nav-item.active {
+  color: #0f172a !important;
+  font-weight: 700 !important;
+}
+
+.app-container.theme-light .sidebar-indicator,
+.app-container.theme-grey .sidebar-indicator {
+  background: rgba(255, 255, 255, 0.4) !important;
+  border: none !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15) !important;
+}
+
+.app-container.theme-light .nav-item.active svg,
+.app-container.theme-grey .nav-item.active svg {
+  color: #0f172a !important;
+  filter: none !important;
+  opacity: 1 !important;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  transition: background 0.3s ease;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+/* Light Theme Scrollbar Override */
+.app-container.theme-light ::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.12);
+}
+
+.app-container.theme-light ::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.25);
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  background: transparent !important;
+}
+
+body {
+  font-family: var(--font-family);
+  background-color: transparent !important;
+  color: var(--text-primary);
+  user-select: none;
+  -webkit-font-smoothing: antialiased;
+}

@@ -1,0 +1,1103 @@
+/* ═══ UI 风格：主要玻璃表面使用全局变量 ═══ */
+/* 亚克力：主内容区作为一块完整玻璃，子元素透明，实现无缝统一 */
+.app-container.ui-style-acrylic .main-content,
+.app-container.ui-style-acrylic .kimo-modal-card,
+.app-container.ui-style-acrylic .titlebar-button,
+.app-container.ui-style-acrylic .nav-active-indicator,
+.app-container.ui-style-acrylic .sticky-header,
+.app-container.ui-style-acrylic .context-menu,
+.app-container.ui-style-acrylic .settings-card,
+.app-container.ui-style-acrylic .player-bar {
+  backdrop-filter: blur(var(--ui-blur)) saturate(var(--ui-saturate));
+  -webkit-backdrop-filter: blur(var(--ui-blur)) saturate(var(--ui-saturate));
+  background: rgba(var(--ui-glass-color), var(--ui-glass-alpha));
+}
+.app-container.ui-style-acrylic .sidebar,
+.app-container.ui-style-acrylic .content-shell,
+.app-container.ui-style-acrylic .content-toolbar,
+.app-container.ui-style-acrylic .titlebar {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  background: transparent;
+}
+/* 高斯模糊模式下，统一覆盖关键元素的 backdrop-filter */
+/* 高斯模糊：主内容区作为一块完整玻璃，子元素透明，实现无缝统一 */
+.app-container.ui-style-gaussian .main-content,
+.app-container.ui-style-gaussian .kimo-modal-card,
+.app-container.ui-style-gaussian .titlebar-button,
+.app-container.ui-style-gaussian .nav-active-indicator,
+.app-container.ui-style-gaussian .sticky-header,
+.app-container.ui-style-gaussian .context-menu,
+.app-container.ui-style-gaussian .settings-card,
+.app-container.ui-style-gaussian .player-bar {
+  backdrop-filter: blur(var(--ui-blur)) saturate(var(--ui-saturate));
+  -webkit-backdrop-filter: blur(var(--ui-blur)) saturate(var(--ui-saturate));
+}
+.app-container.ui-style-gaussian .sidebar,
+.app-container.ui-style-gaussian .content-shell,
+.app-container.ui-style-gaussian .content-toolbar,
+.app-container.ui-style-gaussian .titlebar {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.app-container.theme-light .comments-sort-select option:hover {
+  background: #f0f0f0;
+}
+
+.app-container.theme-light .comments-sort-select option:checked {
+  background: #0088cc;
+  color: #ffffff;
+}
+
+/* Comment List */
+.comments-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 0;
+}
+
+.comments-list::-webkit-scrollbar {
+  width: 4px;
+}
+
+.comments-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.comments-list::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 2px;
+}
+
+/* 标签切换动画 */
+.comments-list-switching {
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.comments-list-entering {
+  animation: comments-fade-in 0.5s ease forwards;
+}
+
+@keyframes comments-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Loading & Empty */
+.comments-loading,
+.comments-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 48px 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.comments-spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  border-top-color: rgb(var(--dynamic-color, 0, 240, 255));
+  border-radius: 50%;
+  animation: comments-spin 0.7s linear infinite;
+}
+
+@keyframes comments-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Comment Item */
+.comment-item {
+  display: flex;
+  gap: 10px;
+  padding: 12px 18px;
+  transition: background 0.12s;
+  position: relative;
+  border-bottom: 1px solid var(--border-color, rgba(255,255,255,0.06));
+}
+
+.comment-item-entering {
+  animation: comment-float-in 0.5s ease-out both;
+}
+
+@keyframes comment-float-in {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.comment-item:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.comment-item-reply {
+  padding-left: 48px;
+}
+
+.comment-left {
+  flex-shrink: 0;
+}
+
+.comment-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.comment-avatar-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(var(--dynamic-color, 0, 240, 255), 0.2);
+  color: rgb(var(--dynamic-color, 0, 240, 255));
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.comment-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.comment-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.comment-hot-tag {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #ff6b35, #ff8c42);
+  color: white;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 5px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.comment-platform-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 4px 8px;
+  font-size: 10px;
+  font-weight: 500;
+  border-radius: 10px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+/* 平台标签颜色 */
+.platform-wy, .platform-netease {
+  background: rgba(230, 50, 50, 0.12);
+  color: #ff6b6b;
+}
+
+.platform-kw, .platform-kuwo {
+  background: rgba(234, 179, 8, 0.12);
+  color: #fbbf24;
+}
+
+.platform-qq {
+  background: rgba(34, 197, 94, 0.12);
+  color: #4ade80;
+}
+
+.platform-kg, .platform-kugou {
+  background: rgba(59, 130, 246, 0.12);
+  color: #60a5fa;
+}
+
+.comment-ip-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 5px;
+  font-size: 10px;
+  color: var(--text-secondary);
+  opacity: 0.6;
+  flex-shrink: 0;
+}
+
+.comment-nickname {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  opacity: 0.85;
+  max-width: 100px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.comment-time {
+  font-size: 11px;
+  color: var(--text-secondary);
+  opacity: 0.6;
+  margin-left: auto;
+}
+
+.comment-time-inline {
+  font-size: 12px;
+  color: var(--text-secondary);
+  opacity: 0.5;
+  margin-left: 8px;
+}
+
+.comment-time-fixed {
+  position: absolute;
+  top: 12px;
+  right: 18px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  opacity: 0.5;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.comment-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+  transition: all 0.2s;
+  white-space: nowrap;
+  line-height: 1;
+}
+
+.comment-action-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-primary);
+}
+
+.comment-action-btn svg {
+  opacity: 0.7;
+  flex-shrink: 0;
+  vertical-align: middle;
+}
+
+.comment-content {
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--text-primary);
+  word-break: break-word;
+  transition: max-height 0.3s ease;
+}
+
+.comment-content.collapsed {
+  max-height: 80px;
+  overflow: hidden;
+}
+
+.comment-expand-btn {
+  background: none;
+  border: none;
+  color: var(--accent-color, #66bbff);
+  font-size: 12px;
+  cursor: pointer;
+  padding: 2px 0;
+  margin-top: 4px;
+  opacity: 0.8;
+  transition: opacity 0.2s;
+}
+
+.comment-expand-btn:hover {
+  opacity: 1;
+}
+
+/* 评论图片 */
+.comment-images {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.comment-image {
+  max-width: 100px;
+  max-height: 120px;
+  border-radius: 8px;
+  object-fit: cover;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+  border: 1px solid var(--border-color, rgba(255,255,255,0.08));
+}
+
+.comment-image:hover {
+  transform: scale(1.05);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+}
+
+.comment-footer {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+/* ══ 回复列表 ══ */
+.comment-replies {
+  margin-top: 8px;
+  padding-left: 12px;
+  border-left: 2px solid rgba(var(--dynamic-color, 0, 240, 255), 0.2);
+}
+
+.comment-reply-item {
+  display: flex;
+  gap: 8px;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 6px;
+  margin-bottom: 4px;
+}
+
+.comment-reply-item .comment-avatar {
+  width: 24px;
+  height: 24px;
+}
+
+.comment-reply-item .comment-avatar-placeholder {
+  width: 24px;
+  height: 24px;
+  font-size: 11px;
+}
+
+.comment-reply-item .comment-nickname {
+  font-size: 12px;
+}
+
+.comment-reply-item .comment-content {
+  font-size: 13px;
+}
+
+.comment-reply-like {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  opacity: 0.7;
+  margin-top: 4px;
+}
+
+.comment-replies-loading {
+  display: flex;
+  align-items: center;
+  padding: 8px 0;
+}
+
+.comment-replies-empty {
+  font-size: 12px;
+  color: var(--text-secondary);
+  opacity: 0.5;
+  padding: 6px 0;
+}
+
+.comment-replies-collapse {
+  font-size: 12px;
+  color: rgba(var(--dynamic-color, 0, 240, 255), 0.7);
+  cursor: pointer;
+  transition: color 0.15s;
+}
+
+.comment-replies-collapse:hover {
+  color: rgb(var(--dynamic-color, 0, 240, 255));
+}
+
+.comment-replies-footer {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 6px 0;
+  font-size: 12px;
+}
+
+.comment-replies-footer span,
+.comment-replies-footer button {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.comment-replies-footer button {
+  color: var(--text-secondary);
+  opacity: 0.7;
+}
+
+.comment-replies-footer button:hover {
+  opacity: 1;
+}
+
+.comment-replies-footer button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* 回复展开/收起动画 */
+.comment-replies {
+  animation: replies-fade-in 0.25s ease-out;
+}
+
+.comment-replies.closing {
+  animation: replies-fade-out 0.2s ease-in forwards;
+}
+
+@keyframes replies-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes replies-fade-out {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+    max-height: 500px;
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-6px);
+    max-height: 0;
+  }
+}
+
+/* ══ Light Theme 回复 ══ */
+.app-container.theme-light .comment-reply-btn:hover {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.app-container.theme-light .comment-reply-item {
+  background: rgba(0, 0, 0, 0.02);
+}
+
+.app-container.theme-light .comment-replies {
+  border-left-color: rgba(var(--dynamic-color, 0, 136, 204), 0.2);
+}
+
+/* ══ Grey Theme 回复 ══ */
+.app-container.theme-grey .comment-reply-btn:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.app-container.theme-grey .comment-reply-item {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.app-container.theme-grey .comment-replies {
+  border-left-color: rgba(var(--dynamic-color, 0, 240, 255), 0.2);
+}
+
+/* Load More */
+.comments-load-more {
+  padding: 10px 18px 16px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.comments-load-more-btn {
+  background: var(--glass-border);
+  border: 1px solid var(--glass-border);
+  color: var(--text-secondary);
+  font-size: 12px;
+  padding: 6px 20px;
+  border-radius: 20px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.comments-load-more-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--text-primary);
+  border-color: rgba(var(--dynamic-color, 0, 240, 255), 0.3);
+}
+
+.comments-end-hint {
+  text-align: center;
+  padding: 16px 0 20px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  opacity: 0.6;
+  letter-spacing: 0.5px;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   音乐列表音质与比特率标签 (Audio Quality & Bitrate Badges)
+   ═══════════════════════════════════════════════════════════════ */
+.song-artist,
+.playlist-detail-song-artist,
+.recent-artist,
+.recommend-artist,
+.comments-song-artist,
+.player-artist,
+.lyrics-header-artist {
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* 歌手名称文本部分：超长时静态限制长度打省略号，标签完全常驻不滚动 */
+.artist-name-text,
+.song-artist-text,
+.comments-artist-name {
+  flex: 0 1 auto;
+  display: inline-block;
+  min-width: 0;
+  max-width: 100px;
+  overflow: hidden;
+  text-overflow: ellipsis !important;
+  white-space: nowrap;
+}
+
+.song-audio-badges {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 6px;
+  flex-shrink: 0 !important;
+  vertical-align: middle;
+}
+
+/* ══ 歌词全屏界面大图下方音频标签特化调大 ══ */
+#lyrics-under-badges {
+  margin-top: 6px;
+  margin-bottom: 2px;
+}
+
+#lyrics-under-badges .song-audio-badges {
+  margin-left: 0 !important;
+  gap: 8px !important;
+}
+
+#lyrics-under-badges .audio-badge {
+  font-size: 11.5px !important;
+  padding: 3px 8.5px !important;
+  border-radius: 4.5px !important;
+  letter-spacing: 0.4px !important;
+  font-weight: 800 !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+}
+
+.audio-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1px 4.5px;
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1;
+  border-radius: 3px;
+  letter-spacing: 0.2px;
+  user-select: none;
+  transition: all 0.15s ease;
+}
+
+.audio-badge:hover {
+  transform: scale(1.06);
+}
+
+/* Hi-Res 黑底 + 金色字 */
+.audio-badge.badge-hires {
+  background: #121214;
+  color: #fbbf24 !important;
+  border: 1px solid rgba(251, 191, 36, 0.4);
+  font-weight: 800;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+}
+
+/* SQ 玫瑰红底 + 白字 */
+.audio-badge.badge-sq {
+  background: linear-gradient(135deg, #f43f5e 0%, #e11d48 100%);
+  color: #ffffff !important;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 1px 4px rgba(225, 29, 72, 0.3);
+}
+
+/* HQ 优雅紫罗兰 */
+.audio-badge.badge-hq {
+  background: rgba(139, 92, 246, 0.1);
+  color: #7c3aed;
+  border: 1px solid rgba(139, 92, 246, 0.22);
+}
+
+/* 比特率微标 - 全局 100% 统一浅粉底 + 白色字 */
+.audio-badge.badge-bitrate {
+  background: linear-gradient(135deg, #f472b6 0%, #fb7185 100%) !important;
+  color: #ffffff !important;
+  border: 1px solid rgba(255, 255, 255, 0.25) !important;
+  box-shadow: 0 1px 3px rgba(244, 114, 182, 0.3) !important;
+  font-weight: 600 !important;
+}
+
+.app-container.theme-light .audio-badge.badge-sq,
+.app-container.theme-grey .audio-badge.badge-sq {
+  background: linear-gradient(135deg, #f43f5e 0%, #e11d48 100%);
+  color: #ffffff !important;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 1px 4px rgba(225, 29, 72, 0.25);
+}
+
+.app-container.theme-light .audio-badge.badge-hires,
+.app-container.theme-grey .audio-badge.badge-hires {
+  background: #121214;
+  color: #fbbf24 !important;
+  border: 1px solid rgba(251, 191, 36, 0.4);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   歌名过长智能跑马灯自动滚动 (Smart Marquee Auto-Scroll)
+   ═══════════════════════════════════════════════════════════════ */
+.player-song-info,
+.player-title-wrap,
+.comments-song-text,
+.comments-song-info,
+.lyrics-meta-under-cover {
+  overflow: hidden !important;
+  max-width: 100% !important;
+}
+
+/* 仅在跑马灯激活时才应用边缘渐变遮罩 — 遮罩在固定容器上，动画在内层元素上 */
+.marquee-mask {
+  display: inline-block;
+  overflow: hidden;
+  width: 100%;
+  -webkit-mask-image: linear-gradient(to right, transparent 0, #000 16px, #000 calc(100% - 16px), transparent 100%);
+  mask-image: linear-gradient(to right, transparent 0, #000 16px, #000 calc(100% - 16px), transparent 100%);
+}
+
+.is-seamless-marquee {
+  display: inline-flex !important;
+  white-space: nowrap !important;
+  width: max-content !important;
+  max-width: none !important;
+  will-change: transform;
+  animation: marquee-continuous var(--marquee-duration, 12s) linear infinite !important;
+}
+
+.is-seamless-marquee .marquee-inner {
+  display: inline-block !important;
+  flex: 0 0 auto !important;
+  white-space: nowrap !important;
+}
+
+@keyframes marquee-continuous {
+  0%, 15% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+/* Vite HMR Reload Trigger */
+
+/* ══ Light Theme ══ */
+.app-container.theme-light .comments-panel {
+  background: rgba(255, 255, 255, 0.15);
+  border-left-color: rgba(0, 0, 0, 0.05);
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.45), 0 8px 24px rgba(0, 0, 0, 0.03);
+}
+
+.app-container.theme-light .comments-header {
+  border-bottom-color: var(--glass-border);
+}
+
+.app-container.theme-light .comments-song-info {
+  border-bottom-color: var(--glass-border);
+}
+
+.app-container.theme-light .comments-play-btn {
+  background: rgba(0, 0, 0, 0.35);
+}
+
+.app-container.theme-light .comments-action-btn:hover {
+  background: rgba(0, 0, 0, 0.06);
+}
+
+.app-container.theme-light .comments-list::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.12);
+}
+
+.app-container.theme-light .comment-item:hover {
+  background: rgba(0, 0, 0, 0.03);
+}
+
+.app-container.theme-light .comment-image {
+  border-color: rgba(0, 0, 0, 0.1);
+}
+
+.app-container.theme-light .comments-close-btn:hover {
+  background: var(--glass-border);
+}
+
+.app-container.theme-light .comments-load-more-btn {
+  background: var(--glass-border);
+  border-color: var(--glass-border);
+}
+
+.app-container.theme-light .comments-load-more-btn:hover {
+  background: rgba(0, 0, 0, 0.08);
+  border-color: rgba(var(--dynamic-color, 0, 136, 204), 0.3);
+}
+
+/* ══ Grey Theme ══ */
+.app-container.theme-grey .comments-panel {
+  background: rgba(255, 255, 255, 0.02);
+  border-left-color: rgba(255, 255, 255, 0.1);
+  box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.25), 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
+.app-container.theme-grey .comments-header {
+  border-bottom-color: var(--glass-border);
+}
+
+.app-container.theme-grey .comments-song-info {
+  border-bottom-color: var(--glass-border);
+}
+
+/* ══ Light/Grey Theme Tags ══ */
+.app-container.theme-light .comment-platform-tag,
+.app-container.theme-grey .comment-platform-tag {
+  background: rgba(0, 0, 0, 0.04);
+  border-color: rgba(0, 0, 0, 0.06);
+}
+
+/* 浅色主题平台标签颜色 */
+.app-container.theme-light .platform-wy,
+.app-container.theme-grey .platform-wy,
+.app-container.theme-light .platform-netease,
+.app-container.theme-grey .platform-netease {
+  background: rgba(230, 50, 50, 0.1);
+  border-color: rgba(230, 50, 50, 0.2);
+  color: #d32f2f;
+}
+
+.app-container.theme-light .platform-kw,
+.app-container.theme-grey .platform-kw,
+.app-container.theme-light .platform-kuwo,
+.app-container.theme-grey .platform-kuwo {
+  background: rgba(234, 179, 8, 0.1);
+  border-color: rgba(234, 179, 8, 0.2);
+  color: #ca8a04;
+}
+
+.app-container.theme-light .platform-qq,
+.app-container.theme-grey .platform-qq {
+  background: rgba(34, 197, 94, 0.1);
+  border-color: rgba(34, 197, 94, 0.2);
+  color: #16a34a;
+}
+
+.app-container.theme-light .platform-kg,
+.app-container.theme-grey .platform-kg,
+.app-container.theme-light .platform-kugou,
+.app-container.theme-grey .platform-kugou {
+  background: rgba(59, 130, 246, 0.1);
+  border-color: rgba(59, 130, 246, 0.2);
+  color: #2563eb;
+}
+
+.app-container.theme-light .comment-ip-tag,
+.app-container.theme-grey .comment-ip-tag {
+  opacity: 0.5;
+}
+
+/* ══ Comment Button in Player Bar ══ */
+#comments-toggle-btn {
+  position: relative;
+}
+
+#comments-toggle-btn.active {
+  color: rgb(var(--dynamic-color, 0, 240, 255));
+}
+
+.app-container.theme-light #comments-toggle-btn.active {
+  color: rgb(var(--dynamic-color, 0, 144, 170));
+}
+
+/* ══ Secondary Comment / Reply Styling ══ */
+.comment-be-replied {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.6);
+  margin-right: 4px;
+}
+
+.comment-be-replied-name {
+  color: rgb(var(--dynamic-color, 0, 240, 255));
+  font-weight: 600;
+}
+
+.app-container.theme-light .comment-be-replied {
+  color: rgba(0, 0, 0, 0.55);
+}
+
+.app-container.theme-light .comment-be-replied-name {
+  color: rgb(var(--dynamic-color, 0, 144, 170));
+}
+
+.comment-replies {
+  margin-top: 10px;
+  padding-left: 12px;
+  border-left: 2px solid rgba(255, 255, 255, 0.1);
+}
+
+.app-container.theme-light .comment-replies {
+  border-left-color: rgba(0, 0, 0, 0.08);
+}
+
+
+/* ══ 评论右键菜单 ══ */
+.comment-context-menu {
+  position: fixed;
+  z-index: 10000;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 6px;
+  min-width: 160px;
+  box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.25), 0 8px 24px rgba(0, 0, 0, 0.12);
+  backdrop-filter: blur(20px) saturate(140%);
+  -webkit-backdrop-filter: blur(20px) saturate(140%);
+  animation: ctxMenuIn 0.15s ease;
+}
+@keyframes ctxMenuIn {
+  from { opacity: 0; transform: scale(0.92); }
+  to { opacity: 1; transform: scale(1); }
+}
+.comment-context-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  font-size: 13px;
+  color: var(--text-primary);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.comment-context-menu-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgb(var(--dynamic-color, 0, 240, 255));
+}
+.comment-context-menu-item svg {
+  width: 16px;
+  height: 16px;
+  opacity: 0.7;
+}
+.comment-context-menu-divider {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.06);
+  margin: 4px 6px;
+}
+.app-container.theme-light .comment-context-menu {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(0, 0, 0, 0.05);
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.45), 0 8px 24px rgba(0, 0, 0, 0.03);
+}
+.app-container.theme-light .comment-context-menu-item:hover {
+  background: rgba(0, 0, 0, 0.04);
+}
+.app-container.theme-light .comment-context-menu-divider {
+  background: rgba(0, 0, 0, 0.06);
+}
+
+/* ══ 评论海报预览模态框 ══ */
+.poster-preview-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10001;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: posterOverlayIn 0.2s ease;
+}
+@keyframes posterOverlayIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.poster-preview-modal {
+  background: rgba(28, 28, 38, 0.98);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  padding: 24px;
+  max-width: 420px;
+  width: 90%;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+  animation: posterModalIn 0.25s ease;
+}
+@keyframes posterModalIn {
+  from { opacity: 0; transform: translateY(20px) scale(0.95); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.poster-preview-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.9);
+  margin-bottom: 16px;
+  text-align: center;
+}
+.poster-preview-image-wrap {
+  width: 100%;
+  border-radius: 10px;
+  overflow: hidden;
+  background: rgba(0, 0, 0, 0.3);
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  max-height: 60vh;
+}
+.poster-preview-image-wrap img {
+  width: 100%;
+  display: block;
+  border-radius: 10px;
+}
+.poster-preview-actions {
+  display: flex;
+  gap: 10px;
+}
+.poster-preview-actions button {
+  flex: 1;
+  padding: 10px 0;
+  border: none;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.poster-btn-copy {
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  color: #fff;
+}
+.poster-btn-copy:hover {
+  filter: brightness(1.1);
+  transform: translateY(-1px);
+}
+.poster-btn-save {
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+}
+.poster-btn-save:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+.poster-btn-close {
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.5);
+}
+.poster-btn-close:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.7);
+}
+.app-container.theme-light .poster-preview-modal {
+  background: rgba(255, 255, 255, 0.98);
+  border-color: rgba(0, 0, 0, 0.1);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+}
+.app-container.theme-light .poster-preview-title {
+  color: rgba(0, 0, 0, 0.85);
+}
+.app-container.theme-light .poster-preview-image-wrap {
+  background: rgba(0, 0, 0, 0.05);
+}
+.app-container.theme-light .poster-btn-save {
+  background: rgba(0, 0, 0, 0.06);
+  color: rgba(0, 0, 0, 0.7);
+  border-color: rgba(0, 0, 0, 0.12) !important;
+}
+.app-container.theme-light .poster-btn-close {
+  background: rgba(0, 0, 0, 0.04);
+  color: rgba(0, 0, 0, 0.5);
+}
+
+/* Audio Quality Tags */
+.song-audio-tags {
+  display: flex;
+  gap: 4px;
+  margin-top: 2px;
+  flex-wrap: wrap;
+}
+
+.audio-tag {
+  font-size: 9px;
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-weight: 500;
+  letter-spacing: 0.3px;
+  line-height: 1.3;
+}
+
+.audio-tag.format {
+  background: rgba(var(--dynamic-color, 0, 240, 255), 0.15);
+  color: rgba(var(--dynamic-color, 0, 240, 255), 0.9);
+}
+
+.audio-tag.quality {
+  background: rgba(255, 215, 0, 0.15);
+  color: rgba(255, 215, 0, 0.9);
+}
+
+.audio-tag.quality.hires {
+  background: rgba(255, 100, 100, 0.15);
+  color: rgba(255, 100, 100, 0.9);
+}
+
+.audio-tag.bitrate {
+  background: rgba(100, 200, 100, 0.15);
+  color: rgba(100, 200, 100, 0.9);
+}
+
+/* Light theme */
+.app-container.theme-light .audio-tag.format {
+  background: rgba(var(--dynamic-color, 0, 136, 204), 0.12);
+  color: rgba(var(--dynamic-color, 0, 136, 204), 0.9);
+}
+
+.app-container.theme-light .audio-tag.quality {
+  background: rgba(180, 130, 0, 0.12);
+  color: rgba(180, 130, 0, 0.9);
+}
+
+.app-container.theme-light .audio-tag.bitrate {
+  background: rgba(0, 140, 0, 0.12);
+  color: rgba(0, 140, 0, 0.9);
+}

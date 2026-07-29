@@ -1,0 +1,945 @@
+/* 1. Frosted Glass Context Menu */
+.kimo-context-menu {
+  position: fixed;
+  z-index: 10000;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 6px;
+  min-width: 170px;
+  box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.25), 0 8px 24px rgba(0, 0, 0, 0.12);
+  backdrop-filter: blur(20px) saturate(140%);
+  -webkit-backdrop-filter: blur(20px) saturate(140%);
+  animation: kimo-menu-fade-in 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  transform-origin: top left;
+}
+
+@keyframes kimo-menu-fade-in {
+  from { opacity: 0; transform: scale(0.96) translateY(-4px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.kimo-context-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  font-size: 13px;
+  color: var(--text-primary);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.kimo-context-menu-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgb(var(--dynamic-color, 0, 240, 255));
+}
+
+/* Light theme */
+.kimo-context-menu[data-lyrics-theme="light"] {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(0, 0, 0, 0.05);
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.45), 0 8px 24px rgba(0, 0, 0, 0.03);
+}
+
+.kimo-context-menu[data-lyrics-theme="light"] .kimo-context-menu-item {
+  color: rgba(0, 0, 0, 0.85);
+}
+
+.kimo-context-menu[data-lyrics-theme="light"] .kimo-context-menu-item:hover {
+  background: rgba(0, 0, 0, 0.04);
+  color: rgb(var(--dynamic-color, 0, 136, 204));
+}
+
+.kimo-context-menu[data-lyrics-theme="light"] .kimo-context-menu-item svg {
+  color: rgba(0, 0, 0, 0.5);
+}
+
+/* Dark theme (default) */
+.kimo-context-menu[data-lyrics-theme="dark"] {
+  background: rgba(255, 255, 255, 0.02);
+  border-color: rgba(255, 255, 255, 0.1);
+  box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.25), 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
+.kimo-context-menu[data-lyrics-theme="dark"] .kimo-context-menu-item {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.kimo-context-menu[data-lyrics-theme="dark"] .kimo-context-menu-item:hover {
+  color: rgb(var(--dynamic-color, 0, 240, 255));
+}
+
+.kimo-context-menu[data-lyrics-theme="dark"] .kimo-context-menu-item svg {
+  color: rgba(255, 255, 255, 0.5);
+}
+
+/* Grey theme (same as dark) */
+.kimo-context-menu:not([data-lyrics-theme]) {
+  background: rgba(255, 255, 255, 0.02);
+  border-color: rgba(255, 255, 255, 0.1);
+  box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.25), 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
+/* 2. Glassmorphism Calibration Dialog/Modal Overlay */
+.kimo-modal-overlay {
+  position: fixed;
+  top: -2px;
+  left: -2px;
+  right: -2px;
+  bottom: -2px;
+  width: calc(100% + 4px);
+  height: calc(100% + 4px);
+  z-index: 10005;
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(16px) saturate(180%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
+  isolation: isolate;
+  transform: translateZ(0);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  opacity: 0;
+  animation: kimo-modal-fade-in 0.25s ease forwards;
+  transition: opacity 0.2s ease, background 0.3s ease;
+}
+
+.kimo-modal-overlay.is-closing {
+  animation: kimo-modal-fade-out 0.22s cubic-bezier(0.4, 0, 0.2, 1) forwards !important;
+  pointer-events: none;
+}
+
+.kimo-modal-overlay.is-closing .kimo-modal-card {
+  animation: kimo-card-zoom-out 0.22s cubic-bezier(0.4, 0, 0.2, 1) forwards !important;
+}
+
+.theme-light .kimo-modal-overlay {
+  background: rgba(240, 240, 245, 0.65);
+}
+
+.theme-grey .kimo-modal-overlay {
+  background: rgba(220, 222, 230, 0.65);
+}
+
+@keyframes kimo-modal-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes kimo-modal-fade-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@keyframes kimo-card-zoom-in {
+  from {
+    opacity: 0;
+    transform: scale(0.9) translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes kimo-card-zoom-out {
+  from {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.9) translateY(20px);
+  }
+}
+
+.kimo-modal-card {
+  width: 550px;
+  max-width: calc(100% - 40px);
+  background: rgba(25, 25, 30, 0.88);
+  backdrop-filter: blur(30px) saturate(180%);
+  -webkit-backdrop-filter: blur(30px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  overflow: hidden;
+  background-clip: padding-box;
+  display: flex;
+  flex-direction: column;
+  opacity: 0;
+  transform: scale(0.9) translateY(20px);
+  animation: kimo-card-zoom-in 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.theme-light .kimo-modal-card {
+  background: rgba(245, 245, 247, 0.94);
+  border-color: rgba(0, 0, 0, 0.08);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+.theme-grey .kimo-modal-card {
+  background: rgba(227, 227, 232, 0.94);
+  border-color: rgba(0, 0, 0, 0.08);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+/* 自定义弹窗输入框 */
+.kimo-prompt-input {
+  width: 100%;
+  padding: 9px 12px;
+  font-size: 14px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  color: var(--text-primary);
+  outline: none;
+  box-sizing: border-box;
+  transition: background 0.25s, border-color 0.25s, color 0.25s;
+}
+.theme-light .kimo-prompt-input {
+  background: rgba(0, 0, 0, 0.04);
+  border-color: rgba(0, 0, 0, 0.1);
+}
+
+/* 自定义弹窗取消按钮 */
+.kimo-modal-btn-cancel {
+  padding: 7px 18px;
+  font-size: 13px;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: var(--text-secondary);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.25s, border-color 0.25s, color 0.25s;
+}
+.theme-light .kimo-modal-btn-cancel {
+  border-color: rgba(0, 0, 0, 0.12);
+}
+
+@keyframes kimo-card-zoom-in {
+  from { opacity: 0; transform: scale(0.9) translateY(20px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.kimo-modal-header {
+  padding: 16px 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.theme-light .kimo-modal-header {
+  border-bottom-color: rgba(0, 0, 0, 0.05);
+}
+
+.kimo-modal-title {
+  display: flex;
+  align-items: center;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.kimo-modal-close {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 22px;
+  cursor: pointer;
+  transition: color 0.15s ease;
+  line-height: 1;
+}
+
+.kimo-modal-close:hover {
+  color: var(--text-primary);
+}
+
+.kimo-modal-body {
+  padding: 24px;
+  max-height: 380px;
+  overflow-y: auto;
+}
+
+/* 3. Loading Indicator Style */
+.kimo-loading-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 20px 0;
+  text-align: center;
+}
+
+.kimo-spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid rgba(255, 255, 255, 0.05);
+  border-top: 3px solid var(--accent-color);
+  border-radius: 50%;
+  animation: kimo-spin 0.8s linear infinite;
+  margin-bottom: 20px;
+}
+
+@keyframes kimo-spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.kimo-loading-text {
+  font-size: 13px;
+  color: var(--text-primary);
+  font-weight: 550;
+  margin-bottom: 8px;
+}
+
+.kimo-loading-subtext {
+  font-size: 12px;
+  color: var(--text-secondary);
+  font-style: italic;
+  opacity: 0.8;
+}
+
+/* 4. Diff Table visual layout */
+.kimo-diff-preview-header {
+  margin-bottom: 18px;
+}
+
+.kimo-diff-text-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--accent-color);
+  margin-bottom: 6px;
+}
+
+.kimo-diff-sub-desc {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.kimo-diff-table {
+  display: flex;
+  flex-direction: column;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.theme-light .kimo-diff-table {
+  background: rgba(0, 0, 0, 0.01);
+  border-color: rgba(0, 0, 0, 0.05);
+}
+
+.kimo-diff-row {
+  display: flex;
+  align-items: center;
+  padding: 10px 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+  font-size: 13px;
+}
+
+.theme-light .kimo-diff-row {
+  border-bottom-color: rgba(0, 0, 0, 0.03);
+}
+
+.kimo-diff-row:last-child {
+  border-bottom: none;
+}
+
+.kimo-diff-row.header {
+  background: rgba(255, 255, 255, 0.04);
+  font-weight: 700;
+  font-size: 11px;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  letter-spacing: 0.5px;
+}
+
+.theme-light .kimo-diff-row.header {
+  background: rgba(0, 0, 0, 0.03);
+}
+
+.kimo-diff-row .col-char {
+  flex: 1.2;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.kimo-diff-row .col-orig {
+  flex: 2;
+  color: var(--text-secondary);
+  font-family: monospace;
+}
+
+.kimo-diff-row .col-arrow {
+  flex: 0.5;
+  color: var(--text-secondary);
+  opacity: 0.5;
+  text-align: center;
+}
+
+.kimo-diff-row .col-new {
+  flex: 2;
+  color: var(--text-primary);
+  font-weight: 550;
+  font-family: monospace;
+}
+
+.kimo-diff-row .col-delta {
+  flex: 2.2;
+  text-align: right;
+  font-weight: 700;
+  font-size: 12px;
+}
+
+/* Beautiful color-coded Diff states */
+.kimo-diff-row .col-delta.perfect {
+  color: rgba(255, 255, 255, 0.4);
+}
+.theme-light .kimo-diff-row .col-delta.perfect {
+  color: rgba(0, 0, 0, 0.35);
+}
+
+.kimo-diff-row .col-delta.new-aligned {
+  color: #00f0ff;
+}
+
+.kimo-diff-row .col-delta.delay {
+  color: #ff8833;
+}
+
+.kimo-diff-row .col-delta.early {
+  color: #00ff88;
+}
+
+/* 5. Modal Footer Action buttons */
+.kimo-modal-footer {
+  padding: 14px 20px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.theme-light .kimo-modal-footer {
+  border-top-color: rgba(0, 0, 0, 0.05);
+}
+
+.kimo-modal-btn {
+  padding: 9px 18px;
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.kimo-modal-btn.cancel {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--text-primary);
+}
+
+.kimo-modal-btn.cancel:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.kimo-modal-btn.apply {
+  background: rgba(0, 240, 255, 0.12);
+  border: 1px solid rgba(0, 240, 255, 0.35);
+  color: #00f0ff;
+}
+
+.kimo-modal-btn.apply:hover {
+  background: rgba(0, 240, 255, 0.22);
+  box-shadow: 0 0 12px rgba(0, 240, 255, 0.3);
+}
+
+/* 6. Elegant floating Page Toast - Crystal Glass Material */
+.kimo-toast {
+  position: fixed;
+  bottom: 120px;
+  left: 50%;
+  transform: translateX(-50%) translateY(30px);
+  z-index: 10010;
+  /* Crystal glass: Pure water-like transparent base */
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.9);
+  /* Lower blur for maximum optical transmission while maintaining scatter */
+  backdrop-filter: blur(12px) saturate(140%);
+  -webkit-backdrop-filter: blur(12px) saturate(140%);
+  /* Crystal specular edge highlight only, zero muddy dark shadows */
+  box-shadow: 
+    inset 0 1px 2px rgba(255, 255, 255, 0.25), 
+    0 8px 24px rgba(0, 0, 0, 0.12);
+  padding: 14px 28px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.3px;
+  opacity: 0;
+  pointer-events: none;
+  transition: transform 0.35s cubic-bezier(0.23, 1, 0.32, 1), opacity 0.35s cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.theme-light .kimo-toast {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(0, 0, 0, 0.05);
+  color: rgba(0, 0, 0, 0.65);
+  box-shadow: 
+    inset 0 1px 1px rgba(255, 255, 255, 0.45), 
+    0 8px 24px rgba(0, 0, 0, 0.03);
+}
+
+/* UI 风格适配：Toast（Toast 挂载在 body 上，所以用 body 选择器） */
+/* 亚克力 */
+body.ui-style-acrylic .kimo-toast,
+.app-container.ui-style-acrylic .kimo-toast {
+  backdrop-filter: blur(20px) saturate(140%);
+  -webkit-backdrop-filter: blur(20px) saturate(140%);
+  background: rgba(0, 0, 0, 0.7);
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.1);
+}
+body.ui-style-acrylic.theme-light .kimo-toast,
+body.ui-style-acrylic.theme-grey .kimo-toast,
+.app-container.ui-style-acrylic.theme-light .kimo-toast,
+.app-container.ui-style-acrylic.theme-grey .kimo-toast {
+  background: rgba(255, 255, 255, 0.96);
+  color: rgba(0, 0, 0, 0.75);
+  border-color: rgba(0, 0, 0, 0.05);
+}
+/* 高斯模糊 */
+body.ui-style-gaussian .kimo-toast,
+.app-container.ui-style-gaussian .kimo-toast {
+  backdrop-filter: blur(32px) saturate(180%);
+  -webkit-backdrop-filter: blur(32px) saturate(180%);
+}
+/* 液态玻璃 */
+body.ui-style-liquid .kimo-toast,
+.app-container.ui-style-liquid .kimo-toast {
+  background: rgba(255, 255, 255, 0.02);
+  backdrop-filter: blur(12px) saturate(140%);
+  -webkit-backdrop-filter: blur(12px) saturate(140%);
+}
+body.ui-style-liquid.theme-light .kimo-toast,
+.app-container.ui-style-liquid.theme-light .kimo-toast {
+  background: rgba(255, 255, 255, 0.15);
+}
+/* 默认效果（纯色） */
+body.ui-style-solid .kimo-toast,
+.app-container.ui-style-solid .kimo-toast {
+  background: #1a1a1f;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border-color: rgba(255, 255, 255, 0.08);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+}
+body.ui-style-solid.theme-light .kimo-toast,
+body.ui-style-solid.theme-grey .kimo-toast,
+.app-container.ui-style-solid.theme-light .kimo-toast,
+.app-container.ui-style-solid.theme-grey .kimo-toast {
+  background: #ffffff;
+  color: rgba(0, 0, 0, 0.75);
+  border-color: rgba(0, 0, 0, 0.08);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+}
+body.ui-style-solid.theme-grey .kimo-toast,
+.app-container.ui-style-solid.theme-grey .kimo-toast {
+  background: #e3e3e8;
+}
+
+/* UI 风格适配：悬浮按钮 */
+/* 亚克力 */
+.app-container.ui-style-acrylic .float-btn {
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(20px) saturate(140%);
+  -webkit-backdrop-filter: blur(20px) saturate(140%);
+  border-color: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.75);
+}
+.app-container.ui-style-acrylic.theme-light .float-btn,
+.app-container.ui-style-acrylic.theme-grey .float-btn {
+  background: rgba(255, 255, 255, 0.7);
+  border-color: rgba(0, 0, 0, 0.08);
+  color: rgba(0, 0, 0, 0.65);
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.45), 0 8px 24px rgba(0, 0, 0, 0.08);
+}
+/* 高斯模糊 */
+.app-container.ui-style-gaussian .float-btn {
+  backdrop-filter: blur(32px) saturate(180%);
+  -webkit-backdrop-filter: blur(32px) saturate(180%);
+}
+/* 液态玻璃 — 与默认一致，无需额外定义 */
+/* 默认效果（纯色） */
+.app-container.ui-style-solid .float-btn {
+  background: #1a1a1f;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border-color: rgba(255, 255, 255, 0.08);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+}
+.app-container.ui-style-solid.theme-light .float-btn,
+.app-container.ui-style-solid.theme-grey .float-btn {
+  background: #ffffff;
+  border-color: rgba(0, 0, 0, 0.08);
+  color: rgba(0, 0, 0, 0.65);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+}
+.app-container.ui-style-solid.theme-grey .float-btn {
+  background: #e3e3e8;
+}
+
+/* UI 风格适配：评论区面板（挂载在 body 上，用 body 选择器） */
+/* 亚克力 */
+body.ui-style-acrylic .comments-panel,
+.app-container.ui-style-acrylic .comments-panel {
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(20px) saturate(140%);
+  -webkit-backdrop-filter: blur(20px) saturate(140%);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+body.ui-style-acrylic.theme-light .comments-panel,
+body.ui-style-acrylic.theme-grey .comments-panel,
+.app-container.ui-style-acrylic.theme-light .comments-panel,
+.app-container.ui-style-acrylic.theme-grey .comments-panel {
+  background: rgba(255, 255, 255, 0.85);
+  border-color: rgba(0, 0, 0, 0.06);
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.45), 0 8px 24px rgba(0, 0, 0, 0.08);
+}
+
+/* 高斯模糊 */
+body.ui-style-gaussian .comments-panel,
+.app-container.ui-style-gaussian .comments-panel {
+  backdrop-filter: blur(32px) saturate(180%);
+  -webkit-backdrop-filter: blur(32px) saturate(180%);
+}
+
+/* 液态玻璃 — 保持默认样式，无需额外定义 */
+
+/* 默认效果（纯色） */
+body.ui-style-solid .comments-panel,
+.app-container.ui-style-solid .comments-panel {
+  background: #1a1a1f;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border-color: rgba(255, 255, 255, 0.08);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+}
+body.ui-style-solid.theme-light .comments-panel,
+body.ui-style-solid.theme-grey .comments-panel,
+.app-container.ui-style-solid.theme-light .comments-panel,
+.app-container.ui-style-solid.theme-grey .comments-panel {
+  background: #ffffff;
+  border-color: rgba(0, 0, 0, 0.08);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+}
+body.ui-style-solid.theme-grey .comments-panel,
+.app-container.ui-style-solid.theme-grey .comments-panel {
+  background: #e3e3e8;
+}
+
+/* UI 风格适配：评论区分割线 */
+/* 亚克力 - 浅色/灰色主题 */
+body.ui-style-acrylic.theme-light .comments-header,
+body.ui-style-acrylic.theme-light .comments-song-info,
+body.ui-style-acrylic.theme-grey .comments-header,
+body.ui-style-acrylic.theme-grey .comments-song-info,
+.app-container.ui-style-acrylic.theme-light .comments-header,
+.app-container.ui-style-acrylic.theme-light .comments-song-info,
+.app-container.ui-style-acrylic.theme-grey .comments-header,
+.app-container.ui-style-acrylic.theme-grey .comments-song-info {
+  border-bottom-color: rgba(0, 0, 0, 0.06);
+}
+
+/* 默认效果（纯色）- 深色主题分割线 */
+body.ui-style-solid .comments-header,
+body.ui-style-solid .comments-song-info,
+.app-container.ui-style-solid .comments-header,
+.app-container.ui-style-solid .comments-song-info {
+  border-bottom-color: rgba(255, 255, 255, 0.06);
+}
+/* 默认效果（纯色）- 浅色/灰色主题分割线 */
+body.ui-style-solid.theme-light .comments-header,
+body.ui-style-solid.theme-light .comments-song-info,
+body.ui-style-solid.theme-grey .comments-header,
+body.ui-style-solid.theme-grey .comments-song-info,
+.app-container.ui-style-solid.theme-light .comments-header,
+.app-container.ui-style-solid.theme-light .comments-song-info,
+.app-container.ui-style-solid.theme-grey .comments-header,
+.app-container.ui-style-solid.theme-grey .comments-song-info {
+  border-bottom-color: rgba(0, 0, 0, 0.06);
+}
+
+/* UI 风格适配：评论区加载更多按钮 */
+/* 默认效果（纯色）- 浅色/灰色主题 */
+body.ui-style-solid.theme-light .comments-load-more-btn,
+body.ui-style-solid.theme-grey .comments-load-more-btn,
+.app-container.ui-style-solid.theme-light .comments-load-more-btn,
+.app-container.ui-style-solid.theme-grey .comments-load-more-btn {
+  background: rgba(0, 0, 0, 0.04);
+  border-color: rgba(0, 0, 0, 0.06);
+}
+body.ui-style-solid.theme-light .comments-load-more-btn:hover,
+body.ui-style-solid.theme-grey .comments-load-more-btn:hover,
+.app-container.ui-style-solid.theme-light .comments-load-more-btn:hover,
+.app-container.ui-style-solid.theme-grey .comments-load-more-btn:hover {
+  background: rgba(0, 0, 0, 0.08);
+}
+
+/* UI 风格适配：评论项 hover */
+/* 默认效果（纯色）- 浅色/灰色主题 */
+body.ui-style-solid.theme-light .comment-item:hover,
+body.ui-style-solid.theme-grey .comment-item:hover,
+.app-container.ui-style-solid.theme-light .comment-item:hover,
+.app-container.ui-style-solid.theme-grey .comment-item:hover {
+  background: rgba(0, 0, 0, 0.03);
+}
+
+/* UI 风格适配：主右键菜单 .custom-context-menu（挂载在 body 上） */
+/* 亚克力 */
+body.ui-style-acrylic .custom-context-menu,
+.app-container.ui-style-acrylic .custom-context-menu {
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(20px) saturate(140%);
+  -webkit-backdrop-filter: blur(20px) saturate(140%);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+body.ui-style-acrylic.theme-light .custom-context-menu,
+body.ui-style-acrylic.theme-grey .custom-context-menu,
+.app-container.ui-style-acrylic.theme-light .custom-context-menu,
+.app-container.ui-style-acrylic.theme-grey .custom-context-menu {
+  background: rgba(255, 255, 255, 0.92);
+  border-color: rgba(0, 0, 0, 0.06);
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.45), 0 8px 24px rgba(0, 0, 0, 0.08);
+}
+body.ui-style-acrylic.theme-light .custom-context-menu .context-menu-item:hover,
+body.ui-style-acrylic.theme-grey .custom-context-menu .context-menu-item:hover,
+.app-container.ui-style-acrylic.theme-light .custom-context-menu .context-menu-item:hover,
+.app-container.ui-style-acrylic.theme-grey .custom-context-menu .context-menu-item:hover {
+  background: rgba(0, 0, 0, 0.06);
+}
+body.ui-style-acrylic.theme-light .custom-context-menu .context-menu-divider,
+body.ui-style-acrylic.theme-grey .custom-context-menu .context-menu-divider,
+.app-container.ui-style-acrylic.theme-light .custom-context-menu .context-menu-divider,
+.app-container.ui-style-acrylic.theme-grey .custom-context-menu .context-menu-divider {
+  background: rgba(0, 0, 0, 0.06);
+}
+
+/* 高斯模糊 */
+body.ui-style-gaussian .custom-context-menu,
+.app-container.ui-style-gaussian .custom-context-menu {
+  backdrop-filter: blur(32px) saturate(180%);
+  -webkit-backdrop-filter: blur(32px) saturate(180%);
+}
+
+/* 液态玻璃 — 保持默认样式，无需额外定义 */
+
+/* 默认效果（纯色） */
+body.ui-style-solid .custom-context-menu,
+.app-container.ui-style-solid .custom-context-menu {
+  background: #1a1a1f;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border-color: rgba(255, 255, 255, 0.08);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+}
+body.ui-style-solid.theme-light .custom-context-menu,
+body.ui-style-solid.theme-grey .custom-context-menu,
+.app-container.ui-style-solid.theme-light .custom-context-menu,
+.app-container.ui-style-solid.theme-grey .custom-context-menu {
+  background: #ffffff;
+  border-color: rgba(0, 0, 0, 0.08);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+}
+body.ui-style-solid.theme-grey .custom-context-menu,
+.app-container.ui-style-solid.theme-grey .custom-context-menu {
+  background: #e3e3e8;
+}
+body.ui-style-solid .custom-context-menu .context-menu-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+body.ui-style-solid.theme-light .custom-context-menu .context-menu-item:hover,
+body.ui-style-solid.theme-grey .custom-context-menu .context-menu-item:hover,
+.app-container.ui-style-solid.theme-light .custom-context-menu .context-menu-item:hover,
+.app-container.ui-style-solid.theme-grey .custom-context-menu .context-menu-item:hover {
+  background: rgba(0, 0, 0, 0.06);
+}
+body.ui-style-solid .custom-context-menu .context-menu-divider {
+  background: rgba(255, 255, 255, 0.06);
+}
+body.ui-style-solid.theme-light .custom-context-menu .context-menu-divider,
+body.ui-style-solid.theme-grey .custom-context-menu .context-menu-divider,
+.app-container.ui-style-solid.theme-light .custom-context-menu .context-menu-divider,
+.app-container.ui-style-solid.theme-grey .custom-context-menu .context-menu-divider {
+  background: rgba(0, 0, 0, 0.06);
+}
+
+/* UI 风格适配：专辑封面右键菜单 .kimo-context-menu（挂载在 body 上） */
+/* 亚克力 */
+body.ui-style-acrylic .kimo-context-menu,
+.app-container.ui-style-acrylic .kimo-context-menu {
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(20px) saturate(140%);
+  -webkit-backdrop-filter: blur(20px) saturate(140%);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+body.ui-style-acrylic.theme-light .kimo-context-menu,
+body.ui-style-acrylic.theme-grey .kimo-context-menu,
+.app-container.ui-style-acrylic.theme-light .kimo-context-menu,
+.app-container.ui-style-acrylic.theme-grey .kimo-context-menu {
+  background: rgba(255, 255, 255, 0.92);
+  border-color: rgba(0, 0, 0, 0.06);
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.45), 0 8px 24px rgba(0, 0, 0, 0.08);
+}
+body.ui-style-acrylic.theme-light .kimo-context-menu .kimo-context-menu-item:hover,
+body.ui-style-acrylic.theme-grey .kimo-context-menu .kimo-context-menu-item:hover,
+.app-container.ui-style-acrylic.theme-light .kimo-context-menu .kimo-context-menu-item:hover,
+.app-container.ui-style-acrylic.theme-grey .kimo-context-menu .kimo-context-menu-item:hover {
+  background: rgba(0, 0, 0, 0.06);
+}
+
+/* 高斯模糊 */
+body.ui-style-gaussian .kimo-context-menu,
+.app-container.ui-style-gaussian .kimo-context-menu {
+  backdrop-filter: blur(32px) saturate(180%);
+  -webkit-backdrop-filter: blur(32px) saturate(180%);
+}
+
+/* 液态玻璃 — 保持默认样式，无需额外定义 */
+
+/* 默认效果（纯色） */
+body.ui-style-solid .kimo-context-menu,
+.app-container.ui-style-solid .kimo-context-menu {
+  background: #1a1a1f;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border-color: rgba(255, 255, 255, 0.08);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+}
+body.ui-style-solid.theme-light .kimo-context-menu,
+body.ui-style-solid.theme-grey .kimo-context-menu,
+.app-container.ui-style-solid.theme-light .kimo-context-menu,
+.app-container.ui-style-solid.theme-grey .kimo-context-menu {
+  background: #ffffff;
+  border-color: rgba(0, 0, 0, 0.08);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+}
+body.ui-style-solid.theme-grey .kimo-context-menu,
+.app-container.ui-style-solid.theme-grey .kimo-context-menu {
+  background: #e3e3e8;
+}
+body.ui-style-solid .kimo-context-menu .kimo-context-menu-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+body.ui-style-solid.theme-light .kimo-context-menu .kimo-context-menu-item:hover,
+body.ui-style-solid.theme-grey .kimo-context-menu .kimo-context-menu-item:hover,
+.app-container.ui-style-solid.theme-light .kimo-context-menu .kimo-context-menu-item:hover,
+.app-container.ui-style-solid.theme-grey .kimo-context-menu .kimo-context-menu-item:hover {
+  background: rgba(0, 0, 0, 0.06);
+}
+
+/* UI 风格适配：评论右键菜单（挂载在 body 上） */
+/* 亚克力 */
+body.ui-style-acrylic .comment-context-menu,
+.app-container.ui-style-acrylic .comment-context-menu {
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(20px) saturate(140%);
+  -webkit-backdrop-filter: blur(20px) saturate(140%);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+body.ui-style-acrylic.theme-light .comment-context-menu,
+body.ui-style-acrylic.theme-grey .comment-context-menu,
+.app-container.ui-style-acrylic.theme-light .comment-context-menu,
+.app-container.ui-style-acrylic.theme-grey .comment-context-menu {
+  background: rgba(255, 255, 255, 0.92);
+  border-color: rgba(0, 0, 0, 0.06);
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.45), 0 8px 24px rgba(0, 0, 0, 0.08);
+}
+body.ui-style-acrylic.theme-light .comment-context-menu-item:hover,
+body.ui-style-acrylic.theme-grey .comment-context-menu-item:hover,
+.app-container.ui-style-acrylic.theme-light .comment-context-menu-item:hover,
+.app-container.ui-style-acrylic.theme-grey .comment-context-menu-item:hover {
+  background: rgba(0, 0, 0, 0.06);
+}
+body.ui-style-acrylic.theme-light .comment-context-menu-divider,
+body.ui-style-acrylic.theme-grey .comment-context-menu-divider,
+.app-container.ui-style-acrylic.theme-light .comment-context-menu-divider,
+.app-container.ui-style-acrylic.theme-grey .comment-context-menu-divider {
+  background: rgba(0, 0, 0, 0.06);
+}
+
+/* 高斯模糊 */
+body.ui-style-gaussian .comment-context-menu,
+.app-container.ui-style-gaussian .comment-context-menu {
+  backdrop-filter: blur(32px) saturate(180%);
+  -webkit-backdrop-filter: blur(32px) saturate(180%);
+}
+
+/* 液态玻璃 — 保持默认样式，无需额外定义 */
+
+/* 默认效果（纯色） */
+body.ui-style-solid .comment-context-menu,
+.app-container.ui-style-solid .comment-context-menu {
+  background: #1a1a1f;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border-color: rgba(255, 255, 255, 0.08);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+}
+body.ui-style-solid.theme-light .comment-context-menu,
+body.ui-style-solid.theme-grey .comment-context-menu,
+.app-container.ui-style-solid.theme-light .comment-context-menu,
+.app-container.ui-style-solid.theme-grey .comment-context-menu {
+  background: #ffffff;
+  border-color: rgba(0, 0, 0, 0.08);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+}
+body.ui-style-solid.theme-grey .comment-context-menu,
+.app-container.ui-style-solid.theme-grey .comment-context-menu {
+  background: #e3e3e8;
+}
+body.ui-style-solid .comment-context-menu-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+body.ui-style-solid.theme-light .comment-context-menu-item:hover,
+body.ui-style-solid.theme-grey .comment-context-menu-item:hover,
+.app-container.ui-style-solid.theme-light .comment-context-menu-item:hover,
+.app-container.ui-style-solid.theme-grey .comment-context-menu-item:hover {
+  background: rgba(0, 0, 0, 0.06);
+}
+body.ui-style-solid .comment-context-menu-divider {
+  background: rgba(255, 255, 255, 0.06);
+}
+body.ui-style-solid.theme-light .comment-context-menu-divider,
+body.ui-style-solid.theme-grey .comment-context-menu-divider,
+.app-container.ui-style-solid.theme-light .comment-context-menu-divider,
+.app-container.ui-style-solid.theme-grey .comment-context-menu-divider {
+  background: rgba(0, 0, 0, 0.06);
+}
+
+.kimo-toast.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+/* Stagger / Row Lyric Animation Toggle Button Icon Visibility */
+.stagger-inactive-icon {
+  display: none;
+}
+.control-btn.stagger-active .stagger-inactive-icon {
+  display: none;
+}
+.control-btn.stagger-active .stagger-active-icon {
+  display: block;
+}
+.control-btn:not(.stagger-active) .stagger-active-icon {
+  display: none;
+}
+.control-btn:not(.stagger-active) .stagger-inactive-icon {
+  display: block;
+}

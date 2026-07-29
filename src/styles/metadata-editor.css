@@ -1,0 +1,843 @@
+/* ── 🌟 元数据编辑磨砂玻璃模态框 (Premium Metadata Editor Modal) ── */
+.modal-overlay {
+  position: fixed;
+  top: -2px;
+  left: -2px;
+  right: -2px;
+  bottom: -2px;
+  width: calc(100% + 4px);
+  height: calc(100% + 4px);
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(16px) saturate(180%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
+  isolation: isolate;
+  transform: translateZ(0);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 9999;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease, background 0.3s ease;
+}
+
+.theme-light .modal-overlay {
+  background: rgba(240, 240, 245, 0.65);
+}
+
+.theme-grey .modal-overlay {
+  background: rgba(220, 222, 230, 0.65);
+}
+
+.modal-overlay.active {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* 🌟 独立元数据编辑器窗口专属磨砂极客样式 🌟 */
+.standalone-editor {
+  background: #18181c !important;
+  height: 100vh !important;
+  width: 100vw !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+}
+
+.theme-light.standalone-editor {
+  background: #f4f4f6 !important;
+}
+
+.standalone-editor .modal-overlay {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
+  display: flex !important;
+  justify-content: center !important;
+  align-items: center !important;
+  background: #18181c !important; /* 优雅深色极地灰背景 */
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+.theme-light.standalone-editor .modal-overlay {
+  background: #f4f4f6 !important;
+}
+
+.standalone-editor .modal-content.wide-modal {
+  width: 100vw !important;
+  max-width: 100vw !important;
+  height: 100vh !important;
+  max-height: 100vh !important;
+  border: none !important;
+  border-radius: 0px !important;
+  box-shadow: none !important;
+  transform: none !important;
+  box-sizing: border-box !important;
+  padding: 24px !important;
+  background: transparent !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+/* 独立编辑窗口使用自绘标题区，替代 Windows 原生黑色标题栏。 */
+.standalone-editor .modal-header {
+  position: relative;
+}
+
+.standalone-editor .metadata-window-drag-region {
+  position: absolute;
+  inset: 0 56px 0 0;
+  z-index: 0;
+  cursor: move;
+}
+
+.standalone-editor .modal-header-title-group {
+  position: relative;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.standalone-editor .modal-close-btn {
+  position: relative;
+  z-index: 2;
+  pointer-events: auto;
+}
+
+.standalone-editor .modal-workspace {
+  height: calc(100vh - 120px) !important;
+  max-height: calc(100vh - 120px) !important;
+}
+
+.standalone-editor #metadata-editor-cancel {
+  display: none !important;
+}
+
+.modal-content.wide-modal {
+  width: 1150px;
+  max-width: calc(100% - 40px);
+  height: 80vh;
+  max-height: calc(100% - 40px);
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
+  border-radius: 16px;
+  overflow: hidden;
+  background-clip: padding-box;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  transform: scale(0.9);
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+}
+
+.modal-header {
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: flex-start !important;
+  width: 100% !important;
+  border-bottom: 1px solid var(--glass-border);
+  padding-bottom: 12px;
+  margin-bottom: 8px;
+}
+
+.modal-header-title-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.filename-tip {
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-family: monospace;
+}
+
+.modal-workspace {
+  display: flex;
+  gap: 24px;
+  flex: 1;
+  width: 100% !important;
+  height: calc(100% - 80px);
+  min-height: 0; /* 极其重要：确保子 flex 容器能够正确缩减并启用滚动 */
+  box-sizing: border-box;
+}
+
+.scrollable-column {
+  overflow-y: auto;
+  height: 100%;
+  padding-right: 8px;
+}
+
+
+
+.modal-workspace-left {
+  width: 420px !important;
+  max-width: 420px !important;
+  min-width: 420px !important;
+  flex: 0 0 420px !important;
+  border-right: 1px solid var(--glass-border);
+  padding-right: 20px;
+  box-sizing: border-box;
+}
+
+.modal-workspace-right {
+  flex: 1 1 auto !important;
+  width: 0 !important; /* 强制分配剩余全部空间，拒绝横向撑爆 */
+  min-width: 0 !important;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+}
+
+.metadata-form-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 16px;
+}
+
+.form-row-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.lyrics-editor-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  border-bottom: 1px solid var(--glass-border);
+  padding-bottom: 8px;
+}
+
+.lyrics-editor-header h4 {
+  margin: 0;
+  font-size: 1rem;
+  color: var(--text-primary);
+}
+
+.lyrics-editor-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.btn-action-sm {
+  background: var(--surface-color);
+  border: 1px solid var(--glass-border);
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 11px;
+  color: var(--text-primary);
+  cursor: pointer;
+  font-family: var(--font-family);
+  transition: all 0.2s ease;
+}
+
+.btn-action-sm:hover {
+  background: var(--surface-hover);
+  border-color: var(--accent-color);
+}
+
+.lyrics-editor-viewport {
+  flex: 1;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+
+.lyrics-editor-loading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 200px;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.lyrics-editor-raw-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.full-textarea {
+  flex: 1;
+  width: 100%;
+  height: 100%;
+  min-height: 380px;
+}
+
+/* ── 🎤 结构化时轴歌词行与字卡片 (Structured Timeline Lyric Row) ── */
+.lyric-row-item {
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 1px dashed rgba(255, 255, 255, 0.05);
+}
+
+.lyric-row-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.lyric-row-meta-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.lyric-row-number {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--accent-color);
+  font-family: monospace;
+  background: rgba(255, 255, 255, 0.03);
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+
+.lyric-row-id-group {
+  display: flex;
+  gap: 6px;
+}
+
+.lyric-row-id-btn {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--glass-border);
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: var(--font-family);
+}
+
+.lyric-row-id-btn:hover {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+
+.lyric-row-id-btn.active {
+  background: rgba(var(--dynamic-color, 0, 240, 255), 0.15);
+  color: rgb(var(--dynamic-color, 0, 240, 255));
+  border-color: rgba(var(--dynamic-color, 0, 240, 255), 0.4);
+  font-weight: 600;
+}
+
+.btn-row-remove {
+  background: transparent;
+  border: none;
+  color: rgba(255, 77, 79, 0.6);
+  font-size: 12px;
+  cursor: pointer;
+  transition: color 0.2s;
+}
+
+.btn-row-remove:hover {
+  color: #ff4d4f;
+}
+
+/* 单元格网格 */
+.lyric-word-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* 迷你字单元格卡片 (点击激活悬浮气泡编辑) */
+.word-unit-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  min-width: 95px;
+  width: auto;
+  height: 90px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--glass-border);
+  border-radius: 8px;
+  padding: 6px 12px;
+  box-sizing: border-box;
+  cursor: pointer;
+  user-select: none;
+  transition: background-color 0.2s, border-color 0.2s, transform 0.15s;
+}
+
+.word-unit-card:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(var(--dynamic-color, 0, 240, 255), 0.3);
+  transform: translateY(-1px);
+}
+
+.word-unit-card.active {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: var(--accent-color);
+  box-shadow: 0 0 10px rgba(var(--dynamic-color, 0, 240, 255), 0.2);
+}
+
+/* 时间戳底色徽章 */
+.word-time-badge {
+  font-size: 10px;
+  font-family: 'Consolas', 'Courier New', monospace;
+  text-align: center;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: 500;
+  letter-spacing: 0.2px;
+  width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.word-time-badge.start {
+  color: #00e676; /* 绿色 */
+  background: rgba(0, 230, 118, 0.12); /* 绿色半透明底色 */
+}
+
+.word-time-badge.end {
+  color: #ff1744; /* 红色 */
+  background: rgba(255, 23, 68, 0.12); /* 红色半透明底色 */
+}
+
+/* 单元卡大字体展示 */
+.word-text-display {
+  font-size: 22px; /* 字体加大 */
+  font-weight: 700;
+  text-align: center;
+  color: var(--text-primary);
+  font-family: var(--font-family);
+  margin: 4px 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  width: auto;
+}
+
+/* ── 🫧 字单元悬浮气泡编辑器 (Word Unit Bubble Popover Editor) ── */
+.word-bubble-editor {
+  position: absolute;
+  z-index: 10005;
+  background: rgba(20, 20, 22, 0.96);
+  border: 1px solid var(--glass-border);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5), 0 0 15px rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-radius: 12px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 155px;
+  box-sizing: border-box;
+  transform: translate(-50%, -115%) scale(0.95);
+  opacity: 0;
+  pointer-events: none;
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.2s;
+}
+
+.word-bubble-editor.active {
+  transform: translate(-50%, -115%) scale(1);
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.word-bubble-editor::after {
+  content: '';
+  position: absolute;
+  bottom: -6px;
+  left: 50%;
+  transform: translateX(-50%) rotate(45deg);
+  width: 12px;
+  height: 12px;
+  background: rgba(20, 20, 22, 0.96);
+  border-right: 1px solid var(--glass-border);
+  border-bottom: 1px solid var(--glass-border);
+}
+
+.bubble-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.bubble-group label {
+  font-size: 10px;
+  color: var(--text-secondary);
+}
+
+.bubble-input {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--glass-border);
+  border-radius: 6px;
+  padding: 5px 8px;
+  color: var(--text-primary);
+  font-size: 11px;
+  outline: none;
+  text-align: center;
+}
+
+.bubble-input:focus {
+  border-color: var(--accent-color);
+}
+
+.bubble-input.start {
+  color: #00e676;
+  font-family: 'Consolas', 'Courier New', monospace;
+}
+
+.bubble-input.end {
+  color: #ff1744;
+  font-family: 'Consolas', 'Courier New', monospace;
+}
+
+.bubble-input.text {
+  font-size: 16px;
+  font-weight: 600;
+  padding: 6px 8px;
+}
+
+/* ── 纯行级时间轴编辑行 (LRC Line Row) ── */
+.lrc-row-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 10px;
+  background: rgba(255, 255, 255, 0.01);
+  border: 1px solid var(--glass-border);
+  padding: 8px 12px;
+  border-radius: 8px;
+}
+
+.lrc-time-input {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--glass-border);
+  border-radius: 6px;
+  color: #4caf50;
+  font-family: monospace;
+  font-size: 13px;
+  padding: 6px 10px;
+  text-align: center;
+  width: 100px;
+  outline: none;
+}
+
+.lrc-time-input:focus {
+  border-color: var(--accent-color);
+}
+
+.lrc-text-input {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--glass-border);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-size: 13px;
+  padding: 6px 12px;
+  outline: none;
+  font-family: var(--font-family);
+}
+
+.lrc-text-input:focus {
+  border-color: var(--accent-color);
+}
+
+.cover-edit-section {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  background: var(--surface-color);
+  padding: 16px;
+  border-radius: 12px;
+  border: 1px solid var(--glass-border);
+}
+
+.cover-edit-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.cover-preview-img {
+  width: 100px;
+  height: 100px;
+  border-radius: 8px;
+  object-fit: cover;
+  border: 1px solid var(--glass-border);
+  background: rgba(0, 0, 0, 0.2);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.form-group label {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.form-input {
+  background: var(--surface-color);
+  border: 1px solid var(--glass-border);
+  border-radius: 8px;
+  padding: 10px 14px;
+  color: var(--text-primary);
+  font-family: var(--font-family);
+  font-size: 0.9rem;
+  outline: none;
+  width: 100% !important;
+  box-sizing: border-box !important;
+  transition: border-color 0.2s, background-color 0.2s;
+}
+
+.form-input:focus {
+  border-color: var(--accent-color);
+  background: var(--surface-hover);
+}
+
+.form-textarea {
+  background: var(--surface-color);
+  border: 1px solid var(--glass-border);
+  border-radius: 8px;
+  padding: 12px 14px;
+  color: var(--text-primary);
+  font-family: var(--font-family);
+  font-size: 0.9rem;
+  outline: none;
+  resize: vertical;
+  line-height: 1.5;
+  width: 100% !important;
+  box-sizing: border-box !important;
+  transition: border-color 0.2s, background-color 0.2s;
+}
+
+.form-textarea:focus {
+  border-color: var(--accent-color);
+  background: var(--surface-hover);
+}
+
+.btn-primary, .btn-secondary {
+  border: none;
+  border-radius: 8px;
+  padding: 10px 18px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s, transform 0.1s;
+  font-family: var(--font-family);
+}
+
+.btn-primary {
+  background: var(--accent-color);
+  color: #121214;
+  font-weight: 600;
+}
+
+.btn-primary:hover {
+  filter: brightness(1.1);
+  transform: translateY(-1px);
+}
+
+.btn-primary:active {
+  transform: translateY(0);
+}
+
+.theme-light .btn-primary {
+  color: #ffffff;
+}
+
+.btn-secondary {
+  background: var(--surface-color);
+  border: 1px solid var(--glass-border);
+  color: var(--text-primary);
+}
+
+.btn-secondary:hover {
+  background: var(--surface-hover);
+}
+
+.btn-danger {
+  color: #ff4d4f !important;
+  border-color: rgba(255, 77, 79, 0.2) !important;
+}
+
+.btn-danger:hover {
+  background: rgba(255, 77, 79, 0.08) !important;
+}
+
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+/* ── 统一元数据编辑器内部全部元素字体样式 ── */
+#metadata-editor-modal,
+#metadata-editor-modal input:not(.word-time-input):not(.lrc-time-input),
+#metadata-editor-modal textarea,
+#metadata-editor-modal button,
+#metadata-editor-modal span,
+#metadata-editor-modal h3,
+#metadata-editor-modal h4,
+#metadata-editor-modal label,
+#metadata-editor-modal .word-text-input,
+#metadata-editor-modal .filename-tip {
+  font-family: var(--font-family) !important;
+}
+
+#metadata-editor-modal .word-time-input,
+#metadata-editor-modal .lrc-time-input {
+  font-family: 'Consolas', 'Courier New', monospace !important;
+}
+
+/* ── 修复 Modal 关闭按钮样式缺陷 ── */
+.modal-close-btn {
+  background: transparent !important;
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  color: var(--text-secondary) !important;
+  font-size: 1.5rem !important;
+  cursor: pointer !important;
+  padding: 4px !important;
+  border-radius: 50% !important;
+  width: 32px !important;
+  height: 32px !important;
+  display: flex !important;
+  justify-content: center !important;
+  align-items: center !important;
+  transition: background 0.2s, color 0.2s !important;
+}
+
+.modal-close-btn:hover {
+  background: var(--surface-hover) !important;
+  color: var(--text-primary) !important;
+}
+
+/* ── 🎤 译文行输入与排版样式 (Lyric Translation Layout) ── */
+.lyric-row-translation-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  padding-left: 40px; /* 与行号对齐，错落有致 */
+  box-sizing: border-box;
+  width: 100%;
+}
+
+.translation-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--accent-color);
+  background: rgba(var(--dynamic-color, 0, 240, 255), 0.1);
+  border: 1px solid rgba(var(--dynamic-color, 0, 240, 255), 0.2);
+  padding: 2px 6px;
+  border-radius: 4px;
+  line-height: 1.2;
+}
+
+.translation-input {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--glass-border);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-size: 14px;
+  padding: 8px 14px;
+  outline: none;
+  transition: border-color 0.2s, background-color 0.2s;
+}
+
+.translation-input:focus {
+  border-color: var(--accent-color);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.btn-translation-add {
+  background: transparent;
+  border: 1px dashed var(--glass-border);
+  border-radius: 6px;
+  color: var(--text-secondary);
+  font-size: 11px;
+  padding: 4px 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: var(--font-family);
+}
+
+.btn-translation-add:hover {
+  border-color: var(--accent-color);
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.btn-translation-delete {
+  background: transparent;
+  border: none;
+  color: rgba(255, 77, 79, 0.6);
+  font-size: 16px;
+  cursor: pointer;
+  padding: 0 4px;
+  transition: color 0.2s;
+  line-height: 1;
+}
+
+.btn-translation-delete:hover {
+  color: #ff4d4f;
+}
+
+/* ── ☀️ 浅色主题 (Theme Light) 下的元数据编辑器和设置界面色彩适配 ── */
+.theme-light #metadata-editor-modal h3 {
+  color: var(--text-primary) !important;
+}
+
+.theme-light #metadata-editor-modal .filename-tip {
+  color: var(--text-secondary) !important;
+}
+
+.theme-light #metadata-editor-modal label {
+  color: var(--text-secondary) !important;
+}
+
+/* 设置面板按钮浅色适配 */
+.theme-light .setting-btn {
+  background: rgba(0, 0, 0, 0.04) !important;
+  color: var(--text-primary) !important;
+  border-color: rgba(0, 0, 0, 0.08) !important;
+}
+
+.theme-light .setting-btn:hover {
+  background: rgba(0, 0, 0, 0.08) !important;
+  border-color: rgb(var(--dynamic-color, 0, 136, 204)) !important;
+  color: rgb(var(--dynamic-color, 0, 136, 204)) !important;
+}
+
+.theme-light .setting-btn.accent {
+  background: rgb(var(--dynamic-color, 0, 136, 204)) !important;
+  color: #ffffff !important;
+  border-color: rgb(var(--dynamic-color, 0, 136, 204)) !important;
+  box-shadow: 0 4px 12px rgba(var(--dynamic-color, 0, 136, 204), 0.15) !important;
+}
+
+.theme-light .setting-btn.accent:hover {
+  box-shadow: 0 4px 18px rgba(var(--dynamic-color, 0, 136, 204), 0.3) !important;
+  background: rgb(var(--dynamic-color, 0, 100, 160)) !important;
+  border-color: rgb(var(--dynamic-color, 0, 100, 160)) !important;
+}

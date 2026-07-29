@@ -1,0 +1,297 @@
+/* ── 🌟 极致美学亚克力自定义右键菜单 (Premium Glassmorphic Context Menu UI) 🌟 ── */
+.custom-context-menu {
+  position: fixed;
+  z-index: 99999;
+  min-width: 180px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 6px;
+  box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.25), 0 8px 24px rgba(0, 0, 0, 0.12);
+  backdrop-filter: blur(20px) saturate(140%);
+  -webkit-backdrop-filter: blur(20px) saturate(140%);
+  opacity: 0;
+  transform: translateY(6px) scale(0.92);
+  pointer-events: none;
+  transition: 
+    opacity 0.22s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  overflow: hidden;
+}
+
+.custom-context-menu.visible {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  pointer-events: auto;
+}
+
+.context-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  font-size: 13px;
+  color: var(--text-primary);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.context-menu-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgb(var(--dynamic-color, 0, 240, 255));
+}
+
+.context-menu-divider {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.06);
+  margin: 4px 6px;
+}
+
+.context-menu-item .menu-icon {
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.7;
+}
+
+/* Light theme */
+.app-container.theme-light .custom-context-menu {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(0, 0, 0, 0.05);
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.45), 0 8px 24px rgba(0, 0, 0, 0.03);
+}
+
+.app-container.theme-light .context-menu-item:hover {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.app-container.theme-light .context-menu-divider {
+  background: rgba(0, 0, 0, 0.06);
+}
+
+/* Grey theme */
+.app-container.theme-grey .custom-context-menu {
+  background: rgba(255, 255, 255, 0.02);
+  border-color: rgba(255, 255, 255, 0.1);
+  box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.25), 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
+/* ── 🌟 极致美学对唱角色与背景歌词系统 (Duet Role & Background Vocal Styling) 🌟 ── */
+
+/* 1. 对唱舞台排版 (Apple Music 经典左右互搏排版) */
+.lyrics-line.role-l1 {
+  align-self: flex-start !important;
+  text-align: left !important;
+  padding-left: 5% !important;
+  padding-right: 25% !important;
+}
+
+.lyrics-line.role-l2 {
+  align-self: flex-end !important;
+  text-align: right !important;
+  padding-right: 5% !important;
+  padding-left: 25% !important;
+}
+
+.lyrics-line.role-both {
+  align-self: center !important;
+  text-align: center !important;
+  padding-left: 10% !important;
+  padding-right: 10% !important;
+}
+
+/* 2. 背景/伴唱歌词 (微倾斜、淡化、微型化，形成声场立体透视) */
+.lyrics-line.is-background-line {
+  font-size: 0.88em !important;
+  font-style: italic !important;
+  opacity: 0.58 !important;
+}
+
+.lyrics-line.is-background-line.active {
+  opacity: 0.92 !important;
+}
+
+
+
+/* ==========================================================================
+   AI Transcription & Alignment Glassmorphism Console Panel CSS
+   ========================================================================== */
+#kiom-ai-console {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) scale(0.9);
+  width: 480px;
+  max-width: 92%;
+  box-sizing: border-box;
+  background: rgba(18, 18, 28, 0.76);
+  backdrop-filter: blur(30px) saturate(190%);
+  -webkit-backdrop-filter: blur(30px) saturate(190%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  padding: 18px;
+  box-shadow: 
+    0 20px 50px rgba(0, 0, 0, 0.6),
+    0 0 40px rgba(0, 240, 255, 0.15),
+    inset 0 0 12px rgba(255, 255, 255, 0.05);
+  z-index: 10000;
+  opacity: 0;
+  pointer-events: none;
+  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+#kiom-ai-console.visible {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translate(-50%, -50%) scale(1);
+}
+
+.ai-console-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  padding-bottom: 12px;
+  margin-bottom: 16px;
+}
+
+.ai-console-title {
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  background: linear-gradient(90deg, #00f0ff, #ff007f);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ai-console-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: #00f0ff;
+  background: rgba(0, 240, 255, 0.08);
+  padding: 4px 10px;
+  border-radius: 20px;
+  border: 1px solid rgba(0, 240, 255, 0.2);
+}
+
+.ai-status-dot {
+  width: 6px;
+  height: 6px;
+  background-color: #00f0ff;
+  border-radius: 50%;
+  box-shadow: 0 0 8px #00f0ff;
+  animation: dot-pulse 1.6s infinite alternate;
+}
+
+@keyframes dot-pulse {
+  0% { opacity: 0.4; }
+  100% { opacity: 1; transform: scale(1.2); }
+}
+
+.ai-console-progress-track {
+  width: 100%;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 10px;
+  overflow: hidden;
+  margin-bottom: 18px;
+  position: relative;
+}
+
+.ai-console-progress-bar {
+  width: 0%;
+  height: 100%;
+  background: linear-gradient(90deg, #00f0ff, #7f00ff, #ff007f);
+  background-size: 200% 100%;
+  border-radius: 10px;
+  transition: width 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
+  animation: aurora-sweep 3s linear infinite;
+}
+
+.ai-console-progress-bar.error-state {
+  background: linear-gradient(90deg, #ff3333, #ff5555) !important;
+  box-shadow: 0 0 10px rgba(255, 51, 51, 0.5);
+}
+
+.ai-console-progress-bar.success-state {
+  background: linear-gradient(90deg, #00ffaa, #00ff66) !important;
+  box-shadow: 0 0 10px rgba(0, 255, 102, 0.5);
+}
+
+.ai-console-logs {
+  height: 120px;
+  overflow-y: auto;
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: 10px;
+  padding: 12px;
+  font-family: 'Consolas', 'Courier New', monospace;
+  font-size: 12px;
+  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.03);
+  scrollbar-width: thin;
+}
+
+
+
+.ai-log-row {
+  margin-bottom: 6px;
+  opacity: 0;
+  transform: translateY(4px);
+  animation: log-slide-in 0.3s forwards ease;
+}
+
+@keyframes log-slide-in {
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.ai-log-row.info { color: #00f0ff; }
+.ai-log-row.success { color: #00ffaa; font-weight: bold; }
+.ai-log-row.warn { color: #ffaa00; }
+.ai-log-row.error { color: #ff5555; font-weight: bold; }
+
+.ai-console-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 16px;
+  gap: 10px;
+}
+
+.ai-console-btn {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.ai-console-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.ai-console-btn.primary {
+  background: rgba(0, 240, 255, 0.1);
+  border-color: rgba(0, 240, 255, 0.3);
+  color: #00f0ff;
+}
+
+.ai-console-btn.primary:hover {
+  background: rgba(0, 240, 255, 0.18);
+  box-shadow: 0 0 10px rgba(0, 240, 255, 0.25);
+}
+
+/* ==========================================================================
+   🌟 KimoPlayer Premium Frosted-Glass Context Menu & Calibration Modal 🌟
+   ========================================================================== */

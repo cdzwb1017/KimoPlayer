@@ -1,0 +1,165 @@
+/* ═══ UI 风格系统：亚克力 / 高斯模糊 / 液态玻璃 / 默认效果 ═══ */
+
+/* 亚克力 — 经典毛玻璃，20px 模糊 + 半透明 */
+.app-container.ui-style-acrylic {
+  --ui-blur: 20px;
+  --ui-saturate: 140%;
+  --ui-glass-alpha: 0.4;
+  --ui-glass-color: 0, 0, 0;
+}
+.app-container.ui-style-acrylic.theme-light,
+.app-container.ui-style-acrylic.theme-grey {
+  --ui-glass-color: 255, 255, 255;
+}
+
+/* 高斯模糊 — 更强的模糊与饱和度，磨砂质感 */
+.app-container.ui-style-gaussian {
+  --ui-blur: 32px;
+  --ui-saturate: 180%;
+  --ui-glass-alpha: 0.88;
+}
+
+/* 液态玻璃 — 统一使用评论区同款材质 */
+.app-container.ui-style-liquid {
+  --ui-blur: 12px;
+  --ui-saturate: 140%;
+  --ui-glass-alpha: 0.02;
+  --liquid-border: rgba(255, 255, 255, 0.1);
+  --liquid-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.25), 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+.app-container.ui-style-liquid.theme-light {
+  --ui-glass-alpha: 0.15;
+  --liquid-border: rgba(0, 0, 0, 0.05);
+  --liquid-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.45), 0 8px 24px rgba(0, 0, 0, 0.03);
+}
+/* 液态玻璃：关键表面统一覆盖为评论区材质 */
+/* 浮动元素：保留完整玻璃材质（背景+模糊+边框+阴影） */
+.app-container.ui-style-liquid .kimo-modal-card,
+.app-container.ui-style-liquid .settings-card,
+.app-container.ui-style-liquid .titlebar-button,
+.app-container.ui-style-liquid .context-menu,
+.app-container.ui-style-liquid .nav-active-indicator,
+.app-container.ui-style-liquid .sticky-header {
+  background: rgba(255, 255, 255, var(--ui-glass-alpha));
+  backdrop-filter: blur(var(--ui-blur)) saturate(var(--ui-saturate));
+  -webkit-backdrop-filter: blur(var(--ui-blur)) saturate(var(--ui-saturate));
+  border-color: var(--liquid-border);
+  box-shadow: var(--liquid-shadow);
+}
+/* 液态玻璃：主内容区作为一块完整玻璃，子元素透明，实现无缝统一 */
+.app-container.ui-style-liquid .main-content {
+  background: rgba(255, 255, 255, var(--ui-glass-alpha));
+  backdrop-filter: blur(var(--ui-blur)) saturate(var(--ui-saturate));
+  -webkit-backdrop-filter: blur(var(--ui-blur)) saturate(var(--ui-saturate));
+}
+.app-container.ui-style-liquid .sidebar,
+.app-container.ui-style-liquid .content-shell,
+.app-container.ui-style-liquid .content-toolbar,
+.app-container.ui-style-liquid .titlebar {
+  background: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow: none;
+}
+.app-container.ui-style-liquid .sidebar {
+  border-right: 1px solid var(--liquid-border);
+}
+.app-container.ui-style-liquid .player-bar {
+  background: rgba(255, 255, 255, var(--ui-glass-alpha));
+  backdrop-filter: blur(var(--ui-blur)) saturate(var(--ui-saturate));
+  -webkit-backdrop-filter: blur(var(--ui-blur)) saturate(var(--ui-saturate));
+  border: none;
+  border-top: 1px solid var(--liquid-border);
+  box-shadow: none;
+}
+.app-container.ui-style-liquid.theme-light .kimo-modal-card {
+  background: rgba(245, 245, 247, 0.15);
+}
+
+/* 默认效果 — 纯白/纯黑不透明背景 */
+.app-container.ui-style-solid {
+  --ui-blur: 0px;
+  --ui-saturate: 100%;
+  --ui-glass-alpha: 1;
+  /* 半透明表面变量统一设为透明，消除纯色背景上的微妙色差 */
+  --card-bg: transparent;
+  --card-hover: transparent;
+  --surface-color: transparent;
+  --surface-hover: transparent;
+  --glass-bg: transparent;
+  --sidebar-bg: transparent;
+  --sticky-header-bg: transparent;
+  /* 边框变量也设为透明，去除玻璃感边线 */
+  --glass-border: transparent;
+  --border-color: transparent;
+}
+.app-container.ui-style-solid * {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+/* 大型表面去掉阴影，避免纯色模式下有浮起感 */
+.app-container.ui-style-solid .main-content,
+.app-container.ui-style-solid .sidebar,
+.app-container.ui-style-solid .player-bar,
+.app-container.ui-style-solid .content-toolbar,
+.app-container.ui-style-solid .sticky-header,
+.app-container.ui-style-solid .titlebar {
+  box-shadow: none !important;
+}
+/* 浮动元素保留细边框，维持可辨识度 */
+.app-container.ui-style-solid .kimo-modal-card,
+.app-container.ui-style-solid .settings-card,
+.app-container.ui-style-solid .context-menu {
+  border: 1px solid rgba(128, 128, 128, 0.15) !important;
+}
+/* 隐藏动态模糊背景层与遮罩层，只保留纯色 */
+.app-container.ui-style-solid .dynamic-bg-layer,
+.app-container.ui-style-solid .bg-blur-img,
+.app-container.ui-style-solid .dynamic-bg-orb,
+.app-container.ui-style-solid .dynamic-overlay,
+.app-container.ui-style-solid .noise-overlay {
+  display: none !important;
+}
+.app-container.ui-style-solid .dynamic-bg {
+  background: #070708;
+}
+.app-container.ui-style-solid.theme-light .dynamic-bg {
+  background: #f5f5f7;
+}
+.app-container.ui-style-solid.theme-grey .dynamic-bg {
+  background: #e3e3e8;
+}
+/* 默认效果：所有表面统一纯色，消除色差（!important 覆盖渐变背景） */
+.app-container.ui-style-solid.theme-dark,
+.app-container.ui-style-solid.theme-dark .main-content,
+.app-container.ui-style-solid.theme-dark .kimo-modal-card,
+.app-container.ui-style-solid.theme-dark .sidebar,
+.app-container.ui-style-solid.theme-dark .player-bar,
+.app-container.ui-style-solid.theme-dark .settings-card,
+.app-container.ui-style-solid.theme-dark .content-toolbar,
+.app-container.ui-style-solid.theme-dark .sticky-header,
+.app-container.ui-style-solid.theme-dark .context-menu {
+  background: #070708 !important;
+}
+.app-container.ui-style-solid.theme-light,
+.app-container.ui-style-solid.theme-light .main-content,
+.app-container.ui-style-solid.theme-light .kimo-modal-card,
+.app-container.ui-style-solid.theme-light .sidebar,
+.app-container.ui-style-solid.theme-light .player-bar,
+.app-container.ui-style-solid.theme-light .settings-card,
+.app-container.ui-style-solid.theme-light .content-toolbar,
+.app-container.ui-style-solid.theme-light .sticky-header,
+.app-container.ui-style-solid.theme-light .context-menu {
+  background: #f5f5f7 !important;
+}
+.app-container.ui-style-solid.theme-grey,
+.app-container.ui-style-solid.theme-grey .main-content,
+.app-container.ui-style-solid.theme-grey .kimo-modal-card,
+.app-container.ui-style-solid.theme-grey .sidebar,
+.app-container.ui-style-solid.theme-grey .player-bar,
+.app-container.ui-style-solid.theme-grey .settings-card,
+.app-container.ui-style-solid.theme-grey .content-toolbar,
+.app-container.ui-style-solid.theme-grey .sticky-header,
+.app-container.ui-style-solid.theme-grey .context-menu {
+  background: #e3e3e8 !important;
+}

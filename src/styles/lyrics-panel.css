@@ -1,0 +1,599 @@
+/* Immersive Sliding Full-Screen Lyrics Panel */
+.lyrics-panel {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  z-index: 2000; /* Float over titlebar (z-index 1000) for 100% immersive mode */
+
+  /* 抵消 documentElement 上的 UI 缩放，歌词面板始终保持原始尺寸 */
+  zoom: calc(1 / var(--ui-scale, 1));
+
+  /* Sleek dual-tone static gradient for gorgeous Apple Music feel with 0% blur lag! */
+  background: radial-gradient(circle at top left, rgba(var(--dynamic-color, 30, 30, 30), 0.35) 0%, transparent 60%),
+              radial-gradient(circle at bottom right, rgba(var(--dynamic-color, 30, 30, 30), 0.25) 0%, transparent 60%),
+              #070709;
+
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+
+  /* Hardward accelerated buttery smooth slide-up */
+  transform: translateY(100%);
+  transition: transform 0.65s cubic-bezier(0.16, 1, 0.3, 1), background 0.8s ease;
+  will-change: transform;
+}
+
+/* Slide up state active */
+.lyrics-panel.active {
+  transform: translateY(0);
+}
+
+/* Light theme overlay variant */
+.app-container.theme-light .lyrics-panel {
+  background: radial-gradient(circle at top left, rgba(var(--dynamic-color, 240, 240, 240), 0.5) 0%, transparent 60%),
+              radial-gradient(circle at bottom right, rgba(var(--dynamic-color, 240, 240, 240), 0.4) 0%, transparent 60%),
+              #f5f5f7;
+}
+
+/* Lyrics independent theme - Dark (force dark colors even when software is light) */
+.lyrics-panel.lyrics-theme-dark {
+  background: radial-gradient(circle at top left, rgba(var(--dynamic-color, 30, 30, 30), 0.35) 0%, transparent 60%),
+              radial-gradient(circle at bottom right, rgba(var(--dynamic-color, 30, 30, 30), 0.25) 0%, transparent 60%),
+              #070709 !important;
+  /* Force dark-theme CSS variables for all child elements */
+  --text-primary: #ffffff;
+  --text-secondary: rgba(255, 255, 255, 0.92);
+}
+/* Override light-theme text/UI when lyrics forced dark */
+.lyrics-panel.lyrics-theme-dark .lyrics-back-btn,
+.lyrics-panel.lyrics-theme-dark #lyrics-settings-toggle,
+.lyrics-panel.lyrics-theme-dark .control-btn {
+  background: transparent !important;
+  border: none !important;
+  color: rgba(255, 255, 255, 0.6) !important;
+}
+.lyrics-panel.lyrics-theme-dark .lyrics-back-btn:hover,
+.lyrics-panel.lyrics-theme-dark #lyrics-settings-toggle:hover,
+.lyrics-panel.lyrics-theme-dark .control-btn:hover {
+  background: rgba(255, 255, 255, 0.08) !important;
+  border: none !important;
+  color: #fff !important;
+}
+.lyrics-panel.lyrics-theme-dark .lyrics-header-artist {
+  color: var(--text-secondary) !important;
+}
+.lyrics-panel.lyrics-theme-dark .lyrics-under-title {
+  text-shadow: 0 4px 16px rgba(0, 0, 0, 0.4) !important;
+}
+.lyrics-panel.lyrics-theme-dark .lyrics-side-btn {
+  background: rgba(255, 255, 255, 0.06) !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+  color: rgba(255, 255, 255, 0.7) !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+}
+.lyrics-panel.lyrics-theme-dark .lyrics-side-btn:hover {
+  background: rgba(255, 255, 255, 0.12) !important;
+  border-color: rgba(255, 255, 255, 0.2) !important;
+  color: #ffffff !important;
+}
+.lyrics-panel.lyrics-theme-dark .lyrics-progress-track {
+  background: rgba(255, 255, 255, 0.16) !important;
+}
+.lyrics-panel.lyrics-theme-dark .lyrics-progress-fill {
+  background: #ffffff !important;
+}
+.lyrics-panel.lyrics-theme-dark .lyrics-progress-fill::after {
+  background: #ffffff !important;
+  box-shadow: 0 0 10px rgba(255, 255, 255, 0.8) !important;
+}
+.lyrics-panel.lyrics-theme-dark .lyrics-line {
+  color: rgba(255, 255, 255, 0.28) !important;
+}
+.lyrics-panel.lyrics-theme-dark .lyrics-line:hover {
+  color: rgba(255, 255, 255, 0.55) !important;
+}
+.lyrics-panel.lyrics-theme-dark .lyrics-line.active {
+  color: #ffffff !important;
+}
+.lyrics-panel.lyrics-theme-dark .lyrics-line.past {
+  color: rgba(255, 255, 255, 0.45) !important;
+}
+.lyrics-panel.lyrics-theme-dark .lyrics-line.translation-brightening .lyrics-translation,
+.lyrics-panel.lyrics-theme-dark .lyrics-line.translation-fading .lyrics-translation,
+.lyrics-panel.lyrics-theme-dark .lyrics-line.translation-faded .lyrics-translation {
+  color: #ffffff !important;
+}
+.lyrics-panel.lyrics-theme-dark .lyrics-word {
+  --filled-color: rgba(255, 255, 255, 0.95) !important;
+  --mid-transition-color: rgba(255, 255, 255, 0.65) !important;
+  --unfilled-color: rgba(255, 255, 255, 0.35) !important;
+}
+.lyrics-panel.lyrics-theme-dark .lyrics-word.singing-glow {
+  text-shadow: none !important;
+}
+.lyrics-panel.lyrics-theme-dark .lyrics-word.is-ruby-word .lyrics-char-text,
+.lyrics-panel.lyrics-theme-dark .lyrics-word.is-ruby-word .lyrics-ruby-suffix {
+  --filled-color: rgba(255, 255, 255, 0.78) !important;
+  --mid-transition-color: rgba(255, 255, 255, 0.54) !important;
+  --unfilled-color: rgba(255, 255, 255, 0.35) !important;
+}
+.lyrics-panel.lyrics-theme-dark .lyrics-word.is-ruby-word.word-active .lyrics-char-text,
+.lyrics-panel.lyrics-theme-dark .lyrics-word.is-ruby-word.word-active .lyrics-ruby-suffix {
+  -webkit-text-fill-color: rgba(255, 255, 255, 0.95) !important;
+  color: rgba(255, 255, 255, 0.95) !important;
+}
+.lyrics-panel.lyrics-theme-dark .lyrics-line.past .lyrics-word.is-ruby-word .lyrics-char-text,
+.lyrics-panel.lyrics-theme-dark .lyrics-line.past .lyrics-word.is-ruby-word .lyrics-ruby-suffix {
+  --filled-color: rgba(255, 255, 255, 0.45) !important;
+  --unfilled-color: rgba(255, 255, 255, 0.35) !important;
+}
+.lyrics-panel.lyrics-theme-dark .lyrics-rt-text {
+  color: rgba(255, 255, 255, 0.42) !important;
+}
+.lyrics-panel.lyrics-theme-dark .lyrics-progress-time {
+  color: var(--text-secondary) !important;
+}
+
+/* Lyrics independent theme - Light (force light colors even when software is dark) */
+.lyrics-panel.lyrics-theme-light {
+  background: radial-gradient(circle at top left, rgba(var(--dynamic-color, 240, 240, 240), 0.5) 0%, transparent 60%),
+              radial-gradient(circle at bottom right, rgba(var(--dynamic-color, 240, 240, 240), 0.4) 0%, transparent 60%),
+              #f5f5f7 !important;
+  /* Force light-theme CSS variables for all child elements */
+  --text-primary: #1d1d1f;
+  --text-secondary: rgba(0, 0, 0, 0.55);
+}
+/* Apply light-theme text/UI when lyrics forced light */
+.lyrics-panel.lyrics-theme-light .lyrics-back-btn {
+  background: transparent !important;
+  border: none !important;
+  color: rgba(0, 0, 0, 0.6) !important;
+}
+.lyrics-panel.lyrics-theme-light .lyrics-back-btn:hover {
+  background: rgba(0, 0, 0, 0.06) !important;
+  color: #000 !important;
+}
+.lyrics-panel.lyrics-theme-light .lyrics-header-artist {
+  color: rgba(0, 0, 0, 0.6) !important;
+}
+.lyrics-panel.lyrics-theme-light .lyrics-under-title {
+  text-shadow: none !important;
+}
+.lyrics-panel.lyrics-theme-light .lyrics-side-btn {
+  background: rgba(0, 0, 0, 0.03) !important;
+  border-color: rgba(0, 0, 0, 0.06) !important;
+  color: rgba(0, 0, 0, 0.6) !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04) !important;
+}
+.lyrics-panel.lyrics-theme-light .lyrics-side-btn:hover {
+  background: rgba(0, 0, 0, 0.07) !important;
+  border-color: rgba(0, 0, 0, 0.1) !important;
+  color: #000000 !important;
+}
+.lyrics-panel.lyrics-theme-light .lyrics-progress-track {
+  background: rgba(0, 0, 0, 0.1) !important;
+}
+.lyrics-panel.lyrics-theme-light .lyrics-progress-fill {
+  background: rgb(var(--dynamic-color, 0, 0, 0)) !important;
+}
+.lyrics-panel.lyrics-theme-light .lyrics-progress-fill::after {
+  background: rgb(var(--dynamic-color, 0, 0, 0)) !important;
+  box-shadow: 0 0 10px rgba(var(--dynamic-color, 0, 0, 0), 0.5) !important;
+}
+.lyrics-panel.lyrics-theme-light .lyrics-line {
+  color: rgba(0, 0, 0, 0.28) !important;
+}
+.lyrics-panel.lyrics-theme-light .lyrics-line:hover {
+  color: rgba(0, 0, 0, 0.55) !important;
+}
+.lyrics-panel.lyrics-theme-light .lyrics-line.active {
+  color: #1d1d1f !important;
+}
+.lyrics-panel.lyrics-theme-light .lyrics-line.past {
+  color: rgba(0, 0, 0, 0.45) !important;
+}
+.lyrics-panel.lyrics-theme-light .lyrics-line.translation-brightening .lyrics-translation,
+.lyrics-panel.lyrics-theme-light .lyrics-line.translation-fading .lyrics-translation,
+.lyrics-panel.lyrics-theme-light .lyrics-line.translation-faded .lyrics-translation {
+  color: #1d1d1f !important;
+}
+.lyrics-panel.lyrics-theme-light .lyrics-word {
+  --filled-color: rgb(var(--dynamic-color, 0, 0, 0)) !important;
+  --mid-transition-color: rgba(var(--dynamic-color, 0, 0, 0), 0.58) !important;
+  --unfilled-color: rgba(0, 0, 0, 0.28) !important;
+}
+.lyrics-panel.lyrics-theme-light .lyrics-word.singing-glow {
+  text-shadow: none !important;
+}
+.lyrics-panel.lyrics-theme-light .lyrics-word.is-ruby-word .lyrics-char-text,
+.lyrics-panel.lyrics-theme-light .lyrics-word.is-ruby-word .lyrics-ruby-suffix {
+  --filled-color: rgb(var(--dynamic-color, 0, 0, 0)) !important;
+  --mid-transition-color: rgba(var(--dynamic-color, 0, 0, 0), 0.58) !important;
+  --unfilled-color: rgba(0, 0, 0, 0.22) !important;
+}
+.lyrics-panel.lyrics-theme-light .lyrics-word.is-ruby-word.word-active .lyrics-char-text,
+.lyrics-panel.lyrics-theme-light .lyrics-word.is-ruby-word.word-active .lyrics-ruby-suffix {
+  -webkit-text-fill-color: rgb(var(--dynamic-color, 0, 0, 0)) !important;
+  color: rgb(var(--dynamic-color, 0, 0, 0)) !important;
+}
+.lyrics-panel.lyrics-theme-light .lyrics-line.past .lyrics-word.is-ruby-word .lyrics-char-text,
+.lyrics-panel.lyrics-theme-light .lyrics-line.past .lyrics-word.is-ruby-word .lyrics-ruby-suffix {
+  --filled-color: rgba(0, 0, 0, 0.38) !important;
+  --unfilled-color: rgba(0, 0, 0, 0.22) !important;
+}
+.lyrics-panel.lyrics-theme-light .lyrics-rt-text {
+  color: rgba(0, 0, 0, 0.34) !important;
+}
+.lyrics-panel.lyrics-theme-light .lyrics-progress-time {
+  color: rgba(0, 0, 0, 0.5) !important;
+}
+
+/* Lyrics Header Area (iOS Segmented and Grid Layout) - Clean & Borderless! */
+.lyrics-header {
+  height: 90px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  padding: 20px 30px 0 30px; /* Elegant safe-area space at the top since we cover the titlebar */
+  flex-shrink: 0;
+  z-index: 10;
+  overflow: hidden;
+}
+
+/* Bare back chevron - aligned with the settings gear (same top, same 32x32 size, no chrome) */
+.lyrics-back-btn {
+  position: absolute;
+  top: 20px;
+  left: 30px;
+  z-index: 15;
+  width: 32px;
+  height: 32px;
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 7px;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.lyrics-back-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-primary);
+}
+
+.app-container.theme-light .lyrics-back-btn {
+  background: transparent;
+  border: none;
+  color: rgba(0, 0, 0, 0.6);
+}
+
+.app-container.theme-light .lyrics-back-btn:hover {
+  background: rgba(0, 0, 0, 0.06);
+  color: #000;
+}
+
+/* Centered Header Metadata - Hidden on wide screens, shown only on narrow screens */
+.lyrics-meta-header {
+  display: none; /* Hidden by default on desktop/wide screens */
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  text-align: center;
+  flex-direction: column;
+  gap: 3px;
+  max-width: 50%;
+  overflow: hidden;
+}
+
+.lyrics-header-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+}
+
+.lyrics-header-artist {
+  font-size: 12px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  opacity: 0.85;
+}
+
+.app-container.theme-light .lyrics-header-artist {
+  color: rgba(0, 0, 0, 0.6);
+}
+
+/* Lyrics controls toolbar - bare icons row, absolutely positioned to top right (aligned with back chevron) */
+.lyrics-controls {
+  position: absolute;
+  top: 20px;
+  right: 30px;
+  z-index: 15;
+  display: flex;
+  align-items: center;
+  width: 32px;
+  height: 32px;
+  background: transparent;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  overflow: visible !important;
+  flex: none;
+}
+
+.lyrics-control-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+/* Lyrics controls toolbar: collapsed by default (only gear visible), click to expand, auto-hide on outside click */
+.lyrics-controls-group {
+  position: absolute;
+  top: 0;
+  right: 38px;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  width: max-content;
+  opacity: 1;
+  clip-path: inset(-200px -12px -140px -12px);
+  transform: translateX(0) scaleX(1);
+  transform-origin: right center;
+  transition:
+    clip-path 0.32s cubic-bezier(0.2, 0.8, 0.2, 1),
+    transform 0.32s cubic-bezier(0.2, 0.8, 0.2, 1),
+    opacity 0.2s ease;
+}
+
+/* Keep the gear anchored to the toolbar's fixed right edge while the
+   optional controls expand toward the left. */
+#lyrics-settings-toggle {
+  position: relative;
+  z-index: 2;
+  flex: 0 0 32px;
+  width: 32px;
+  height: 32px;
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 7px;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+#lyrics-settings-toggle:hover {
+  background: rgba(255, 255, 255, 0.08) !important;
+  border: none !important;
+  color: var(--text-primary) !important;
+  transform: none;
+}
+
+.lyrics-panel.lyrics-theme-light #lyrics-settings-toggle,
+.lyrics-panel.lyrics-theme-light .control-btn,
+.app-container.theme-light .lyrics-panel:not(.lyrics-theme-dark) #lyrics-settings-toggle,
+.app-container.theme-light .lyrics-panel:not(.lyrics-theme-dark) .control-btn {
+  background: transparent !important;
+  border: none !important;
+  color: rgba(0, 0, 0, 0.6) !important;
+}
+
+.lyrics-panel.lyrics-theme-light #lyrics-settings-toggle:hover,
+.lyrics-panel.lyrics-theme-light .control-btn:hover,
+.app-container.theme-light .lyrics-panel:not(.lyrics-theme-dark) #lyrics-settings-toggle:hover,
+.app-container.theme-light .lyrics-panel:not(.lyrics-theme-dark) .control-btn:hover {
+  background: rgba(0, 0, 0, 0.06) !important;
+  border: none !important;
+  color: #000000 !important;
+}
+
+.lyrics-controls.is-collapsed .lyrics-controls-group {
+  opacity: 0;
+  pointer-events: none;
+  clip-path: inset(-12px -12px -140px 100%);
+  transform: translateX(8px) scaleX(0.96);
+}
+#lyrics-settings-toggle svg {
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.lyrics-controls:not(.is-collapsed) #lyrics-settings-toggle svg {
+  transform: rotate(90deg);
+}
+
+.control-btn {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: var(--text-primary);
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 600;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.control-btn:hover {
+  background: rgba(255, 255, 255, 0.14);
+  border-color: rgba(255, 255, 255, 0.2);
+  color: var(--text-primary);
+  transform: translateY(-1px);
+}
+
+.control-btn:active {
+  transform: translateY(0);
+}
+
+.app-container.theme-light .control-btn {
+  background: rgba(0, 0, 0, 0.04);
+  border-color: rgba(0, 0, 0, 0.08);
+  color: rgba(0, 0, 0, 0.75);
+}
+
+.app-container.theme-light .control-btn:hover {
+  background: rgba(0, 0, 0, 0.08);
+  border-color: rgba(0, 0, 0, 0.15);
+  color: #000;
+}
+
+/* Alignment toggle special styling */
+.align-btn .icon-left {
+  display: none;
+}
+.align-btn.left-active .icon-center {
+  display: none;
+}
+.align-btn.left-active .icon-left {
+  display: block;
+}
+
+/* Sliding hover popover for sliders - glassmorphic style */
+/* ═══ Slider Popover — Modern Glass Capsule ═══ */
+.slider-popover {
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%) translateY(0) scale(0.92);
+  width: 148px;
+  padding: 11px 14px 9px;
+  border-radius: 16px;
+  background: rgba(22, 22, 26, 0.82);
+  backdrop-filter: blur(32px) saturate(180%);
+  -webkit-backdrop-filter: blur(32px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.28);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease, transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+  z-index: 10000;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 7px;
+}
+
+.lyrics-control-item:hover .slider-popover {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateX(-50%) translateY(-6px) scale(1);
+}
+
+/* JS moves popover to body to avoid clipping */
+.slider-popover.moved-to-body {
+  position: fixed;
+  z-index: 10000;
+  pointer-events: auto;
+  bottom: auto;
+  /* 抵消 documentElement 上的 UI 缩放，弹出框与歌词面板内控件保持一致尺寸 */
+  zoom: calc(1 / var(--ui-scale, 1));
+}
+
+/* Light lyrics theme variant (follows lyrics page theme setting) */
+.slider-popover[data-lyrics-theme="light"] {
+  background: rgba(255, 255, 255, 0.78);
+  border-color: rgba(0, 0, 0, 0.06);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.10);
+}
+
+/* Right-aligned popover for rightmost control items */
+.lyrics-control-item.popover-align-right .slider-popover {
+  left: auto;
+  right: 0;
+  transform: translateX(0) translateY(0) scale(0.92);
+}
+.lyrics-control-item.popover-align-right:hover .slider-popover {
+  transform: translateX(0) translateY(-6px) scale(1);
+}
+
+/* Value label — subtle, muted */
+.slider-value-label {
+  font-size: 10px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.45);
+  text-align: center;
+  width: 100%;
+  user-select: none;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+  line-height: 1;
+}
+
+.slider-popover[data-lyrics-theme="light"] .slider-value-label {
+  color: rgba(0, 0, 0, 0.38);
+}
+
+/* Range slider with filled track */
+.range-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 22px;
+  background: transparent;
+  outline: none;
+  cursor: pointer;
+  border: none;
+  --slider-fill: 50%;
+}
+
+.range-slider::-webkit-slider-runnable-track {
+  width: 100%;
+  height: 6px;
+  border-radius: 3px;
+  background: linear-gradient(to right,
+    rgba(var(--dynamic-color, 0, 180, 216), 0.85) 0%,
+    rgba(var(--dynamic-color, 0, 180, 216), 0.85) var(--slider-fill),
+    rgba(255, 255, 255, 0.1) var(--slider-fill),
+    rgba(255, 255, 255, 0.1) 100%);
+  border: none;
+}
+
+.slider-popover[data-lyrics-theme="light"] .range-slider::-webkit-slider-runnable-track {
+  background: linear-gradient(to right,
+    rgba(var(--dynamic-color, 0, 119, 182), 0.85) 0%,
+    rgba(var(--dynamic-color, 0, 119, 182), 0.85) var(--slider-fill),
+    rgba(0, 0, 0, 0.07) var(--slider-fill),
+    rgba(0, 0, 0, 0.07) 100%);
+}
+
+.range-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3), 0 0 0 0.5px rgba(0, 0, 0, 0.08);
+  cursor: pointer;
+  margin-top: -5px;
+  transition: transform 0.15s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.slider-popover[data-lyrics-theme="light"] .range-slider::-webkit-slider-thumb {
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2), 0 0 0 0.5px rgba(0, 0, 0, 0.12);
+}
+
+.range-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.25);
+}
+
+.range-slider::-webkit-slider-thumb:active {
+  transform: scale(1.1);
+}

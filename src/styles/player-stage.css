@@ -1,0 +1,548 @@
+/* Split Pane Body */
+.lyrics-body {
+  display: flex;
+  flex: 1;
+  flex-direction: row;
+  overflow: hidden;
+}
+
+/* Left side: Artwork showcase - Clean & Borderless! */
+.lyrics-cover-container {
+  flex: 48;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+  box-sizing: border-box;
+  flex-direction: column;
+}
+
+/* Metadata sitting under the artwork */
+.lyrics-meta-under-cover {
+  display: flex; /* Shown on desktop/wide screens */
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  margin-top: 28px;
+  width: var(--lyrics-cover-size);
+  max-width: 100%;
+  overflow: hidden !important;
+  box-sizing: border-box;
+  gap: 8px;
+}
+
+.lyrics-under-title {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text-primary);
+  width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+}
+
+.app-container.theme-light .lyrics-under-title {
+  text-shadow: none;
+}
+
+.lyrics-under-artist {
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  width: 100%;
+  white-space: nowrap;
+  opacity: 0.9;
+}
+
+/* Sleek Control Cockpit around the Album Art */
+.lyrics-controls-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  max-width: 440px;
+  gap: 24px;
+}
+
+/* Floating art card with album dynamic-glow shadows */
+.lyrics-cover-wrapper {
+  position: relative;
+  width: var(--lyrics-cover-size);
+  height: var(--lyrics-cover-size);
+  aspect-ratio: 1 / 1;
+  border-radius: 20px;
+  overflow: hidden;
+  will-change: transform, box-shadow;
+  cursor: pointer;
+  
+  /* Gorgeous Dynamic Ambient Color Halo Shadow */
+  box-shadow: 
+    0 15px 45px -10px rgba(0, 0, 0, 0.65),
+    0 20px 80px -15px rgba(var(--dynamic-color, 0, 0, 0), 0.45);
+  
+  transition: box-shadow 0.6s cubic-bezier(0.16, 1, 0.3, 1), transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+  
+  /* Slow elegant album float breathing animation */
+  animation: album-float 8s ease-in-out infinite alternate;
+}
+
+.lyrics-cover-wrapper:hover {
+  transform: scale(1.04) translateY(-4px);
+  box-shadow: 
+    0 20px 55px -10px rgba(0, 0, 0, 0.75),
+    0 30px 95px -10px rgba(var(--dynamic-color, 0, 0, 0), 0.6);
+}
+
+/* Apple Music style play/pause hover overlay */
+.cover-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Show overlay strictly and elegantly only when hovering directly over the cover image itself */
+.lyrics-cover-wrapper:hover .cover-overlay {
+  opacity: 1;
+}
+
+.cover-overlay-btn {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.25), 0 8px 32px rgba(0, 0, 0, 0.12);
+  backdrop-filter: blur(20px) saturate(140%);
+  -webkit-backdrop-filter: blur(20px) saturate(140%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  transform: scale(0.85);
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.lyrics-cover-wrapper:hover .cover-overlay-btn {
+  transform: scale(1);
+}
+
+.cover-overlay-btn svg {
+  transition: transform 0.2s ease;
+}
+
+.cover-overlay-btn:active svg {
+  transform: scale(0.9);
+}
+
+/* Toggle play/pause visibility */
+.lyrics-cover-wrapper.is-playing .cover-overlay-icon-play {
+  display: none;
+}
+.lyrics-cover-wrapper.is-playing .cover-overlay-icon-pause {
+  display: block;
+}
+.lyrics-cover-wrapper:not(.is-playing) .cover-overlay-icon-play {
+  display: block;
+  margin-left: 2px; /* Center adjustment for play triangle */
+}
+.lyrics-cover-wrapper:not(.is-playing) .cover-overlay-icon-pause {
+  display: none;
+}
+
+/* Side navigation buttons (⏮ / ⏭) - Default hidden and translated */
+.lyrics-side-btn {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.25), 0 4px 12px rgba(0, 0, 0, 0.12);
+  backdrop-filter: blur(20px) saturate(140%);
+  -webkit-backdrop-filter: blur(20px) saturate(140%);
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255, 255, 255, 0.8);
+  cursor: pointer;
+  outline: none;
+  opacity: 0;
+  pointer-events: none;
+  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.lyrics-side-btn.prev {
+  transform: translateX(15px) scale(0.9);
+}
+
+.lyrics-side-btn.next {
+  transform: translateX(-15px) scale(0.9);
+}
+
+/* On hover of container, reveal side buttons and progress bar */
+.lyrics-cover-container:hover .lyrics-side-btn,
+.lyrics-cover-container:hover .lyrics-progress-container {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.lyrics-cover-container:hover .lyrics-progress-container {
+  transform: translateY(0);
+}
+
+.lyrics-cover-container:hover .lyrics-side-btn.prev {
+  transform: translateX(0) scale(1);
+}
+
+.lyrics-cover-container:hover .lyrics-side-btn.next {
+  transform: translateX(0) scale(1);
+}
+
+.app-container.theme-light .lyrics-side-btn {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(0, 0, 0, 0.05);
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.45), 0 4px 12px rgba(0, 0, 0, 0.03);
+  color: rgba(0, 0, 0, 0.6);
+}
+
+.lyrics-side-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+  transform: scale(1.1) !important;
+  box-shadow: 
+    0 6px 16px rgba(0, 0, 0, 0.25),
+    0 0 12px rgba(var(--dynamic-color, 255, 255, 255), 0.2);
+}
+
+.app-container.theme-light .lyrics-side-btn:hover {
+  background: rgba(0, 0, 0, 0.07);
+  border-color: rgba(0, 0, 0, 0.1);
+  color: #000000;
+  box-shadow: 
+    0 6px 16px rgba(0, 0, 0, 0.06),
+    0 0 12px rgba(var(--dynamic-color, 0, 0, 0), 0.08);
+}
+
+.lyrics-side-btn:active {
+  transform: scale(0.92) !important;
+}
+
+/* Premium integrated progress bar below artist */
+.lyrics-progress-container {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  gap: 12px;
+  margin-top: 14px;
+  user-select: none;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(10px);
+  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.lyrics-progress-time {
+  font-size: 12.5px; /* 🌟 Elevated font size for a perfectly proportioned visual balance */
+  font-weight: 600; /* 🌟 Stronger bold presence that aligns with the thicker progress bar */
+  font-variant-numeric: tabular-nums;
+  color: var(--text-secondary);
+  opacity: 0.9; /* 🌟 Increased visibility */
+  min-width: 36px; /* 🌟 Expanded safe width to prevent any wrapping on bold text */
+}
+
+.lyrics-progress-track {
+  flex: 1;
+  height: 6px; /* 🌟 Upgraded progress rail thickness from 4px to 6px for robust aesthetics */
+  background: rgba(255, 255, 255, 0.16);
+  border-radius: 3px; /* 🌟 Synchronized border radius with the 6px height */
+  cursor: pointer;
+  position: relative;
+  transition: height 0.15s ease;
+}
+
+.app-container.theme-light .lyrics-progress-track {
+  background: rgba(0, 0, 0, 0.1);
+}
+
+.lyrics-progress-track:hover {
+  height: 8px; /* 🌟 Superb substantial feedback thickness on hover */
+}
+
+.lyrics-progress-fill {
+  height: 100%;
+  width: 0%;
+  background: #ffffff;
+  border-radius: 3px; /* 🌟 Fully rounded matching fill bar */
+  position: relative;
+}
+
+.app-container.theme-light .lyrics-progress-fill {
+  background: rgb(var(--dynamic-color, 0, 0, 0));
+}
+
+.lyrics-progress-fill::after {
+  content: '';
+  position: absolute;
+  right: -6px;
+  top: 50%;
+  transform: translateY(-50%) scale(0);
+  width: 12px; /* 🌟 Thicker high-visibility slider thumb (from 10px to 12px) */
+  height: 12px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
+  transition: transform 0.15s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.app-container.theme-light .lyrics-progress-fill::after {
+  background: rgb(var(--dynamic-color, 0, 0, 0));
+  box-shadow: 0 0 10px rgba(var(--dynamic-color, 0, 0, 0), 0.5);
+}
+
+.lyrics-progress-track.is-dragging .lyrics-progress-fill::after,
+.lyrics-progress-track:hover .lyrics-progress-fill::after {
+  transform: translateY(-50%) scale(1);
+}
+
+.lyrics-large-cover {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  user-select: none;
+}
+
+@keyframes album-float {
+  0% { transform: translateY(0px) rotate(0deg); }
+  50% { transform: translateY(-6px) rotate(0.8deg); }
+  100% { transform: translateY(0px) rotate(-1deg); }
+}
+
+/* Right side: Lyrics area container */
+.lyrics-scroll-container {
+  flex: 52;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+}
+
+/* 
+  Poetic Center Aligned Lyrics Scroll 
+*/
+.lyrics-scroll {
+  flex: 1;
+  overflow-y: auto;
+  scroll-behavior: auto;
+  padding: 0 clamp(24px, 5vw, 80px);
+  
+  mask-image: linear-gradient(to bottom, transparent 0%, black 15%, black 85%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 15%, black 85%, transparent 100%);
+  
+  transition: padding-left 0.4s cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+/* Dynamic Poetic Alignment System */
+.lyrics-scroll.align-center {
+  text-align: center;
+}
+
+.lyrics-scroll.align-center .lyrics-line {
+  transform-origin: center center;
+}
+
+.lyrics-scroll.align-left {
+  text-align: left;
+  padding-left: 12%; /* Beautiful offset so text doesn't hug the border */
+}
+
+.lyrics-scroll.align-left .lyrics-line {
+  transform-origin: left center;
+}
+
+.lyrics-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.lyrics-spacer {
+  height: 38vh;
+}
+
+/* Height-Adaptive Layout: dynamic adjustment when window height is shallow */
+@media (max-height: 650px) {
+  :root {
+    --lyrics-cover-size: clamp(160px, 24vh, 220px);
+  }
+  
+  .lyrics-header {
+    height: 60px; /* Compressed header height */
+    padding: 10px 30px 0 30px;
+  }
+
+  .lyrics-controls {
+    top: 10px; /* Aligned controls positioning */
+  }
+
+  .lyrics-back-btn {
+    top: 10px; /* Match controls top on shallow windows */
+  }
+  
+  .lyrics-cover-container {
+    padding: 20px; /* Reduced vertical padding */
+  }
+  
+  .lyrics-meta-under-cover {
+    margin-top: 14px; /* Cozy tight fit */
+    gap: 4px;
+  }
+  
+  .lyrics-under-title {
+    font-size: 17px; /* Elegant scale down */
+  }
+  
+  .lyrics-under-artist {
+    font-size: 11.5px;
+  }
+  
+  .lyrics-controls-row {
+    gap: 16px; /* Tight controls cluster spacing */
+  }
+  
+  .lyrics-side-btn {
+    width: 36px;
+    height: 36px;
+  }
+  
+  .lyrics-side-btn svg {
+    width: 14px;
+    height: 14px;
+  }
+  
+  .lyrics-visualizer-container {
+    height: 40px; /* Low profile spectrum height */
+    margin-top: 8px;
+  }
+  
+  .lyrics-spacer {
+    height: 34vh; /* Safe buffer adjustments */
+  }
+}
+
+/* Middle-sized screens layout optimization: tighten empty margins */
+@media (min-width: 901px) and (max-width: 1100px) {
+  :root {
+    --lyrics-cover-size: clamp(160px, 24vw, 240px);
+  }
+
+  .lyrics-cover-container {
+    flex: 42 !important;
+    padding: 24px !important;
+  }
+  
+  .lyrics-scroll-container {
+    flex: 58 !important;
+  }
+  
+  .lyrics-meta-under-cover {
+    margin-top: 20px;
+  }
+}
+
+/* Responsive adjust for smaller/vertical windows (iPad/Mobile styles) */
+@media (max-width: 900px) {
+  /* Show header metadata on narrow screens when cover is hidden! */
+  .lyrics-meta-header {
+    display: flex !important;
+  }
+
+  /* HIDE the giant artwork entirely to let lyrics have full focus and massive legibility! */
+  .lyrics-cover-container {
+    display: none !important;
+  }
+  
+  /* Let lyrics occupy 100% width cleanly! */
+  .lyrics-scroll-container {
+    flex: 100 !important;
+  }
+  
+  .lyrics-scroll {
+    padding: 0 24px;
+  }
+  
+  .lyrics-spacer {
+    height: 42vh;
+  }
+}
+
+.icon-btn {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--text-secondary);
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 600;
+  transition: all 0.2s ease;
+  backdrop-filter: blur(5px);
+}
+
+.icon-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+  color: #fff;
+  transform: scale(1.05);
+}
+
+.app-container.theme-light .icon-btn {
+  background: rgba(0, 0, 0, 0.05);
+  border-color: rgba(0, 0, 0, 0.1);
+  color: rgba(0, 0, 0, 0.6);
+}
+
+.app-container.theme-light .icon-btn:hover {
+  background: rgba(0, 0, 0, 0.1);
+  color: #000;
+}
+
+.lyrics-line {
+  --unfilled-color: rgba(255, 255, 255, 0.35);
+  padding: calc(var(--lyrics-font-size, 22px) * var(--lyrics-line-spacing, 0.85)) 0 0;
+  line-height: 1.8;
+  font-size: var(--lyrics-font-size, 22px);
+  font-weight: var(--lyrics-font-weight, 600);
+  color: rgba(255, 255, 255, 0.35);
+  cursor: pointer;
+  transform-origin: center center;
+  transform: translateY(0px);
+  /* Slow-start row motion with independently responsive depth effects. */
+  transition:
+    color 0.45s ease,
+    filter 0.32s ease,
+    transform 1.15s cubic-bezier(0.2, 0, 0.2, 1) var(--stagger-delay, 0s),
+    opacity 1.05s cubic-bezier(0.2, 0, 0.2, 1);
+  will-change: transform, filter, opacity;
+}
+
+.lyrics-line:hover {
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.lyrics-line.active {
+  color: #ffffff;
+}
+
+.lyrics-line.past {
+  color: rgba(255, 255, 255, 0.45);
+}

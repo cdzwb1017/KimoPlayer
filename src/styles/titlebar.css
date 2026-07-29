@@ -1,0 +1,147 @@
+/* Frameless Window Titlebar */
+/* Frameless Window Titlebar */
+.titlebar {
+  height: var(--titlebar-height);
+  background: transparent;
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  pointer-events: none; /* Let clicks pass through default frame */
+}
+
+/* Dedicated physically isolated dragging layer that truncates 130px before right side buttons */
+.titlebar-drag-region {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  right: 130px; 
+  -webkit-app-region: drag !important;
+  pointer-events: auto !important;
+  z-index: 1;
+}
+
+.titlebar-title {
+  position: absolute;
+  left: 20px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  pointer-events: none;
+  letter-spacing: 0.5px;
+  z-index: 2;
+}
+
+.titlebar-controls {
+  position: absolute;
+  right: 16px;
+  top: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  pointer-events: auto !important; /* Ensure children captures mouse input */
+  z-index: 2;
+  -webkit-app-region: no-drag !important;
+}
+
+.titlebar-button {
+  -webkit-app-region: no-drag !important;
+  pointer-events: auto !important;
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.25);
+  backdrop-filter: blur(20px) saturate(140%);
+  -webkit-backdrop-filter: blur(20px) saturate(140%);
+  color: rgba(255, 255, 255, 0.5);
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.titlebar-button svg {
+  width: 9px;
+  height: 9px;
+  transition: transform 0.2s ease;
+}
+
+.titlebar-button svg,
+.titlebar-button svg * {
+  pointer-events: none !important; /* Block children capture to prevent Windows dragging hijack */
+  -webkit-app-region: no-drag !important;
+}
+
+#titlebar-minimize:hover {
+  background: rgba(0, 240, 255, 0.12);
+  border-color: rgba(0, 240, 255, 0.25);
+  color: #00f0ff;
+  transform: scale(1.08) translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 240, 255, 0.25);
+}
+
+#titlebar-maximize:hover {
+  background: rgba(251, 191, 36, 0.12);
+  border-color: rgba(251, 191, 36, 0.25);
+  color: #fbbf24;
+  transform: scale(1.08) translateY(-1px);
+  box-shadow: 0 4px 12px rgba(251, 191, 36, 0.25);
+}
+
+#titlebar-close:hover {
+  background: rgba(239, 68, 68, 0.85);
+  border-color: rgba(239, 68, 68, 0.95);
+  color: #ffffff;
+  transform: scale(1.08) translateY(-1px);
+  box-shadow: 0 4px 16px rgba(239, 68, 68, 0.45);
+}
+
+.titlebar-button:active {
+  transform: scale(0.92) translateY(0);
+  transition: all 0.1s ease;
+}
+
+/* Light Theme Adaptations */
+.app-container.theme-light .titlebar-button {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(0, 0, 0, 0.05);
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.45);
+  color: rgba(0, 0, 0, 0.45);
+}
+
+.app-container.theme-light #titlebar-minimize:hover {
+  background: rgba(0, 136, 204, 0.08);
+  border-color: rgba(0, 136, 204, 0.18);
+  color: #0088cc;
+  box-shadow: 0 4px 10px rgba(0, 136, 204, 0.15);
+}
+
+.app-container.theme-light #titlebar-maximize:hover {
+  background: rgba(217, 119, 6, 0.08);
+  border-color: rgba(217, 119, 6, 0.18);
+  color: #d97706;
+  box-shadow: 0 4px 10px rgba(217, 119, 6, 0.15);
+}
+
+.app-container.theme-light #titlebar-close:hover {
+  background: rgba(220, 38, 38, 0.85);
+  border-color: rgba(220, 38, 38, 0.95);
+  color: #ffffff;
+  box-shadow: 0 4px 12px rgba(220, 38, 38, 0.3);
+}
+
+/* Grey Theme */
+.app-container.theme-grey .titlebar-button {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(0, 0, 0, 0.05);
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.45);
+  color: rgba(0, 0, 0, 0.45);
+}

@@ -1,0 +1,136 @@
+/* Main Layout */
+.main-content {
+  display: flex;
+  flex: 1;
+  padding-top: var(--titlebar-height);
+  height: calc(100vh - var(--player-bar-height));
+  position: relative;
+  z-index: 2;
+}
+
+/* Sidebar */
+.sidebar {
+  width: var(--sidebar-width);
+  background: transparent;
+  border-right: 1px solid var(--glass-border);
+  display: flex;
+  flex-direction: column;
+  padding: 24px 16px;
+  z-index: 2;
+}
+
+.sidebar h2 {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.4);
+  letter-spacing: 2px;
+  margin-bottom: 12px;
+  padding-left: 12px;
+}
+
+.sidebar-nav-container {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+.sidebar-indicator {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 44px;
+  border-radius: 12px;
+    background: rgba(var(--dynamic-color, 255, 255, 255), 0.08);
+  border: none;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.25);
+  backdrop-filter: blur(16px) saturate(150%);
+  -webkit-backdrop-filter: blur(16px) saturate(150%);
+  transition: top 0.3s cubic-bezier(0.4, 0, 0.2, 1), height 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.nav-item {
+  padding: 12px 16px;
+  border-radius: 12px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: var(--transition-smooth);
+  font-size: 14px;
+  font-weight: 500;
+  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid transparent;
+  position: relative;
+  z-index: 1;
+}
+
+.nav-item svg {
+  opacity: 0.75;
+  transition: var(--transition-smooth);
+}
+
+.nav-item:hover {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+
+.nav-item:hover svg {
+  opacity: 1;
+  color: var(--text-primary);
+}
+
+.nav-item.active {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.nav-item.active svg {
+  color: currentColor;
+  opacity: 1;
+  filter: none;
+}
+
+/* Content Area */
+.content-area {
+  flex: 1;
+  min-height: 0;
+  padding: 0 30px 30px;
+  overflow-y: auto;
+  position: relative;
+  background: transparent;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.12) transparent;
+  transform: translateZ(0);          /* GPU 加速滚动层 */
+  will-change: scroll-position;       /* 预通知浏览器 */
+  -webkit-overflow-scrolling: touch;  /* iOS 顺滑 */
+}
+
+.content-shell {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.content-toolbar {
+  flex: 0 0 auto;
+  padding: 30px 30px 0;
+}
+
+.content-toolbar:empty { display: none; }
+.content-toolbar:empty + .content-area { padding: 30px; }
+
+.app-container.theme-light .content-area {
+  scrollbar-color: rgba(0, 0, 0, 0.12) transparent;
+}
+
+.content-area h1 {
+  display: none;
+}

@@ -1,0 +1,774 @@
+/* 参考 references/audio-player.js 的纯 CSS 景深模糊架构 */
+.has-depth-blur .lyrics-line.active {
+  opacity: 1 !important;
+  filter: none !important;
+}
+
+.has-depth-blur .lyrics-line.past,
+.has-depth-blur .lyrics-line.depth-past {
+  opacity: 0.55 !important;
+  filter: none !important;
+}
+
+/* Translation opacity is animated on the child, so do not dim its whole row. */
+.has-depth-blur .lyrics-line.has-translation.past,
+.has-depth-blur .lyrics-line.has-translation.depth-past {
+  opacity: 1 !important;
+}
+
+.has-depth-blur .lyrics-line.depth-1 {
+  opacity: 0.75 !important;
+  filter: blur(1.5px) !important;
+}
+
+.has-depth-blur .lyrics-line.depth-2 {
+  opacity: 0.5 !important;
+  filter: blur(3.0px) !important;
+}
+
+.has-depth-blur .lyrics-line.depth-3 {
+  opacity: 0.3 !important;
+  filter: blur(4.5px) !important;
+}
+
+.lyrics-line.past-old {
+  opacity: 0.3 !important;
+  transform: scale(0.95) translateY(-20px) !important;
+  filter: none !important;
+  pointer-events: none !important;
+  transition: opacity 0.8s cubic-bezier(0.25, 1, 0.5, 1), transform 0.8s cubic-bezier(0.25, 1, 0.5, 1) !important;
+}
+
+.app-container.theme-light .lyrics-line {
+  color: rgba(0, 0, 0, 0.28);
+}
+
+.app-container.theme-light .lyrics-line:hover {
+  color: rgba(0, 0, 0, 0.55);
+}
+
+.app-container.theme-light .lyrics-line.active {
+  color: #1d1d1f;
+}
+
+.app-container.theme-light .lyrics-line.past {
+  color: rgba(0, 0, 0, 0.45);
+}
+
+/* Interlude Line Transition Mechanics */
+.lyrics-line.is-interlude-line {
+  height: 0px;
+  opacity: 0;
+  overflow: hidden;
+  padding-top: 0px !important;
+  padding-bottom: 0px !important;
+  margin: 0px !important;
+  transition: 
+    height 0.6s cubic-bezier(0.25, 1, 0.5, 1),
+    padding 0.6s cubic-bezier(0.25, 1, 0.5, 1),
+    opacity 0.6s ease,
+    transform 0.72s cubic-bezier(0.15, 0.85, 0.35, 1) var(--stagger-delay, 0s);
+}
+
+.lyrics-line.is-interlude-line.active {
+  height: 36px;
+  opacity: 0.8;
+  padding-top: 16px !important;
+  padding-bottom: 2px !important;
+  overflow: visible; /* Let breathing dots and glow effects overflow freely without clipping */
+}
+
+.lyrics-line.is-interlude-line.past {
+  height: 0px;
+  opacity: 0;
+  padding-top: 0px !important;
+  padding-bottom: 0px !important;
+  pointer-events: none;
+  overflow: hidden;
+  /* 两阶段退场：opacity 先淡出(0.3s)，然后 height/padding 延迟收缩(delay 0.25s, duration 0.35s) */
+  transition:
+    opacity 0.3s cubic-bezier(0.25, 1, 0.5, 1),
+    height 0.35s cubic-bezier(0.25, 1, 0.5, 1) 0.25s,
+    padding 0.35s cubic-bezier(0.25, 1, 0.5, 1) 0.25s;
+}
+
+/* Elegant Dom-Staggered Scale-down and Fade-out for Interlude Dots */
+.lyrics-line.is-interlude-line.past .interlude-dot {
+  transform: scale(0);
+  opacity: 0;
+  box-shadow: 0 0 0px transparent;
+  transition: 
+    transform 0.55s cubic-bezier(0.34, 1.56, 0.64, 1), 
+    opacity 0.45s ease,
+    background-color 0.45s ease;
+}
+
+.lyrics-line.is-interlude-line.past .interlude-dot:nth-child(1) { transition-delay: 0s; }
+.lyrics-line.is-interlude-line.past .interlude-dot:nth-child(2) { transition-delay: 0.08s; }
+.lyrics-line.is-interlude-line.past .interlude-dot:nth-child(3) { transition-delay: 0.16s; }
+
+/* Interlude Dots */
+.lyrics-interlude {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  height: 100%;
+  padding-left: 12px; /* Prevent the left dot from being clipped when scaling/glowing */
+}
+
+.interlude-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background-color: rgba(255, 255, 255, 0.4);
+  transform: scale(0.8);
+  transition: var(--transition-smooth);
+}
+
+.lyrics-line.active .interlude-dot {
+  animation: dot-breathe 2s infinite ease-in-out;
+}
+
+.lyrics-line.active .interlude-dot:nth-child(1) { animation-delay: 0s; }
+.lyrics-line.active .interlude-dot:nth-child(2) { animation-delay: 0.3s; }
+.lyrics-line.active .interlude-dot:nth-child(3) { animation-delay: 0.6s; }
+
+@keyframes dot-breathe {
+  0%, 100% {
+    transform: scale(0.7);
+    opacity: 0.35;
+    box-shadow: 0 0 0px transparent;
+  }
+  50% {
+    transform: scale(1.35);
+    opacity: 1;
+    background-color: rgb(var(--dynamic-color)) !important;
+    box-shadow: 0 0 14px rgb(var(--dynamic-color));
+  }
+}
+
+/* 🌟 间奏即将退出时的缩回淡出动画 🌟 */
+.lyrics-line.is-interlude-line.is-exiting {
+  opacity: 0.35 !important;
+}
+.lyrics-line.is-interlude-line.is-exiting .interlude-dot {
+  transform: scale(0) !important;
+  opacity: 0 !important;
+  box-shadow: 0 0 0px transparent !important;
+  transition: transform 0.4s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.4s ease !important;
+}
+
+/* Refined interlude phases: row expansion, staggered dots, dot retraction, row collapse. */
+.lyrics-line.is-interlude-line {
+  transform: translateY(6px) scale(0.985);
+  transform-origin: left center;
+  transition:
+    height 0.58s cubic-bezier(0.22, 1, 0.36, 1),
+    padding 0.58s cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 0.34s ease,
+    transform 0.58s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.lyrics-line.is-interlude-line.active {
+  height: 40px;
+  opacity: 0.84;
+  transform: translateY(0) scale(1);
+}
+
+.lyrics-line.is-interlude-line.past {
+  transform: translateY(-4px) scale(0.985);
+  transition:
+    height 0.48s cubic-bezier(0.4, 0, 0.2, 1),
+    padding 0.48s cubic-bezier(0.4, 0, 0.2, 1),
+    opacity 0.24s ease,
+    transform 0.42s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.interlude-dot {
+  position: relative;
+  width: 10px;
+  height: 10px;
+  flex: 0 0 10px;
+  border-radius: 0;
+  background: transparent;
+  opacity: 0;
+  transform: translateY(5px) scale(0.55);
+  animation: none;
+  transition:
+    opacity 0.34s ease,
+    transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.interlude-dot::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: rgb(var(--dynamic-color));
+  opacity: 0.58;
+  transform: scale(0.82);
+  box-shadow: 0 0 0 rgba(var(--dynamic-color), 0);
+}
+
+.lyrics-line.active:not(.is-exiting) .interlude-dot {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  animation: none;
+}
+
+.lyrics-line.active:not(.is-exiting) .interlude-dot:nth-child(1) { transition-delay: 0.08s; }
+.lyrics-line.active:not(.is-exiting) .interlude-dot:nth-child(2) { transition-delay: 0.16s; }
+.lyrics-line.active:not(.is-exiting) .interlude-dot:nth-child(3) { transition-delay: 0.24s; }
+
+.lyrics-line.active:not(.is-exiting) .interlude-dot::before {
+  animation: refined-dot-breathe 2.15s infinite ease-in-out;
+}
+
+.lyrics-line.active:not(.is-exiting) .interlude-dot:nth-child(1)::before { animation-delay: 0s; }
+.lyrics-line.active:not(.is-exiting) .interlude-dot:nth-child(2)::before { animation-delay: 0.28s; }
+.lyrics-line.active:not(.is-exiting) .interlude-dot:nth-child(3)::before { animation-delay: 0.56s; }
+
+@keyframes refined-dot-breathe {
+  0%, 100% {
+    transform: scale(0.82);
+    opacity: 0.55;
+    box-shadow: 0 0 0 rgba(var(--dynamic-color), 0);
+  }
+  50% {
+    transform: scale(1.28);
+    opacity: 1;
+    box-shadow: 0 0 12px rgba(var(--dynamic-color), 0.72);
+  }
+}
+
+.lyrics-line.is-interlude-line.active.is-exiting {
+  opacity: 0.58 !important;
+}
+
+.lyrics-line.is-interlude-line.active.is-exiting .interlude-dot {
+  opacity: 0 !important;
+  transform: translateY(-4px) scale(0.55) !important;
+  animation: none !important;
+  transition:
+    opacity 0.3s ease,
+    transform 0.4s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+.lyrics-line.is-interlude-line.active.is-exiting .interlude-dot:nth-child(1) { transition-delay: 0.14s !important; }
+.lyrics-line.is-interlude-line.active.is-exiting .interlude-dot:nth-child(2) { transition-delay: 0.07s !important; }
+.lyrics-line.is-interlude-line.active.is-exiting .interlude-dot:nth-child(3) { transition-delay: 0s !important; }
+
+/* Translation fades continuously while its lyric row moves upward. */
+.lyrics-translation {
+  font-size: calc(var(--lyrics-font-size, 22px) * 0.68);
+  font-weight: 400;
+  margin-top: 2px;
+  opacity: 0.95;
+  transition: opacity 1.05s cubic-bezier(0.2, 0, 0.2, 1);
+}
+
+.lyrics-line.active .lyrics-translation {
+  opacity: 0.95;
+  transition-delay: 0s;
+  transition-duration: 0.35s;
+}
+
+.lyrics-line.translation-brightening-start .lyrics-translation {
+  color: var(--translation-brighten-from-color, currentColor);
+  opacity: var(--translation-brighten-from-opacity, 0.95);
+  transition: none;
+}
+
+.lyrics-line.translation-brightening .lyrics-translation {
+  color: #ffffff;
+  opacity: 0.95;
+  transition-property: color, opacity;
+  transition-delay: 0s;
+  transition-duration: 1.05s;
+  transition-timing-function: cubic-bezier(0.2, 0, 0.2, 1);
+}
+
+.lyrics-line.translation-fading .lyrics-translation {
+  /* Keep the leaving translation independent from the parent's delayed
+     active -> past color change during automatic playback. */
+  color: #ffffff;
+  opacity: 0.55;
+  transition-delay: 0s;
+  transition-duration: 1.05s;
+}
+
+.lyrics-line.translation-faded .lyrics-translation {
+  color: #ffffff;
+  opacity: 0.55;
+  transition: none;
+}
+
+.app-container.theme-light .lyrics-line.translation-brightening .lyrics-translation,
+.app-container.theme-light .lyrics-line.translation-fading .lyrics-translation,
+.app-container.theme-light .lyrics-line.translation-faded .lyrics-translation,
+.app-container.theme-grey .lyrics-line.translation-brightening .lyrics-translation,
+.app-container.theme-grey .lyrics-line.translation-fading .lyrics-translation,
+.app-container.theme-grey .lyrics-line.translation-faded .lyrics-translation {
+  color: #1d1d1f;
+}
+
+@property --filled-color-start {
+  syntax: '<color>';
+  initial-value: rgba(255, 255, 255, 0.8);
+  inherits: true;
+}
+@property --filled-color-end {
+  syntax: '<color>';
+  initial-value: #ffffff;
+  inherits: true;
+}
+@property --unfilled-color {
+  syntax: '<color>';
+  initial-value: rgba(255, 255, 255, 0.3);
+  inherits: true;
+}
+
+/* Restore container behavior for lyrics-main */
+.lyrics-main {
+  display: inline-block;
+  max-width: 100%; /* 防止 char-level / 长元数据行（如 "Composed by:DAISHIDANCE/..."）撑超父宽 */
+  overflow-wrap: break-word; /* 超长无空格词在父宽受限时允许断行 */
+}
+
+/* 
+  English Word Non-Break Wrapper:
+  Ensures that split English letters within the same word are never cut off in the middle, 
+  and the entire word will wrap to the next line smoothly if space is insufficient.
+*/
+.lyrics-english-word {
+  display: inline;
+  white-space: nowrap;
+}
+
+/* Individual word layer for karaoke fill with rendering safety and solid-color fallback */
+.lyrics-word {
+  display: inline-block;
+  vertical-align: bottom !important; /* 🌟 物理垂直最底端底边对齐：完美统一带注音与不带注音字元的绝对垂直水平基线，彻底根除高低错位参差 🌟 */
+  background-image: none !important; /* 默认未唱状态：彻底关闭任何可能导致左侧亮边的渐变背景 */
+  -webkit-text-fill-color: var(--unfilled-color) !important;
+  color: var(--unfilled-color) !important;
+  
+  /* Pure and classic Karaoke colors */
+  --filled-color: rgba(255, 255, 255, 0.95);
+  --mid-transition-color: rgba(255, 255, 255, 0.65);
+  --unfilled-color: rgba(255, 255, 255, 0.35);
+  --transition-width: 8%; /* 🌟 缩短至精悍锋利的 8% 过渡高光带 🌟 */
+
+  /* GPU accelerated, driven perfectly 1:1 by JS Lerp frame timeline */
+  transform: translateY(0px) translateZ(0);
+  will-change: transform;
+}
+
+/* Light theme word fill - 100% 原版动态主题提取色体系 */
+.app-container.theme-light .lyrics-word {
+  --filled-color: rgb(var(--dynamic-color, 0, 0, 0));
+  --mid-transition-color: rgba(var(--dynamic-color, 0, 0, 0), 0.58);
+  --unfilled-color: rgba(0, 0, 0, 0.28);
+  --transition-width: 8%;
+}
+
+/* 🌟 唱词高光与渐变渲染：默认自适应支持整排投影与单字平滑回退，彻底防止文字割裂 🌟 */
+.lyrics-word.word-singing {
+  background-clip: text !important;
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  background-repeat: no-repeat !important;
+  
+  /* 优先使用整排/整行宽度与坐标，未对齐时自动优雅回退 */
+  background-size: var(--line-width, 100%) 100% !important;
+  background-position: calc(-1 * var(--char-offset, 0px)) 0px !important;
+  
+  background-image: linear-gradient(
+    to right,
+    var(--filled-color) var(--line-percent, var(--char-fill, 0%)),
+    var(--mid-transition-color) calc(var(--line-percent, var(--char-fill, 0%)) + var(--transition-width) * 0.45),
+    var(--unfilled-color) calc(var(--line-percent, var(--char-fill, 0%)) + var(--transition-width))
+  ) !important;
+
+  clip-path: inset(0) !important;
+  -webkit-clip-path: inset(0) !important;
+}
+
+/* 🌟 当字元唱完时（word-active）：保持原生主题填充染色，并维持上抬 -4px 的立体悬浮位置 🌟 */
+.lyrics-word.word-active {
+  background-image: none !important;
+  -webkit-text-fill-color: var(--filled-color) !important;
+  color: var(--filled-color) !important;
+  /* Fallback only: the per-word animation writes the configured lift inline. */
+  transform: translateY(-4px) translateZ(0);
+  transition: transform 0.35s cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+.lyrics-line.past .lyrics-word.word-active {
+  transform: translateY(-4px) translateZ(0);
+}
+
+.lyrics-word.singing-glow {
+  /* 极致高贵纯净：关闭污染字形的模糊白光影 */
+  text-shadow: none !important;
+}
+
+/* Light Theme Glowing overrides to maintain ultimate high contrast and readability */
+.app-container.theme-light .lyrics-word.singing-glow {
+  text-shadow: none !important;
+}
+
+/* 
+  ── 🌟 Furigana Transliterations Physical Layer Decoupling (注音字元物理图层物理隔离) ── 
+*/
+.lyrics-word.is-ruby-word {
+  /* 🌟 inline-block：保持 baseline 排版，与普通字元完美同高度，不撑高父 span 🌟 */
+  display: inline-block !important;
+  vertical-align: baseline !important;
+  text-shadow: none !important;
+
+  /* 屏蔽父级的渐变裁剪，改由汉字和假名后缀独立平铺剪裁，防止 Stacking Context 冲突 */
+  background: transparent !important;
+  background-image: none !important;
+  background-clip: unset !important;
+  -webkit-background-clip: unset !important;
+  -webkit-text-fill-color: unset !important;
+  color: unset !important;
+}
+
+.lyrics-word.is-ruby-word .lyrics-char-text,
+.lyrics-word.is-ruby-word .lyrics-ruby-suffix {
+  vertical-align: bottom !important;
+  text-shadow: none !important; /* 🌟 独立文字裁剪时强制关闭阴影，彻底斩断 Chromium 错位重影 Bug 🌟 */
+  background-image: none !important; /* 默认未唱状态：物理阻断 any left-side highlight gradients */
+  -webkit-text-fill-color: var(--unfilled-color) !important;
+  color: var(--unfilled-color) !important;
+  
+  --filled-color: rgba(255, 255, 255, 0.78); /* 🌟 纯白→柔和，消除深色模式"色块" 🌟 */
+  --mid-transition-color: rgba(255, 255, 255, 0.54);
+  --unfilled-color: rgba(255, 255, 255, 0.35);
+  --transition-width: 8%; /* 🌟 缩短至精悍锋利的 8% 过渡高光带 🌟 */
+  
+  transition: --filled-color 0.6s ease, --unfilled-color 0.6s ease;
+}
+
+/* 🌟 只有在正在演唱此字元且其正处于流光高光带范围内时，才在汉字及后缀上绘制卡拉OK渐变 🌟 */
+.lyrics-word.is-ruby-word.word-singing .lyrics-char-text,
+.lyrics-word.is-ruby-word.word-singing .lyrics-ruby-suffix {
+  background-clip: text !important;
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  background-repeat: no-repeat !important;
+  
+  /* 默认：降级单字元卡拉OK渐变填充，适配尚未对齐时 */
+  background-size: 100% 100% !important;
+  background-position: 0px 0px !important;
+  
+  background-image: linear-gradient(
+    to right,
+    var(--filled-color) var(--char-fill, 0%),
+    var(--mid-transition-color) calc(var(--char-fill, 0%) + var(--transition-width) * 0.45),
+    var(--unfilled-color) calc(var(--char-fill, 0%) + var(--transition-width))
+  ) !important;
+}
+
+/* 🌟 当这一行成功完成物理排版背景对齐后，才启用联觉整行渐变拼接 🌟 */
+.lyrics-line[data-bg-aligned="true"] .lyrics-word.is-ruby-word.word-singing .lyrics-char-text,
+.lyrics-line[data-bg-aligned="true"] .lyrics-word.is-ruby-word.word-singing .lyrics-ruby-suffix {
+  /* Viewport Texture Mapping: 拼接整行渐变 */
+  background-size: var(--line-width) 100% !important;
+  background-position: calc(-1 * var(--char-offset)) 0px !important;
+  
+  background-image: linear-gradient(
+    to right,
+    var(--filled-color) var(--line-percent, 0%),
+    var(--mid-transition-color) calc(var(--line-percent, 0%) + var(--transition-width) * 0.45),
+    var(--unfilled-color) calc(var(--line-percent, 0%) + var(--transition-width))
+  ) !important;
+}
+
+/* Finished state for isolated Kanji & suffix layer */
+.lyrics-word.is-ruby-word.word-active .lyrics-char-text,
+.lyrics-word.is-ruby-word.word-active .lyrics-ruby-suffix {
+  background-image: none !important;
+  -webkit-text-fill-color: var(--filled-color) !important;
+  color: var(--filled-color) !important;
+}
+
+/* Past state for isolated Kanji & suffix layer */
+.lyrics-line.past .lyrics-word.is-ruby-word .lyrics-char-text,
+.lyrics-line.past .lyrics-word.is-ruby-word .lyrics-ruby-suffix {
+  --filled-color: rgba(255, 255, 255, 0.45);
+  --unfilled-color: rgba(255, 255, 255, 0.35);
+}
+
+/* Light theme for isolated Kanji & suffix layer */
+.app-container.theme-light .lyrics-word.is-ruby-word .lyrics-char-text,
+.app-container.theme-light .lyrics-word.is-ruby-word .lyrics-ruby-suffix {
+  --filled-color: rgb(var(--dynamic-color, 0, 0, 0));
+  --mid-transition-color: rgba(var(--dynamic-color, 0, 0, 0), 0.58);
+  --unfilled-color: rgba(0, 0, 0, 0.22);
+  --transition-width: 8%; /* 🌟 缩短至精悍锋利的 8% 过渡高光带 🌟 */
+}
+
+.app-container.theme-light .lyrics-word.is-ruby-word.word-singing .lyrics-char-text,
+.app-container.theme-light .lyrics-word.is-ruby-word.word-singing .lyrics-ruby-suffix {
+  background-clip: text !important;
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  background-repeat: no-repeat !important;
+  
+  /* 默认：降级单字元卡拉OK渐变填充，适配尚未对齐时 */
+  background-size: 100% 100% !important;
+  background-position: 0px 0px !important;
+  
+  background-image: linear-gradient(
+    to right,
+    var(--filled-color) var(--char-fill, 0%),
+    var(--mid-transition-color) calc(var(--char-fill, 0%) + var(--transition-width) * 0.45),
+    var(--unfilled-color) calc(var(--char-fill, 0%) + var(--transition-width))
+  ) !important;
+}
+
+/* 🌟 当这一行成功完成物理排版背景对齐后，才启用联觉整行渐变拼接 🌟 */
+.app-container.theme-light .lyrics-line[data-bg-aligned="true"] .lyrics-word.is-ruby-word.word-singing .lyrics-char-text,
+.app-container.theme-light .lyrics-line[data-bg-aligned="true"] .lyrics-word.is-ruby-word.word-singing .lyrics-ruby-suffix {
+  /* Viewport Texture Mapping: 拼接整行渐变 */
+  background-size: var(--line-width) 100% !important;
+  background-position: calc(-1 * var(--char-offset)) 0px !important;
+  
+  background-image: linear-gradient(
+    to right,
+    var(--filled-color) var(--line-percent, 0%),
+    var(--mid-transition-color) calc(var(--line-percent, 0%) + var(--transition-width) * 0.45),
+    var(--unfilled-color) calc(var(--line-percent, 0%) + var(--transition-width))
+  ) !important;
+}
+
+.app-container.theme-light .lyrics-word.is-ruby-word.word-active .lyrics-char-text,
+.app-container.theme-light .lyrics-word.is-ruby-word.word-active .lyrics-ruby-suffix {
+  --filled-color: rgb(var(--dynamic-color, 0, 0, 0));
+  background-image: none !important;
+  -webkit-text-fill-color: rgb(var(--dynamic-color, 0, 0, 0)) !important;
+  color: rgb(var(--dynamic-color, 0, 0, 0)) !important;
+}
+
+.app-container.theme-light .lyrics-line.past .lyrics-word.is-ruby-word .lyrics-char-text,
+.app-container.theme-light .lyrics-line.past .lyrics-word.is-ruby-word .lyrics-ruby-suffix {
+  --filled-color: rgba(0, 0, 0, 0.38);
+  --unfilled-color: rgba(0, 0, 0, 0.22);
+}
+
+/* ── Apple Music Style Ruby Transliterations (Furigana) ── */
+.lyrics-ruby-container {
+  /* 🌟 不再用 inline-flex column 撑高父容器，改用 inline-block + position:relative，
+        注音绝对定位浮在汉字上方，汉字 baseline 与同行普通字完全一致 🌟 */
+  display: inline-block !important;
+  position: relative !important;
+  vertical-align: baseline !important;
+  line-height: inherit !important;
+}
+
+.lyrics-rt-text,
+.lyrics-char-text {
+  display: inline-block !important;
+}
+
+.lyrics-char-text {
+  line-height: inherit !important;
+  vertical-align: baseline !important;
+}
+
+/* 
+  🌟 强力物理隔离注音样式：
+  完全独立的高雅注音样式，与汉字的 text-clip 渐变裁剪彻底划清界线，100% 免疫局部变色！
+*/
+.lyrics-rt-text {
+  /* 
+    终极降维隔绝注音系统：注音不撑高父容器，浮在汉字上方，汉字 baseline 与普通字完全一致
+  */
+  position: absolute !important;
+  bottom: calc(100% - 0.42em) !important; /* 🌟 注音再往下压，更紧贴汉字 🌟 */
+  left: 50% !important;
+  transform: translateX(-50%) !important;
+  font-size: 0.42em !important;
+  font-weight: 600 !important;
+  line-height: 1 !important;
+  white-space: nowrap !important;
+  user-select: none !important;
+  margin-bottom: 0 !important; /* 🌟 不再撑高父容器 🌟 */
+  text-transform: none !important;
+  letter-spacing: 0px !important;
+  white-space: nowrap !important; /* 杜绝注音内部折行 */
+  
+  /* 🌟 物理阻断卡拉OK裁剪核心：强制将 text-fill 归于 currentcolor，使文字只被 color 实色渲染 🌟 */
+  -webkit-text-fill-color: currentcolor !important;
+  -webkit-background-clip: border-box !important;
+  background-clip: border-box !important;
+  background: transparent !important;
+
+  /* 默认未来行/静止行的注音底色（深色模式下为柔和半透明暗白色） */
+  color: rgba(255, 255, 255, 0.35) !important;
+  
+  /* Sync active/past color fade transition with base word */
+  transition: color 0.6s ease;
+}
+
+/* Light theme Furigana default */
+.app-container.theme-light .lyrics-rt-text {
+  color: rgba(0, 0, 0, 0.28) !important;
+}
+
+/* 🌟 注音始终保持统一淡灰色，不随 active/past 变高亮（避免"色块"效果）🌟 */
+.lyrics-rt-text {
+  color: rgba(255, 255, 255, 0.42) !important;
+}
+
+.app-container.theme-light .lyrics-rt-text {
+  color: rgba(0, 0, 0, 0.34) !important;
+}
+
+/* Light theme lyrics */
+.app-container.theme-light .lyrics-line {
+  color: rgba(0, 0, 0, 0.2);
+}
+.app-container.theme-light .lyrics-line.active {
+  color: #1a1a1a;
+}
+.app-container.theme-light .lyrics-line.past {
+  color: rgba(0, 0, 0, 0.35);
+}
+.app-container.theme-light .lyrics-line:hover {
+  color: rgba(0, 0, 0, 0.4);
+}
+
+.song-item {
+  display: flex;
+  align-items: center;
+  padding: 12px 16px;
+  border-radius: 14px;
+  cursor: pointer;
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1),
+              background 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  margin-bottom: 8px;
+  background: transparent;
+  border: 1px solid transparent;
+    position: relative;
+  content-visibility: auto;           /* 不可见项跳过渲染 */
+  contain-intrinsic-size: 90px;       /* 占位高度，避免滚动条跳变 */
+  contain: layout style;              /* 隔离布局/样式重算 */
+}
+
+.song-item::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, rgba(var(--dynamic-color, 255, 255, 255), 0.04) 0%, transparent 100%);
+  opacity: 0;
+  transition: var(--transition-smooth);
+  pointer-events: none;
+}
+
+.song-item:hover {
+  background: var(--card-hover);
+  border-color: var(--card-border-hover);
+  transform: translateY(-2px);
+}
+
+.song-item:hover::before {
+  opacity: 1;
+}
+
+.song-item:active {
+  transform: translateY(0);
+}
+
+.song-item.playing {
+  background: linear-gradient(135deg, rgba(var(--dynamic-color, 0, 240, 255), 0.1) 0%, rgba(var(--dynamic-color, 0, 240, 255), 0.02) 100%);
+  border: 1px solid rgba(var(--dynamic-color, 0, 240, 255), 0.25);
+}
+
+.song-item .song-cover {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  margin-right: 16px;
+  object-fit: cover;
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 1;
+}
+
+.song-item:hover .song-cover {
+  transform: scale(1.05);
+}
+
+.song-item .song-info {
+  flex: 1;
+  z-index: 1;
+}
+
+.song-item .song-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+  letter-spacing: 0.1px;
+}
+
+.song-item .song-artist {
+  font-size: 12px;
+  color: var(--text-secondary);
+  font-weight: 500;
+  opacity: 0.85;
+}
+
+.song-item .song-duration {
+  font-size: 13px;
+  color: var(--text-secondary);
+  font-weight: 500;
+  margin-right: 6px;
+  z-index: 1;
+}
+
+/* Elegant CSS Audio Wave Equalizer */
+.eq-animation {
+  display: none;
+  align-items: flex-end;
+  gap: 2px;
+  width: 14px;
+  height: 12px;
+  margin-right: 8px;
+  z-index: 2;
+  flex-shrink: 0;
+}
+
+.song-item.playing .eq-animation {
+  display: flex;
+}
+
+.eq-bar {
+  width: 2px;
+  height: 2px;
+  background-color: rgb(var(--dynamic-color, 0, 240, 255));
+  border-radius: 1px;
+  animation: bounce-bar 1.2s ease-in-out infinite alternate;
+  transform-origin: bottom;
+  box-shadow: 0 0 4px rgba(var(--dynamic-color, 0, 240, 255), 0.4);
+  flex-shrink: 0;
+}
+
+.eq-bar:nth-child(1) { animation-duration: 0.8s; animation-delay: 0.1s; }
+.eq-bar:nth-child(2) { animation-duration: 1.1s; animation-delay: 0.3s; }
+.eq-bar:nth-child(3) { animation-duration: 0.9s; animation-delay: 0.5s; }
+.eq-bar:nth-child(4) { animation-duration: 0.7s; animation-delay: 0.2s; }
+
+/* Paused state of equalizer */
+.eq-animation.paused .eq-bar {
+  animation-play-state: paused !important;
+  height: 3px !important;
+}
+
+@keyframes bounce-bar {
+  0% { height: 2px; }
+  100% { height: 12px; }
+}

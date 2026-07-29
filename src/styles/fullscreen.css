@@ -1,0 +1,380 @@
+/* ══ 沉浸全屏模式 ══ */
+.titlebar.immersive-hidden {
+  height: 0 !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  transition: all 0.3s ease !important;
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   🚀 Intel Iris Xe / Low-Power Hardware Performance Optimization (.perf-mode)
+   ══════════════════════════════════════════════════════════════════ */
+.perf-mode .lyrics-line {
+  filter: none !important;
+}
+.perf-mode .lyrics-line.past-old {
+  filter: none !important;
+}
+.perf-mode .lyrics-visualizer-container.playing .visualizer-bar {
+  box-shadow: none !important;
+}
+.perf-mode,
+.perf-mode * {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+.perf-mode .lyrics-panel-bg,
+.perf-mode .lyrics-header,
+.perf-mode .lyrics-footer {
+  background: rgba(18, 18, 22, 0.95) !important;
+}
+.perf-mode.theme-light .lyrics-panel-bg,
+.perf-mode.theme-light .lyrics-header,
+.perf-mode.theme-light .lyrics-footer {
+  background: rgba(245, 245, 248, 0.96) !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   Comments Panel - 网易云音乐歌曲评论面板
+   Liquid Glass Material (与悬浮按钮统一材质)
+   ═══════════════════════════════════════════════════════════════ */
+
+.comments-panel {
+  position: fixed;
+  top: 56px;
+  right: 8px;
+  bottom: calc(var(--player-bar-height, 90px) + 8px);
+  width: min(380px, 45vw);
+  /* Crystal glass: 与悬浮按钮统一的透明材质 */
+  background: rgba(255, 255, 255, 0.02);
+  backdrop-filter: blur(12px) saturate(140%);
+  -webkit-backdrop-filter: blur(12px) saturate(140%);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.25), 0 8px 24px rgba(0, 0, 0, 0.12);
+  z-index: 9998;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(100%);
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.2s ease;
+}
+
+.comments-panel.active {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateX(0);
+  transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.25s ease;
+}
+
+/* Header */
+.comments-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 18px 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  flex-shrink: 0;
+}
+
+.comments-header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.comments-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.comments-count {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.comments-close-btn {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, color 0.15s;
+}
+
+.comments-close-btn:hover {
+  background: var(--glass-border);
+  color: var(--text-primary);
+}
+
+/* Song Info Bar */
+.comments-song-info {
+  padding: 14px 18px 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.comments-song-cover-wrap {
+  position: relative;
+  width: 48px;
+  height: 48px;
+  flex-shrink: 0;
+}
+
+.comments-song-cover {
+  width: 48px;
+  height: 48px;
+  border-radius: 8px;
+  object-fit: cover;
+  display: block;
+}
+
+.comments-play-btn {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.45);
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.comments-play-btn svg {
+  width: 20px;
+  height: 20px;
+  color: #fff;
+  margin-left: 2px;
+}
+
+.comments-song-cover-wrap:hover .comments-play-btn {
+  opacity: 1;
+}
+
+.comments-song-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.comments-action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.comments-action-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+.comments-action-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-primary);
+}
+
+.comments-action-btn:active {
+  transform: scale(0.9);
+}
+
+.comments-song-text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.comments-song-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.comments-song-artist {
+  display: flex;
+  align-items: center;
+  font-size: 12px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+/* ══ Toolbar - 筛选和排序 ══ */
+.comments-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 18px;
+  border-bottom: 1px solid var(--glass-border);
+  flex-shrink: 0;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.comments-filter-group,
+.comments-sort-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.comments-filter-btn,
+.comments-sort-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+  position: relative;
+}
+
+.comments-sort-btn::after {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: 14px;
+  border: 1.5px solid rgba(var(--dynamic-color, 0, 240, 255), 0.15);
+  transition: border-color 0.2s;
+  pointer-events: none;
+}
+
+.comments-sort-btn:hover::after {
+  border-color: rgba(var(--dynamic-color, 0, 240, 255), 0.3);
+}
+
+.comments-sort-btn.active::after {
+  border-color: rgba(var(--dynamic-color, 0, 240, 255), 0.5);
+}
+
+.comments-filter-btn:hover,
+.comments-sort-btn:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-primary);
+}
+
+.comments-filter-btn.active,
+.comments-sort-btn.active {
+  background: rgba(var(--dynamic-color, 0, 240, 255), 0.12);
+  color: rgb(var(--dynamic-color, 0, 240, 255));
+  border-color: rgba(var(--dynamic-color, 0, 240, 255), 0.2);
+}
+
+/* ══ Light Theme Toolbar ══ */
+.app-container.theme-light .comments-sort-btn::after {
+  border-color: rgba(var(--dynamic-color, 0, 136, 204), 0.15);
+}
+
+.app-container.theme-light .comments-filter-btn:hover,
+.app-container.theme-light .comments-sort-btn:hover {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.app-container.theme-light .comments-sort-btn:hover::after {
+  border-color: rgba(var(--dynamic-color, 0, 136, 204), 0.3);
+}
+
+.app-container.theme-light .comments-filter-btn.active,
+.app-container.theme-light .comments-sort-btn.active {
+  background: rgba(var(--dynamic-color, 0, 136, 204), 0.1);
+  color: rgb(var(--dynamic-color, 0, 136, 204));
+  border-color: rgba(var(--dynamic-color, 0, 136, 204), 0.2);
+}
+
+.app-container.theme-light .comments-sort-btn.active::after {
+  border-color: rgba(var(--dynamic-color, 0, 136, 204), 0.5);
+}
+
+/* ══ Sort Select Dropdown ══ */
+.comments-sort-select {
+  padding: 4px 8px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  background: transparent;
+  border: 1px solid var(--glass-border);
+  border-radius: 12px;
+  cursor: pointer;
+  outline: none;
+  transition: all 0.15s;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%23999' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 6px center;
+  padding-right: 22px;
+}
+
+.comments-sort-select:hover {
+  background-color: rgba(255, 255, 255, 0.06);
+  color: var(--text-primary);
+}
+
+.comments-sort-select:focus {
+  border-color: rgba(var(--dynamic-color, 0, 240, 255), 0.4);
+}
+
+.comments-sort-select option {
+  background: #1e1e2e;
+  color: #e0e0e0;
+  padding: 6px 10px;
+}
+
+.comments-sort-select option:hover {
+  background: #2a2a3e;
+}
+
+.comments-sort-select option:checked {
+  background: #00f0ff;
+  color: #000;
+}
+
+.app-container.theme-light .comments-sort-select {
+  border-color: rgba(0, 0, 0, 0.1);
+}
+
+.app-container.theme-light .comments-sort-select:hover {
+  background-color: rgba(0, 0, 0, 0.04);
+}
+
+.app-container.theme-light .comments-sort-select option {
+  background: #ffffff;
+  color: #333333;
+}
