@@ -39,7 +39,8 @@
 .app-container.ui-style-liquid .titlebar-button,
 .app-container.ui-style-liquid .context-menu,
 .app-container.ui-style-liquid .nav-active-indicator,
-.app-container.ui-style-liquid .sticky-header {
+.app-container.ui-style-liquid .sticky-header,
+.app-container.ui-style-liquid .playlist-panel {
   background: rgba(255, 255, 255, var(--ui-glass-alpha));
   backdrop-filter: blur(var(--ui-blur)) saturate(var(--ui-saturate));
   -webkit-backdrop-filter: blur(var(--ui-blur)) saturate(var(--ui-saturate));
@@ -109,7 +110,8 @@
 /* 浮动元素保留细边框，维持可辨识度 */
 .app-container.ui-style-solid .kimo-modal-card,
 .app-container.ui-style-solid .settings-card,
-.app-container.ui-style-solid .context-menu {
+.app-container.ui-style-solid .context-menu,
+.app-container.ui-style-solid .playlist-panel {
   border: 1px solid rgba(128, 128, 128, 0.15) !important;
 }
 /* 隐藏动态模糊背景层与遮罩层，只保留纯色 */
@@ -138,7 +140,8 @@
 .app-container.ui-style-solid.theme-dark .settings-card,
 .app-container.ui-style-solid.theme-dark .content-toolbar,
 .app-container.ui-style-solid.theme-dark .sticky-header,
-.app-container.ui-style-solid.theme-dark .context-menu {
+.app-container.ui-style-solid.theme-dark .context-menu,
+.app-container.ui-style-solid.theme-dark .playlist-panel {
   background: #070708 !important;
 }
 .app-container.ui-style-solid.theme-light,
@@ -149,7 +152,8 @@
 .app-container.ui-style-solid.theme-light .settings-card,
 .app-container.ui-style-solid.theme-light .content-toolbar,
 .app-container.ui-style-solid.theme-light .sticky-header,
-.app-container.ui-style-solid.theme-light .context-menu {
+.app-container.ui-style-solid.theme-light .context-menu,
+.app-container.ui-style-solid.theme-light .playlist-panel {
   background: #f5f5f7 !important;
 }
 .app-container.ui-style-solid.theme-grey,
@@ -160,6 +164,7 @@
 .app-container.ui-style-solid.theme-grey .settings-card,
 .app-container.ui-style-solid.theme-grey .content-toolbar,
 .app-container.ui-style-solid.theme-grey .sticky-header,
-.app-container.ui-style-solid.theme-grey .context-menu {
+.app-container.ui-style-solid.theme-grey .context-menu,
+.app-container.ui-style-solid.theme-grey .playlist-panel {
   background: #e3e3e8 !important;
 }

@@ -17,10 +17,9 @@ export function bindLyricsEditorControls({
         multiple: false,
         filters: [{
           name: 'Lyrics Files',
-          extensions: ['lrc', 'ttml', 'txt'],
+          extensions: ['lrc', 'ttml', 'json', 'txt'],
         }],
       });
-
       if (!selected) return;
 
       const content = await readTextFile(selected);
@@ -31,17 +30,20 @@ export function bindLyricsEditorControls({
 
       const list = parseLyrics(content);
       if (!list || list.length === 0) {
-        showToast('歌词解析失败，请检查格式');
+        showToast('歌词解析失败，请检查文件格式');
         return;
       }
 
       setLyrics(list);
       const textarea = document.getElementById('edit-metadata-lyrics');
-      if (textarea) textarea.value = content;
+      if (textarea) {
+        textarea.value = content;
+        textarea.dataset.workspaceSnapshot = serializeWorkspace();
+      }
       renderTimeline(list);
-      showToast('成功导入外部歌词文件');
-    } catch (err) {
-      console.error('[MetadataEditor] Failed to import external lyrics:', err);
+      showToast('歌词文件已导入');
+    } catch (error) {
+      console.error('[MetadataEditor] Failed to import external lyrics:', error);
       showToast('导入歌词文件失败');
     }
   });
@@ -54,10 +56,20 @@ export function bindLyricsEditorControls({
     const addLineBtn = document.getElementById('btn-lyrics-add-line');
 
     if (getEditorMode() === 'timeline') {
-      if (textarea) textarea.value = serializeWorkspace();
+      if (textarea) {
+        const workspaceSnapshot = serializeWorkspace();
+        // Preserve the exact source until the structured workspace changes.
+        if (
+          textarea.dataset.workspaceSnapshot
+          && textarea.dataset.workspaceSnapshot !== workspaceSnapshot
+        ) {
+          textarea.value = workspaceSnapshot;
+        }
+        textarea.dataset.workspaceSnapshot = workspaceSnapshot;
+      }
       if (viewport) viewport.style.display = 'none';
-      if (rawContainer) rawContainer.style.display = 'block';
-      if (toggleBtn) toggleBtn.textContent = '切换图形时间轴';
+      if (rawContainer) rawContainer.style.display = 'flex';
+      if (toggleBtn) toggleBtn.textContent = '返回结构视图';
       if (addLineBtn) addLineBtn.style.display = 'none';
       setEditorMode('raw');
       return;
@@ -66,9 +78,10 @@ export function bindLyricsEditorControls({
     const list = parseLyrics(textarea?.value || '');
     setLyrics(list);
     renderTimeline(list);
+    if (textarea) textarea.dataset.workspaceSnapshot = serializeWorkspace();
     if (rawContainer) rawContainer.style.display = 'none';
     if (viewport) viewport.style.display = 'block';
-    if (toggleBtn) toggleBtn.textContent = '切换纯文本编辑';
+    if (toggleBtn) toggleBtn.textContent = '查看原始文本';
     if (addLineBtn) {
       addLineBtn.style.display = getLyricsType() === 'lrc' ? 'inline-block' : 'none';
     }
@@ -80,7 +93,7 @@ export function bindLyricsEditorControls({
     if (getLyricsType() !== 'lrc' || !lyrics) return;
 
     const lastTime = lyrics.length > 0 ? lyrics[lyrics.length - 1].time + 5 : 0;
-    lyrics.push({ time: lastTime, text: '新歌词行' });
+    lyrics.push({ time: lastTime, text: '新歌词行', translation: null });
     renderTimeline(lyrics);
   });
 }

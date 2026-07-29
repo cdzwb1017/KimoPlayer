@@ -22,9 +22,10 @@ export function parseLRC(text) {
 
   // Check if line has word-by-word timing: text between [ts] markers
   const hasWordTiming = (line) => {
-    // Remove first timestamp, then check if there's still text + [ts] pattern
-    const rest = line.replace(/^\[\d{1,2}:\d{2}[.:]\d{1,3}\]/, '');
-    return /[^\[\]]+\[\d{1,2}:\d{2}[.:]\d{1,3}\]/.test(rest);
+    const timestamps = line.match(/\[\d{1,2}:\d{2}[.:]\d{1,3}\]/g) || [];
+    // [start]whole line[end] is line-timed LRC. Word timing needs at
+    // least one additional boundary between the line start and end.
+    return timestamps.length >= 3;
   };
 
   // Parse word-timed line into individual words (syllables)
@@ -32,25 +33,39 @@ export function parseLRC(text) {
   const parseWords = (line) => {
     const words = [];
     const regex = /\[(\d{1,2}:\d{2}[.:]\d{1,3})\]([^\[\]]*)/g;
-    let match;
     let lastTS = null;
-    let prevTime = null;
-    while ((match = regex.exec(line)) !== null) {
+    const segments = [...line.matchAll(regex)];
+
+    segments.forEach((match, index) => {
       const time = parseTS(match[1]);
-      let text = match[2];
-      if (time !== null) {
-        // 上一 syllable 的 duration = 当前 time - 上一 time（BetterLyrics 风格：duration 由下一时间戳推断）
-        if (prevTime !== null && words.length > 0) {
-          words[words.length - 1].duration = time - prevTime;
+      const text = match[2] || '';
+      const nextTime = index + 1 < segments.length
+        ? parseTS(segments[index + 1][1])
+        : null;
+      if (time === null) return;
+      lastTS = time;
+
+      if (!text) return;
+      if (/^\s+$/.test(text)) {
+        // A timed whitespace segment is a gap between visible words, not a
+        // karaoke word. Keep the separator on the preceding word while the
+        // next visible word's timestamp preserves the actual gap duration.
+        const previousWord = words[words.length - 1];
+        if (previousWord) {
+          if (!/\s$/.test(previousWord.text)) previousWord.text += text;
+          previousWord.spaceAfter = true;
         }
-        prevTime = time;
-        lastTS = time;
+        return;
       }
-      if (text.length > 0) {
-        // 保留原文（含空格），不 trim；duration 暂未定（等下一时间戳），给默认值
-        words.push({ time: time !== null ? time : (prevTime || 0), text, duration: 0 });
-      }
-    }
+
+      words.push({
+        time,
+        end: nextTime,
+        text,
+        duration: nextTime !== null ? Math.max(0, nextTime - time) : 0,
+        spaceAfter: /\s$/.test(text),
+      });
+    });
     return { words, lastTS };
   };
 
@@ -70,6 +85,12 @@ const joinWords = (words) => {
     return line.replace(/\[\d{1,2}:\d{2}[.:]\d{1,3}\]/g, '').trim();
   };
 
+  const getLastTS = (line) => {
+    const matches = [...line.matchAll(/\[(\d{1,2}:\d{2}[.:]\d{1,3})\]/g)];
+    if (matches.length < 2) return null;
+    return parseTS(matches[matches.length - 1][1]);
+  };
+
   // ── Pass 1: Parse every line into an entry ──
   const entries = [];
   for (const line of rawLines) {
@@ -80,12 +101,19 @@ const joinWords = (words) => {
     const isWordTimed = hasWordTiming(line);
     const parsed = isWordTimed ? parseWords(line) : null;
     const words = parsed ? parsed.words : null;
-    const lastTS = parsed ? parsed.lastTS : null;
+    const lastTS = parsed ? parsed.lastTS : getLastTS(line);
     const plainText = isWordTimed ? joinWords(words) : getPlainText(line);
 
     if (plainText.length === 0) continue;
 
-    entries.push({ time: ts, text: plainText, words, isWordTimed, end: lastTS });
+    entries.push({
+      time: ts,
+      text: plainText,
+      words,
+      isWordTimed,
+      timingFormat: isWordTimed ? 'word-lrc' : 'lrc',
+      end: lastTS,
+    });
   }
 
   // ── Pass 2: Group by timestamp, merge word-timed + plain as main + translation ──
@@ -127,7 +155,9 @@ const joinWords = (words) => {
         time: main.time,
         text: main.text,
         words: main.words,
+        timingFormat: main.timingFormat,
         translation: trans.text,
+        translationEnd: trans.end,
         end: main.end,
       });
     } else {
@@ -136,6 +166,7 @@ const joinWords = (words) => {
         time: entry.time,
         text: entry.text,
         words: entry.words,
+        timingFormat: entry.timingFormat,
         translation: null,
         end: entry.end,
       });
@@ -212,11 +243,20 @@ export function parseTTML(xmlText) {
     const key = getRobustAttribute(pEl, "key") || getRobustAttribute(pEl, "id") || "";
     
     let role = getRobustAttribute(pEl, "agent") || getRobustAttribute(pEl, "role") || "";
-    const isBackground = /BG|background/i.test(role) || pEl.classList.contains("background");
+    const hasBackgroundMarker = (value) => /(?:^|[-_:])(?:xr-)?bg(?:$|[-_:])|background/i.test(value || '');
+    const pAttributeValues = pEl.attributes
+      ? Array.from(pEl.attributes).map(attribute => attribute.value).join(' ')
+      : '';
+    let isBackground = hasBackgroundMarker(role)
+      || hasBackgroundMarker(pAttributeValues)
+      || pEl.classList.contains("background");
 
     const spans = [];
+    const backgroundGroups = [];
     let translation = null;
     let lastNodeWasSpace = false;
+    let inParentheticalBackground = false;
+    let backgroundWrapperDepth = 0;
 
     // Recursively process nodes to handle nested span elements and spaceBefore correctly
     const processNode = (node) => {
@@ -233,7 +273,20 @@ export function parseTTML(xmlText) {
             translation = node.textContent.trim();
           }
         } else if (spanAttrsRole === "x-bg") {
+          // Some TTML writers put the background-vocal marker on a wrapper
+          // span rather than on the paragraph itself. Keep it at word level
+          // because one paragraph may contain both main and background text.
+          const groupStart = spans.length;
+          const groupTranslation = Array.from(node.querySelectorAll("span"))
+            .find(child => getRobustAttribute(child, "role") === "x-translation")
+            ?.textContent.trim() || null;
+          backgroundWrapperDepth += 1;
           node.childNodes.forEach(child => processNode(child));
+          backgroundWrapperDepth -= 1;
+          const groupSpans = spans.splice(groupStart);
+          if (groupSpans.length > 0) {
+            backgroundGroups.push({ spans: groupSpans, translation: groupTranslation });
+          }
         } else {
           const wBegin = parseTTMLTime(getRobustAttribute(node, "begin"));
           const wEnd = parseTTMLTime(getRobustAttribute(node, "end"));
@@ -248,8 +301,13 @@ export function parseTTML(xmlText) {
               end: wEnd,
               text: rawText,
               duration: (wEnd && wBegin) ? (wEnd - wBegin) : 0,
-              spaceBefore: lastNodeWasSpace || hasLeadingSpace
+              spaceBefore: lastNodeWasSpace || hasLeadingSpace,
+              isBackground: backgroundWrapperDepth > 0
+                || inParentheticalBackground
+                || rawText.includes('('),
             });
+            if (rawText.includes('(')) inParentheticalBackground = true;
+            if (rawText.includes(')')) inParentheticalBackground = false;
             lastNodeWasSpace = false;
           } else {
             node.childNodes.forEach(child => processNode(child));
@@ -287,7 +345,8 @@ export function parseTTML(xmlText) {
         text: s.text,
         duration: s.duration,
         ruby: ruby,
-        spaceBefore: s.spaceBefore
+        spaceBefore: s.spaceBefore,
+        isBackground: s.isBackground
       });
     }
 
@@ -299,8 +358,25 @@ export function parseTTML(xmlText) {
         if (getRobustAttribute(s, "role") === "x-translation") {
           s.remove();
         }
+        if (getRobustAttribute(s, "role") === "x-bg") {
+          s.remove();
+        }
       });
       text = clonedP.textContent.replace(/\s+/g, ' ').trim();
+
+      // Some TTML producers omit the separator text node between adjacent
+      // timed spans and rely on xml:space/word boundaries instead. The word
+      // parser has already captured those boundaries in `spaceBefore`, so use
+      // them to keep the line text consistent with the karaoke renderer.
+      if (words.length > 1) {
+        const wordText = words.map((word, index) => {
+          const value = word.text || '';
+          if (index === 0 || !word.spaceBefore || /^\s/.test(value)) return value;
+          return ` ${value}`;
+        }).join('');
+        const normalizedWordText = wordText.replace(/\s+/g, ' ').trim();
+        if (normalizedWordText) text = normalizedWordText;
+      }
     } else {
       const clonedP = pEl.cloneNode(true);
       clonedP.querySelectorAll("span").forEach(s => {
@@ -322,6 +398,41 @@ export function parseTTML(xmlText) {
         isBackground
       });
     }
+
+    // x-bg is a complete secondary lyric row nested inside the main <p>.
+    // Emit it separately so it can be positioned, highlighted, and collapsed
+    // independently while still sharing the main phrase's timing context.
+    backgroundGroups.forEach(group => {
+      const groupWords = group.spans.map(s => ({
+        time: s.begin,
+        end: s.end,
+        text: s.text,
+        duration: s.duration,
+        ruby: null,
+        spaceBefore: s.spaceBefore,
+        // The emitted row itself carries isBackground. Do not apply the
+        // inline background-word treatment a second time.
+        isBackground: false,
+      }));
+      if (groupWords.length === 0) return;
+      const groupText = groupWords.map((word, index) => {
+        const value = word.text || '';
+        return index > 0 && word.spaceBefore && !/^\s/.test(value) ? ` ${value}` : value;
+      }).join('').replace(/\s+/g, ' ').trim();
+      if (!groupText) return;
+      result.push({
+        time: groupWords[0].time,
+        end: groupWords[groupWords.length - 1].end,
+        text: groupText,
+        translation: group.translation,
+        words: groupWords,
+        // Keep the parent singer lane so the background row sits directly
+        // below the corresponding main line (left/right), while retaining
+        // the background marker for its visual treatment.
+        role: role ? `${role} xr-BG` : 'xr-BG',
+        isBackground: true,
+      });
+    });
   });
 
   // Deduplicate and Sort

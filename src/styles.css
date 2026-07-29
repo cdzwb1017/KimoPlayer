@@ -37,3 +37,4 @@
 @import './styles/splash.css';             /* 启动遮罩 */
 @import './styles/fullscreen.css';         /* 沉浸全屏模式 */
 @import './styles/comments.css';           /* 评论区, 音频标签 */
+@import './styles/floating-surfaces.css';  /* 播放列表与悬浮操作统一材质 */

@@ -3,9 +3,15 @@ export function initializePlaylistPanel({ player, getCoverSrc, showToast }) {
   const list = document.getElementById('playlist-panel-list');
   const count = document.getElementById('playlist-panel-count');
   const clearButton = document.getElementById('playlist-panel-clear');
+  const closeButton = document.getElementById('playlist-panel-close');
   const toggleButton = document.getElementById('playlist-panel-btn');
 
   if (!panel || !list) return null;
+
+  // 与评论区保持相同的顶层合成上下文，避免嵌套 backdrop-filter 只透明不模糊。
+  if (panel.parentElement !== document.body) {
+    document.body.appendChild(panel);
+  }
 
   const render = () => {
     list.innerHTML = '';
@@ -78,15 +84,24 @@ export function initializePlaylistPanel({ player, getCoverSrc, showToast }) {
 
   window.updatePlaylistPanelCurrent = updateCurrent;
 
+  const setPanelVisible = (visible) => {
+    panel.classList.toggle('is-visible', visible);
+    document.body.classList.toggle('playlist-panel-open', visible);
+    toggleButton?.classList.toggle('active', visible);
+    toggleButton?.setAttribute('aria-expanded', String(visible));
+  };
+
+  toggleButton?.setAttribute('aria-expanded', 'false');
   toggleButton?.addEventListener('click', (event) => {
     event.stopPropagation();
-    if (panel.classList.contains('is-visible')) {
-      panel.classList.remove('is-visible');
-    } else {
+    const shouldOpen = !panel.classList.contains('is-visible');
+    if (shouldOpen) {
       render();
-      panel.classList.add('is-visible');
     }
+    setPanelVisible(shouldOpen);
   });
+
+  closeButton?.addEventListener('click', () => setPanelVisible(false));
 
   clearButton?.addEventListener('click', () => {
     player.playlist = [];
@@ -102,7 +117,7 @@ export function initializePlaylistPanel({ player, getCoverSrc, showToast }) {
       && !panel.contains(event.target)
       && !toggleButton?.contains(event.target)
     ) {
-      panel.classList.remove('is-visible');
+      setPanelVisible(false);
     }
   });
 

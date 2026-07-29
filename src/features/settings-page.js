@@ -6,6 +6,7 @@ import {
 } from '../ui/interface-font.js';
 import { checkForUpdates, setBetaKey, getBetaStatus, BETA_KEY, APP_VERSION } from '../ui/update-checker.js';
 import { openUrl } from '@tauri-apps/plugin-opener';
+import { updateLyricsPreference } from '../lyrics/preferences.js';
 
 export const createSettingsPage = ({
   player,
@@ -37,7 +38,10 @@ export const createSettingsPage = ({
     const fsRaw = localStorage.getItem('kimo-lyrics-font-size');
     const fontSize = (fsRaw !== null && !isNaN(parseFloat(fsRaw))) ? parseFloat(fsRaw) : 22.0;
     const liftRaw = localStorage.getItem('kimo-lyrics-lift-amplitude');
-    const liftAmp = (liftRaw !== null && !isNaN(parseFloat(liftRaw))) ? parseFloat(liftRaw) : 4.0;
+    const liftAmp = Math.max(
+      0,
+      Math.min(5, (liftRaw !== null && !isNaN(parseFloat(liftRaw))) ? parseFloat(liftRaw) : 4.0),
+    );
     const lineSpacingRaw = localStorage.getItem('kimo-lyrics-line-spacing');
     const lineSpacing = (lineSpacingRaw !== null && !isNaN(parseFloat(lineSpacingRaw))) ? parseFloat(lineSpacingRaw) : 0.85;
     const rowFollowAnimationVal = localStorage.getItem('kimo-lyrics-row-follow-enabled') !== 'false';
@@ -114,7 +118,7 @@ export const createSettingsPage = ({
           <div class="setting-desc">调节当前发音的歌词向上漂移抬升的物理高度（以像素为单位）。</div>
         </div>
         <div class="setting-slider-wrapper">
-          <input type="range" class="setting-slider" id="settings-slider-lift" min="0" max="40" step="1" value="${liftAmp}">
+          <input type="range" class="setting-slider" id="settings-slider-lift" min="0" max="5" step="1" value="${liftAmp}">
           <div class="setting-value-display" id="settings-lift-val">${liftAmp}px</div>
         </div>
       </div>
@@ -688,6 +692,18 @@ export const createSettingsPage = ({
         // 历史更新公告数据
         const changelogData = [
       {
+        version: '1.6.0',
+        date: '2026.07.30',
+        type: '歌词引擎与编辑器升级',
+        sections: [
+          { title: '歌词解析全面升级', items: ['逐字 LRC 与 TTML 统一为明确的行、单元 begin/end 时间模型，相邻单元无缝共用时间边界', '修复英文空格、单字母、末尾单词瞬间染色、首行跳动与编辑预览不一致问题', '完善翻译、行结束时间以及 TTML xr-BG 背景人声解析'] },
+          { title: '共唱、背景人声与动效', items: ['真正重叠的歌词支持同时演唱，首尾仅接触的两行不再误判为共唱', '背景人声在主句下方独立展开并原位收起，优化字号、翻译比例与消失动画', '修复共唱滚动抽搐、背景行错位与模糊更新延迟', '新增轻微放大效果，缩放还原与上移同步；快速歌词自动缩短行切换动画'] },
+          { title: '元数据与歌词编辑器', items: ['重构歌曲信息与歌词编辑窗口，适配新布局、主题和 UI 材质', '完整展示逐字歌词、翻译、声道、背景人声及时间边界', '优化卡片层级、按钮位置、颜色区分、字号与滚动区域'] },
+          { title: '界面与交互', items: ['歌词工具栏滑块浮层全区域支持滚轮操作', '歌词抬起幅度上限统一为 5px', '封面播放/暂停按钮出现首帧即呈现背景模糊', '播放列表、侧边栏选中滑块与三枚页面悬浮按钮完整适配四套 UI 材质'] },
+          { title: '应用内更新修复', items: ['静默安装完成后自动重新打开新版', '新版启动时显式刷新主窗口图标，修复任务栏保留旧图标的问题'] },
+        ],
+      },
+      {
         version: '1.5.2',
         date: '2026.07.30',
         type: '取色与界面优化',
@@ -1124,7 +1140,7 @@ export const createSettingsPage = ({
 
     lyricCard.querySelector('#settings-lyrics-row-follow')?.addEventListener('change', (e) => {
       const enabled = e.target.checked;
-      localStorage.setItem('kimo-lyrics-row-follow-enabled', enabled ? 'true' : 'false');
+      updateLyricsPreference('rowFollowEnabled', enabled);
       showToast(`已${enabled ? '开启' : '关闭'}歌词逐行跟随动画`);
     });
 
@@ -1453,15 +1469,15 @@ export const createSettingsPage = ({
     });
     liftInput.addEventListener('change', (e) => {
       const val = parseInt(e.target.value);
-      localStorage.setItem('kimo-lyrics-lift-amplitude', val);
+      updateLyricsPreference('liftAmplitude', val);
     });
     liftInput.addEventListener('wheel', (e) => {
       e.preventDefault();
       const delta = e.deltaY < 0 ? 1 : -1;
-      const nextVal = Math.max(0, Math.min(40, parseInt(liftInput.value) + delta));
+      const nextVal = Math.max(0, Math.min(5, parseInt(liftInput.value) + delta));
       liftInput.value = nextVal;
       liftDisplay.innerText = `${nextVal}px`;
-      localStorage.setItem('kimo-lyrics-lift-amplitude', nextVal);
+      updateLyricsPreference('liftAmplitude', nextVal);
     }, { passive: false });
 
     const spacingInput = lyricCard.querySelector('#settings-slider-line-spacing');

@@ -56,7 +56,13 @@ export function renderRowKaraokeProgress({
     });
 
     const rowPercent = (playheadX / rowWidth) * 100;
-    const isRowComplete = playheadX >= rowWidth - 1;
+    // 像素投影会受字体取整或尚未刷新的 DOM 几何影响。最后一个词刚开始时，
+    // playheadX 偶尔已经落到行尾，从而被误判为整行唱完并瞬间染色。
+    // 行完成状态应以单调递增的逻辑字符游标为准。
+    const rowCompletionPlayhead = row.endIdx + 1;
+    const isRowComplete =
+      charC >= rowCompletionPlayhead - 0.001 ||
+      charC >= totalChars;
 
     row.words.forEach(word => {
       if (charC <= 0 || playheadX <= 0) {

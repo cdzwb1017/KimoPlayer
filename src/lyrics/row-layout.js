@@ -11,38 +11,49 @@ export function alignLyricRows(domLine, words, { force = false, rowThresholdPx =
     return false;
   }
 
+  const wordList = Array.from(words);
   const domLineRect = domLine.getBoundingClientRect();
-  const firstRect = words[0].getBoundingClientRect();
-  const lastRect = words[words.length - 1].getBoundingClientRect();
+  const wordMetrics = wordList.map((word, index) => {
+    const rect = word.getBoundingClientRect();
+    const suffixNode = word.querySelector('.lyrics-ruby-suffix');
+    return {
+      word,
+      index,
+      relativeTop: rect.top - domLineRect.top,
+      offsetLeft: word.offsetLeft,
+      offsetWidth: word.offsetWidth,
+      suffixNode,
+      suffixOffsetLeft: suffixNode ? suffixNode.offsetLeft : 0,
+    };
+  });
 
-  domLine._prevFirstRelativeTop = firstRect.top - domLineRect.top;
-  domLine._prevLastRelativeTop = lastRect.top - domLineRect.top;
+  domLine._prevFirstRelativeTop = wordMetrics[0].relativeTop;
+  domLine._prevLastRelativeTop = wordMetrics[wordMetrics.length - 1].relativeTop;
 
   const rowGroups = [];
-  words.forEach(word => {
-    const y = word.getBoundingClientRect().top - domLineRect.top;
-    const foundGroup = rowGroups.find(group => Math.abs(group[0]._relativeTop - y) < rowThresholdPx);
+  wordMetrics.forEach(metric => {
+    const foundGroup = rowGroups.find(group => Math.abs(group[0].relativeTop - metric.relativeTop) < rowThresholdPx);
 
     if (foundGroup) {
-      foundGroup.push(word);
+      foundGroup.push(metric);
     } else {
-      word._relativeTop = y;
-      rowGroups.push([word]);
+      rowGroups.push([metric]);
     }
   });
 
-  rowGroups.sort((a, b) => a[0]._relativeTop - b[0]._relativeTop);
+  rowGroups.sort((a, b) => a[0].relativeTop - b[0].relativeTop);
 
   const rowsData = [];
+  const styleUpdates = [];
   let allValid = true;
 
-  rowGroups.forEach((rowWords, rowIndex) => {
-    rowWords.sort((a, b) => a.offsetLeft - b.offsetLeft);
+  rowGroups.forEach((rowMetrics, rowIndex) => {
+    rowMetrics.sort((a, b) => a.offsetLeft - b.offsetLeft);
 
-    const firstWord = rowWords[0];
-    const lastWord = rowWords[rowWords.length - 1];
-    const rowLeft = firstWord.offsetLeft;
-    const rowRight = lastWord.offsetLeft + lastWord.offsetWidth;
+    const firstMetric = rowMetrics[0];
+    const lastMetric = rowMetrics[rowMetrics.length - 1];
+    const rowLeft = firstMetric.offsetLeft;
+    const rowRight = lastMetric.offsetLeft + lastMetric.offsetWidth;
     const rowWidth = rowRight - rowLeft;
 
     if (rowWidth <= 0) {
@@ -51,32 +62,39 @@ export function alignLyricRows(domLine, words, { force = false, rowThresholdPx =
 
     const widthToUse = rowWidth || 300;
 
-    rowWords.forEach(word => {
-      word.style.setProperty('--line-width', `${widthToUse}px`);
-
-      const baseOffset = word.offsetLeft - rowLeft;
-      word.style.setProperty('--char-offset', `${baseOffset}px`);
-
-      const suffixNode = word.querySelector('.lyrics-ruby-suffix');
-      if (suffixNode) {
-        const suffixOffset = baseOffset + suffixNode.offsetLeft;
-        suffixNode.style.setProperty('--char-offset', `${suffixOffset}px`);
-      }
-
-      word.style.setProperty('--glow-left-pct', ((70 / widthToUse) * 100).toFixed(3));
-      word.style.setProperty('--glow-right-pct', ((50 / widthToUse) * 100).toFixed(3));
-      word.style.setProperty('--glow-mid-pct', ((20 / widthToUse) * 100).toFixed(3));
-      word.dataset.rowIndex = rowIndex;
+    rowMetrics.forEach(metric => {
+      const baseOffset = metric.offsetLeft - rowLeft;
+      styleUpdates.push({
+        metric,
+        rowIndex,
+        baseOffset,
+        widthToUse,
+      });
     });
 
     rowsData.push({
       rowIndex,
       left: rowLeft,
       width: widthToUse,
-      words: rowWords,
-      startIdx: words.indexOf(firstWord),
-      endIdx: words.indexOf(lastWord),
+      words: rowMetrics.map(metric => metric.word),
+      startIdx: firstMetric.index,
+      endIdx: lastMetric.index,
     });
+  });
+
+  styleUpdates.forEach(({ metric, rowIndex, baseOffset, widthToUse }) => {
+    const { word, suffixNode, suffixOffsetLeft } = metric;
+    word.style.setProperty('--line-width', `${widthToUse}px`);
+    word.style.setProperty('--char-offset', `${baseOffset}px`);
+
+    if (suffixNode) {
+      suffixNode.style.setProperty('--char-offset', `${baseOffset + suffixOffsetLeft}px`);
+    }
+
+    word.style.setProperty('--glow-left-pct', ((70 / widthToUse) * 100).toFixed(3));
+    word.style.setProperty('--glow-right-pct', ((50 / widthToUse) * 100).toFixed(3));
+    word.style.setProperty('--glow-mid-pct', ((20 / widthToUse) * 100).toFixed(3));
+    word.dataset.rowIndex = rowIndex;
   });
 
   domLine.rowsData = rowsData;

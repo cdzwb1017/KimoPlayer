@@ -19,6 +19,7 @@ import {
   getLyricsScrollAlign,
 } from './lyrics/scroll-position.js';
 import {
+  buildLyricTimeIndex,
   calculateActiveLineState,
   calculateLinesToProcess,
   calculateViewActiveIndices,
@@ -41,6 +42,7 @@ import {
   updateMiniBarLyrics,
 } from './lyrics/mini-bar.js';
 import { updateLyricLineEndTimes } from './lyrics/line-timing.js';
+import { getLyricsPreferences, updateLyricsPreference } from './lyrics/preferences.js';
 import { renderTimedLyricWords } from './lyrics/line-renderer.js';
 import { updateInactiveLineFixedState } from './lyrics/line-visual-state.js';
 import {
@@ -132,12 +134,47 @@ import {
   reapplyCurrentColor,
 } from './ui/theme.js';
 
+function clearLyricRowAnimationState(el) {
+  if (el._scaleReleaseTimer) {
+    clearTimeout(el._scaleReleaseTimer);
+    el._scaleReleaseTimer = null;
+  }
+  el.style.transition = '';
+  el.style.transitionDelay = '';
+  el.style.transform = '';
+  el.style.removeProperty('--lyric-motion-duration');
+  el.style.removeProperty('--lyric-scale-duration');
+  el.classList.remove('lyric-scale-leaving');
+
+  const translationEl = el.querySelector('.lyrics-translation');
+  if (translationEl) {
+    translationEl.style.removeProperty('--translation-brighten-from-color');
+    translationEl.style.removeProperty('--translation-brighten-from-opacity');
+  }
+}
+
+function getAnimatedLyricRows(allLines, targetIndex, previousAnimatedRows = new Set()) {
+  const animatedRows = [];
+  const minIndex = Math.max(0, targetIndex - 14);
+  const maxIndex = Math.min(allLines.length - 1, targetIndex + 18);
+
+  allLines.forEach((el, index) => {
+    if (index >= minIndex && index <= maxIndex) {
+      animatedRows.push({ el, index });
+    } else if (previousAnimatedRows.has(el) || el.style.transform || el.style.transition) {
+      clearLyricRowAnimationState(el);
+    }
+  });
+
+  return animatedRows;
+}
+
 // ══ Early Shell Window Controls (Rust-Command Driven) ══
 initializeWindowControls();
 
 // Shared in-memory state for the structured lyrics editor.
 let currentEditableLyrics = [];
-let currentLyricsType = 'lrc'; // 'json', 'enhanced-lrc', 或者是 'lrc'
+let currentLyricsType = 'lrc'; // 'json', 'word-lrc', 'ttml' 或者 'lrc'
 let currentLyricsEditorMode = 'timeline'; // 'timeline' 或者是 'raw'
 
 // ══ Lyrics Controller ══
@@ -156,6 +193,12 @@ class LyricsController {
     this._lastViewActiveKey = '';
     this._lastInterludeVisualKey = '';
     this._scrollTimeout = null;
+    this._loadGeneration = 0;
+    this._timeIndex = null;
+    this._lastAnimatedScrollRows = new Set();
+    this._concurrentScrollGroup = null;
+    this._concurrentScrollAnchor = -1;
+    this._hasPositionedCurrentLyrics = false;
     // Cache lyric row nodes to avoid repeated DOM tree scans.
     this._cachedAllLines = null;
 
@@ -258,7 +301,7 @@ class LyricsController {
   }
 
   setBlurEnabled(enabled) {
-    localStorage.setItem('kimo-lyrics-blur-enabled', enabled ? 'true' : 'false');
+    updateLyricsPreference('blurEnabled', enabled);
     const lines = this._cachedAllLines || Array.from(document.querySelectorAll('#lyrics-lines .lyrics-line'));
     markDepthBlurDirty(lines);
     this.applyBlur(this.activeIndices || [], this.currentScrollIndex || 0, lines);
@@ -356,8 +399,20 @@ class LyricsController {
   }
 
   async load(audioPath) {
+    const loadGeneration = ++this._loadGeneration;
     this.audioPath = audioPath;
     this.lines = [];
+    this._timeIndex = null;
+    this._lastAnimatedScrollRows.clear();
+    this._concurrentScrollGroup = null;
+    this._concurrentScrollAnchor = -1;
+    this._hasPositionedCurrentLyrics = false;
+    this.currentScrollIndex = -1;
+    this._lastActiveIndicesKey = '';
+    this._lastVisualScrollIndex = -1;
+    this._lastViewActiveKey = '';
+    clearTimeout(this._scrollCleanup);
+    this.isAutoScrolling = false;
     this.activeIndex = -1;
     this.miniBarIndex = -1;
     this._barWordSpans = null; // 清空迷你歌词缓存，避免引用已失效的DOM
@@ -375,6 +430,11 @@ class LyricsController {
 
     try {
       const result = await invoke('get_lyrics', { audioPath });
+      // A slower request for the previous track must never replace the lyrics
+      // of a track selected while it was still loading.
+      if (loadGeneration !== this._loadGeneration || audioPath !== this.audioPath) {
+        return;
+      }
       console.log('[Lyrics] type:', result.lyrics_type, 'content length:', result.content.length);
 
       if (result.lyrics_type === 'none') {
@@ -440,6 +500,9 @@ class LyricsController {
       this.updateBarLyrics(currentActive);
       this.startSync();
     } catch (e) {
+      if (loadGeneration !== this._loadGeneration || audioPath !== this.audioPath) {
+        return;
+      }
       console.error('Lyrics load error:', e);
       linesEl.innerHTML = '<div class="lyrics-line" style="text-align:center; color:var(--text-secondary);">暂无歌词</div>';
       if (barLyric1) barLyric1.textContent = '暂无歌词';
@@ -536,6 +599,7 @@ class LyricsController {
     // All character-word nodes are ready after rendering completes.
     // Recalculate accurate line end times after all word nodes are rendered.
     updateLyricLineEndTimes(this.lines);
+    this._timeIndex = buildLyricTimeIndex(this.lines);
     this.updateSpacerHeights();
   }
 
@@ -641,6 +705,7 @@ class LyricsController {
     let extrapolatedTime = this.player.audio.currentTime;
     let lastSysTime = performance.now();
     let lastAudioTime = extrapolatedTime;
+    let lastPresentedTime = extrapolatedTime;
     let lastVisTime = 0;
 
     const tick = (now) => {
@@ -654,28 +719,34 @@ class LyricsController {
       const isPaused = this.player.audio.paused;
       const dt = (now - lastSysTime) / 1000;
       lastSysTime = now;
+      const jumpedBackward = audioTime < lastAudioTime - 0.25;
 
-      if (!isPaused && !this.player.audio.seeking) {
+      if (!isPaused && !this.player.audio.seeking && !jumpedBackward) {
         // Move time forward smoothly
-        extrapolatedTime += dt;
+        extrapolatedTime += dt * (this.player.audio.playbackRate || 1);
 
         // When the browser's audio time updates, gently correct our extrapolated time
         if (audioTime !== lastAudioTime) {
           const diff = audioTime - extrapolatedTime;
-          if (Math.abs(diff) > 0.15) {
+          if (diff > 0.15) {
             extrapolatedTime = audioTime;
           } else {
-            // Apply a rapid correction towards the true audio time for high-speed tracking
-            extrapolatedTime += diff * 0.45;
+            // Negative drift is corrected gradually and clamped below so a
+            // coarse audio clock update can never rewind the karaoke fill.
+            extrapolatedTime += diff * 0.18;
           }
           lastAudioTime = audioTime;
         }
+
+        extrapolatedTime = Math.max(lastPresentedTime, extrapolatedTime);
       } else {
         extrapolatedTime = audioTime;
         lastAudioTime = audioTime;
       }
 
-      this.syncToTime(extrapolatedTime);
+      lastPresentedTime = extrapolatedTime;
+
+      this.syncToTime(extrapolatedTime, now);
       
       // Throttle spectrum DOM updates to roughly 30 FPS.
       if (this.isVisible && !isPaused) {
@@ -694,65 +765,55 @@ class LyricsController {
     if (this.animFrameId) { cancelAnimationFrame(this.animFrameId); this.animFrameId = null; }
   }
 
-  syncToTime(rawCurrentTime) {
+  syncToTime(rawCurrentTime, frameNow = performance.now()) {
     if (!this.lines.length) return;
     
-    const timeOffset = parseFloat(localStorage.getItem('kimo-lyrics-time-offset')) || 0.0;
+    const preferences = getLyricsPreferences();
+    const timeOffset = preferences.timeOffset;
     const currentTime = rawCurrentTime + timeOffset;
-    const liftAmp = parseFloat(localStorage.getItem('kimo-lyrics-lift-amplitude')) ?? 4.0;
+    const liftAmp = preferences.liftAmplitude;
 
-    const dt = this._prevPhysicsTime !== undefined ? Math.max(0.001, Math.min(0.08, currentTime - this._prevPhysicsTime)) : 0.016;
-    this._prevPhysicsTime = currentTime;
+    const dt = this._prevPhysicsNow !== undefined
+      ? Math.max(0.001, Math.min(0.08, (frameNow - this._prevPhysicsNow) / 1000))
+      : 0.016;
+    this._prevPhysicsNow = frameNow;
 
-    // 1. Calculate activeIndices & activeIndex (Support multiple overlapping active lines)
-    const activeIndices = [];
-    let activeIndex = -1; // Latest active line on the primary vocal lane.
-    for (let i = 0; i < this.lines.length; i++) {
-      const line = this.lines[i];
-      const endBoundary = line.isInterlude
-        ? Math.max(line.endTime + 0.4, (this.lines[i + 1]?.time ?? 0) + 0.5)
-        : line.endTime + 0.4;
-      if (currentTime >= line.time - 0.5 && currentTime <= endBoundary) {
-        activeIndices.push(i);
+    // Seeking changes lyric time discontinuously; animation physics should not
+    // interpret that jump as motion elapsed between two adjacent frames.
+    if (this._previousLyricTime !== undefined && Math.abs(currentTime - this._previousLyricTime) > 0.5) {
+      this._prevPhysicsNow = frameNow;
+      this._concurrentScrollGroup = null;
+      this._concurrentScrollAnchor = -1;
+    }
+    this._previousLyricTime = currentTime;
+
+    // Keep time-state calculation independent from DOM rendering.
+    const lineState = calculateActiveLineState(this.lines, currentTime, this._timeIndex);
+    const { activeIndices, activeIndex } = lineState;
+    let { scrollIndex } = lineState;
+
+    // Treat simultaneous foreground lines as one scroll group. If one voice
+    // has a slightly shorter tail, do not briefly re-anchor to the remaining
+    // voice and then immediately to the following lyric.
+    const foregroundActiveIndices = activeIndices.filter(index => !this.lines[index].isBackground);
+    if (this._concurrentScrollGroup) {
+      const hasActiveGroupMember = foregroundActiveIndices.some(index => this._concurrentScrollGroup.has(index));
+      const hasNewForeground = foregroundActiveIndices.some(index => !this._concurrentScrollGroup.has(index));
+      if (!hasActiveGroupMember && hasNewForeground) {
+        this._concurrentScrollGroup = null;
+        this._concurrentScrollAnchor = -1;
       }
     }
-
-    const laneEndTimes = [];
-    for (const idx of activeIndices) {
-      const line = this.lines[idx];
-      let assignedLane = -1;
-      for (let l = 0; l < laneEndTimes.length; l++) {
-        if (line.time >= laneEndTimes[l] - 0.05) {
-          assignedLane = l;
-          break;
-        }
-      }
-      if (assignedLane === -1) {
-        assignedLane = laneEndTimes.length;
-        laneEndTimes.push(line.endTime);
-      } else {
-        laneEndTimes[assignedLane] = line.endTime;
-      }
-      line.laneIndex = assignedLane;
+    if (!this._concurrentScrollGroup && foregroundActiveIndices.length > 1) {
+      this._concurrentScrollGroup = new Set(foregroundActiveIndices);
+      this._concurrentScrollAnchor = foregroundActiveIndices.includes(this.currentScrollIndex)
+        ? this.currentScrollIndex
+        : activeIndex;
     }
-
-    // Prefer the primary vocal lane when choosing the current lyric line.
-    let primaryIdx = -1;
-    let primaryTime = -Infinity;
-    for (const idx of activeIndices) {
-      const line = this.lines[idx];
-      if (currentTime >= line.time - 0.1 && line.laneIndex === 0 && line.time > primaryTime) {
-        primaryTime = line.time;
-        primaryIdx = idx;
-      }
-    }
-    if (primaryIdx === -1 && activeIndices.length > 0) {
-      primaryIdx = activeIndices[0];
-    }
-    activeIndex = primaryIdx;
-
-    if (activeIndices.length === 0 && activeIndex >= 0) {
-      activeIndices.push(activeIndex);
+    if (this._concurrentScrollGroup
+      && (foregroundActiveIndices.length === 0
+        || foregroundActiveIndices.some(index => this._concurrentScrollGroup.has(index)))) {
+      scrollIndex = this._concurrentScrollAnchor;
     }
 
     // Mini lyrics should follow the newest line that has actually started.
@@ -775,20 +836,6 @@ class LyricsController {
         lineStart: miniLine?.time || 0,
         lineEnd: miniLine?.end || 0,
       });
-    }
-
-    // Calculate a monotonic, slightly anticipatory lyric scroll index.
-    let scrollIndex = activeIndex;
-    for (let i = this.lines.length - 1; i >= 0; i--) {
-      if (currentTime >= this.lines[i].time - 0.5) {
-        if (i > scrollIndex) {
-          scrollIndex = i;
-        }
-        break;
-      }
-    }
-    if (scrollIndex < 0 && this.lines.length > 0) {
-      scrollIndex = 0;
     }
 
     if (!this.isVisible) {
@@ -825,13 +872,18 @@ class LyricsController {
     const container = document.getElementById('lyrics-scroll');
 
     const viewActiveIndices = calculateViewActiveIndices(this.lines, currentTime);
-    const viewActiveKey = JSON.stringify(viewActiveIndices);
+    const viewActiveKey = viewActiveIndices.join(',');
 
-    // Update scrolling position (scrollIndex triggers early for anticipatory positioning)
-    // Runs when the primary scrollIndex changes OR when the set of overlapping active lines changes.
-    if (scrollIndex !== this.currentScrollIndex || viewActiveKey !== this._lastViewActiveKey) {
+    // Update scrolling position only when the actual anchor changes. A change
+    // in the warmup/overlap window alone must not replay FLIP: when two lines
+    // finish together their layout is already changing, and a second
+    // measurement in the same transition causes a visible twitch.
+    if (scrollIndex !== this.currentScrollIndex) {
+      const isInitialPositioning = !this._hasPositionedCurrentLyrics;
       this.currentScrollIndex = scrollIndex;
       this._lastViewActiveKey = viewActiveKey;
+      const wasConcurrent = (this._lastActiveIndicesKey || '').includes(',');
+      const isConcurrentTransition = wasConcurrent || activeIndices.length > 1;
       
       if (scrollIndex >= 0 && allLines[scrollIndex]) {
         this.isAutoScrolling = true;
@@ -844,7 +896,7 @@ class LyricsController {
         const baseOffsetTop = lineEl.offsetTop;
         
         const containerHeight = container.clientHeight || container.getBoundingClientRect().height || 500;
-        const alignOffset = parseFloat(localStorage.getItem('kimo-lyrics-scroll-align')) || 0.5;
+        const alignOffset = preferences.scrollAlign;
         const topSpacerHeight = containerHeight * alignOffset;
         const targetOffset = baseOffsetTop - topSpacerHeight;
         
@@ -855,17 +907,57 @@ class LyricsController {
         const startScrollTop = container.scrollTop;
         const delta = finalTargetOffset - startScrollTop;
 
-        if (Math.abs(delta) < 1) {
+        if (isInitialPositioning || Math.abs(delta) < 1) {
           container.scrollTop = finalTargetOffset;
+          // No visible row travel is needed; release any completed row in
+          // this same state update instead of leaving its scale latched.
+          allLines.forEach((el, idx) => {
+            if (idx < scrollIndex) {
+              if (el._scaleReleaseTimer) {
+                clearTimeout(el._scaleReleaseTimer);
+                el._scaleReleaseTimer = null;
+              }
+              el.classList.remove('lyric-scale-leaving');
+            }
+          });
         } else {
           container.scrollTop = finalTargetOffset;
 
           const targetIdx = scrollIndex;
+          const animatedRows = getAnimatedLyricRows(allLines, targetIdx, this._lastAnimatedScrollRows);
+          const animatedElements = animatedRows.map(({ el }) => el);
+          this._lastAnimatedScrollRows = new Set(animatedElements);
 
-          // Step A: freeze transitions and offset all lyric rows together.
-          const rowFollowEnabled = localStorage.getItem('kimo-lyrics-row-follow-enabled') !== 'false';
-          allLines.forEach((el, idx) => {
+          // Fast consecutive phrases must finish their row motion before the
+          // next phrase starts. A fixed 1.15 s transition gets interrupted
+          // repeatedly on short lines and produces a visible catch-up jerk.
+          let nextForegroundTime = Infinity;
+          for (let nextIdx = targetIdx + 1; nextIdx < this.lines.length; nextIdx += 1) {
+            const nextLine = this.lines[nextIdx];
+            if (!nextLine.isBackground && !nextLine.isInterlude && nextLine.time > currentTime + 0.01) {
+              nextForegroundTime = nextLine.time;
+              break;
+            }
+          }
+          const availableMotionTime = nextForegroundTime - currentTime;
+          const motionDuration = Number.isFinite(availableMotionTime)
+            ? Math.max(0.28, Math.min(1.15, availableMotionTime * 0.72))
+            : 1.15;
+          const opacityDuration = Math.max(0.24, Math.min(1.05, motionDuration * 0.92));
+          const durationScale = motionDuration / 1.15;
+          let largestDelay = 0;
+
+          // Step A: freeze transitions and offset nearby lyric rows together.
+          const rowFollowEnabled = preferences.rowFollowEnabled;
+          animatedRows.forEach(({ el, index: idx }) => {
             if (el.classList.contains('is-interlude-line')) return;
+            if (el.classList.contains('is-background-line')) {
+              clearLyricRowAnimationState(el);
+              return;
+            }
+            if (el.classList.contains('active') && idx !== targetIdx) {
+              el.classList.add('lyric-scale-leaving');
+            }
             if (el.classList.contains('has-translation') && idx === targetIdx) {
               const translationEl = el.querySelector('.lyrics-translation');
               if (translationEl) {
@@ -883,25 +975,33 @@ class LyricsController {
           // Step B: trigger one container-wide reflow.
           void container.offsetHeight;
 
-          // Step C: animate all rows back to their zero transform.
-          allLines.forEach((el, idx) => {
+          // Step C: animate nearby rows back to their zero transform.
+          animatedRows.forEach(({ el, index: idx }) => {
             if (el.classList.contains('is-interlude-line')) {
               // Interlude entry/exit is fully phased by CSS; do not override it
               // with the regular lyric-row FLIP transition.
               el.style.transition = '';
               el.style.transitionDelay = '';
+            } else if (el.classList.contains('is-background-line')) {
+              // Background rows are expandable slots attached to their main
+              // line. Let max-height/padding collapse them in place; applying
+              // the regular FLIP translate would make them jump elsewhere.
+              clearLyricRowAnimationState(el);
             } else {
               let delay = 0;
-              if (rowFollowEnabled && idx !== targetIdx) {
+              if (rowFollowEnabled && !isConcurrentTransition && idx !== targetIdx) {
                 const dist = Math.abs(idx - targetIdx);
                 if (idx > targetIdx) {
-                  delay = Math.min(0.42, dist * 0.055);
+                  delay = Math.min(0.42, dist * 0.055) * durationScale;
                 } else {
-                  delay = Math.min(0.18, dist * 0.025);
+                  delay = Math.min(0.18, dist * 0.025) * durationScale;
                 }
               }
+              largestDelay = Math.max(largestDelay, delay);
+              el.style.setProperty('--lyric-motion-duration', `${opacityDuration.toFixed(3)}s`);
+              el.style.setProperty('--lyric-scale-duration', `${motionDuration.toFixed(3)}s`);
               // Row motion and fading progress together; depth blur still reacts quickly.
-              el.style.transition = `transform 1.15s cubic-bezier(0.2, 0, 0.2, 1) ${delay}s, opacity 1.05s cubic-bezier(0.2, 0, 0.2, 1) 0s, filter 0.32s ease 0s`;
+              el.style.transition = `transform ${motionDuration.toFixed(3)}s cubic-bezier(0.2, 0, 0.2, 1) ${delay.toFixed(3)}s, opacity ${opacityDuration.toFixed(3)}s cubic-bezier(0.2, 0, 0.2, 1) 0s, filter 0.32s ease 0s`;
               el.style.transform = 'translateY(0)';
 
               if (el.classList.contains('has-translation')) {
@@ -920,6 +1020,12 @@ class LyricsController {
               }
 
               if (idx < targetIdx) {
+                if (el._scaleReleaseTimer) {
+                  clearTimeout(el._scaleReleaseTimer);
+                  el._scaleReleaseTimer = null;
+                }
+                // Start scale restoration in the same frame as upward FLIP.
+                el.classList.remove('lyric-scale-leaving');
                 el.classList.add('past');
                 el.classList.remove('active');
               } else if (idx === targetIdx) {
@@ -934,25 +1040,21 @@ class LyricsController {
           // Clear the previous cleanup timer before scheduling a new animation cleanup.
           clearTimeout(this._scrollCleanup);
           this._scrollCleanup = setTimeout(() => {
-            allLines.forEach(el => {
-              el.style.transition = '';
-              el.style.transitionDelay = '';
-              const translationEl = el.querySelector('.lyrics-translation');
-              if (translationEl) {
-                translationEl.style.removeProperty('--translation-brighten-from-color');
-                translationEl.style.removeProperty('--translation-brighten-from-opacity');
-              }
+            animatedElements.forEach(el => {
+              clearLyricRowAnimationState(el);
             });
+            this._lastAnimatedScrollRows.clear();
             this.isAutoScrolling = false;
-          }, 1700);
+          }, Math.ceil((motionDuration + largestDelay) * 1000 + 180));
         }
+        this._hasPositionedCurrentLyrics = true;
       }
     }
 
     const linesToProcess = calculateLinesToProcess(this.lines, currentTime, scrollIndex, activeIndices);
 
     // Update active/past visual classes, blur and clean up states based on dual axis sync (activeIndices + scrollIndex)
-    const activeIndicesKey = JSON.stringify(activeIndices);
+    const activeIndicesKey = activeIndices.join(',');
     const interludeVisualKey = this.lines.map((line, idx) => {
       if (!line.isInterlude) return '';
       const targetTime = line.end || line.endTime || (this.lines[idx + 1] ? this.lines[idx + 1].time - 0.3 : line.time + 5.0);
@@ -977,7 +1079,40 @@ class LyricsController {
       const minActiveIdx = activeIndices.length > 0 ? Math.min(...activeIndices) : activeIndex;
       
       allLines.forEach((el, idx) => {
-        el.classList.remove('active', 'past', 'past-old');
+        const wasActive = el.classList.contains('active');
+        const willBeActive = activeIndices.includes(idx);
+
+        if (willBeActive) {
+          if (el._scaleReleaseTimer) {
+            clearTimeout(el._scaleReleaseTimer);
+            el._scaleReleaseTimer = null;
+          }
+          el.classList.remove('lyric-scale-leaving');
+        } else if (
+          wasActive
+          && !el.classList.contains('is-interlude-line')
+          && !el.classList.contains('is-background-line')
+        ) {
+          // Keep the subtle active scale through the silent tail and the next
+          // row's upward transition. Releasing it immediately when `active`
+          // ends creates a visible shrink-before-scroll flash.
+          if (el._scaleReleaseTimer) {
+            clearTimeout(el._scaleReleaseTimer);
+            el._scaleReleaseTimer = null;
+          }
+          el.classList.add('lyric-scale-leaving');
+        }
+
+        el.classList.remove(
+          'active',
+          'past',
+          'past-old',
+          'concurrent-active',
+          'concurrent-lane-0',
+          'concurrent-lane-1',
+          'concurrent-lane-2',
+          'concurrent-lane-3',
+        );
 
         if (el.classList.contains('is-interlude-line')) {
           el.classList.remove('active', 'past', 'is-exiting');
@@ -1029,6 +1164,10 @@ class LyricsController {
 
         if (activeIndices.includes(idx)) {
           el.classList.add('active');
+          if (activeIndices.length > 1 && !this.lines[idx].isBackground) {
+            const laneIndex = Math.max(0, Math.min(3, this.lines[idx].laneIndex || 0));
+            el.classList.add('concurrent-active', `concurrent-lane-${laneIndex}`);
+          }
         } else if (idx < minActiveIdx && idx < effectiveActive) {
           el.classList.add('past');
         }
@@ -1058,7 +1197,7 @@ class LyricsController {
     linesToProcess.forEach(idx => {
       if (idx >= 0 && this.lines[idx].charWords && this.lines[idx].charWords.length > 0) {
         const lineData = this.lines[idx];
-        const domLine = document.querySelector(`#lyrics-lines .lyrics-line[data-index="${idx}"]`);
+        const domLine = allLines[idx];
         if (domLine) {
           if (!domLine._wordSpans) {
             domLine._wordSpans = domLine.querySelectorAll('.lyrics-word');
@@ -1130,9 +1269,6 @@ class LyricsController {
             longIndices,
           });
 
-          if (idx === this.activeIndex) {
-            this.syncBarSpans(wordSpans, charC, totalChars);
-          }
         }
       }
     });
@@ -1249,7 +1385,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Restore default lyric lift amplitude to 4.0 on version 1.2.2 launch (word lift animation)
   if (localStorage.getItem('kimo-lyrics-lift-amplitude-migrated-122') !== 'true') {
-    localStorage.setItem('kimo-lyrics-lift-amplitude', '4.0');
+    updateLyricsPreference('liftAmplitude', 4);
     localStorage.setItem('kimo-lyrics-lift-amplitude-migrated-122', 'true');
   }
 
@@ -1265,6 +1401,13 @@ document.addEventListener('DOMContentLoaded', () => {
   // 加载已保存的 UI 风格
   const savedUiStyle = localStorage.getItem('kimo-ui-style') || 'solid';
   applyUiStyle(savedUiStyle);
+  if (isStandaloneEditor) {
+    window.addEventListener('storage', event => {
+      if (event.key === 'kimo-ui-style' && event.newValue) {
+        applyUiStyle(event.newValue);
+      }
+    });
+  }
   // 加载已保存的背景样式
   const savedBgStyle = localStorage.getItem('kimo-bg-style') || 'static';
   applyBackgroundStyle(savedBgStyle);
@@ -1274,19 +1417,26 @@ document.addEventListener('DOMContentLoaded', () => {
     document.body.classList.add('perf-mode');
   }
 
-  let savedScale = parseFloat(localStorage.getItem('kimo-ui-scale')) || 1.0;
-  if (savedScale > 1.2) {
-    savedScale = 1.2;
-    localStorage.setItem('kimo-ui-scale', '1.2');
+  if (isStandaloneEditor) {
+    // The metadata editor is already sized as a dedicated window. Inheriting
+    // the main player's UI zoom leaves unused space on the right and bottom.
+    document.documentElement.style.setProperty('--ui-scale', '1');
+    document.documentElement.style.zoom = '1';
+  } else {
+    let savedScale = parseFloat(localStorage.getItem('kimo-ui-scale')) || 1.0;
+    if (savedScale > 1.2) {
+      savedScale = 1.2;
+      localStorage.setItem('kimo-ui-scale', '1.2');
+    }
+    document.documentElement.style.setProperty('--ui-scale', savedScale.toString());
+    document.documentElement.style.zoom = savedScale.toString();
   }
-  document.documentElement.style.setProperty('--ui-scale', savedScale.toString());
-  document.documentElement.style.zoom = savedScale.toString();
 
   // Lyrics depth-of-field blur toggle.
   const blurBtn = document.getElementById('btn-blur-toggle');
   const blurVal = document.getElementById('lyric-blur-value');
   const updateBlurUI = () => {
-    const isEnabled = localStorage.getItem('kimo-lyrics-blur-enabled') !== 'false';
+    const isEnabled = getLyricsPreferences().blurEnabled;
     const activeIcon = blurBtn?.querySelector('.blur-active-icon');
     const inactiveIcon = blurBtn?.querySelector('.blur-inactive-icon');
     if (isEnabled) {
@@ -1301,13 +1451,10 @@ document.addEventListener('DOMContentLoaded', () => {
   };
   if (blurBtn) {
     blurBtn.addEventListener('click', () => {
-      const isEnabled = localStorage.getItem('kimo-lyrics-blur-enabled') !== 'false';
+      const isEnabled = getLyricsPreferences().blurEnabled;
       const nextState = !isEnabled;
-      localStorage.setItem('kimo-lyrics-blur-enabled', nextState ? 'true' : 'false');
+      player.lyrics.setBlurEnabled(nextState);
       updateBlurUI();
-      if (typeof playerUI !== 'undefined' && playerUI && playerUI.lyrics) {
-        playerUI.lyrics.setBlurEnabled(nextState);
-      }
     });
     updateBlurUI();
   }
@@ -1721,9 +1868,13 @@ document.addEventListener('DOMContentLoaded', () => {
     if (activeNav) updateSidebarIndicator(activeNav);
     
     // Control visibility of individual floating actions
+    const floatingActions = document.getElementById('floating-actions');
+    const floatSearch = document.getElementById('float-search');
     const floatToTop = document.getElementById('float-to-top');
     const floatToPlaying = document.getElementById('float-to-playing');
     const isListTab = tabName === 'local' || tabName === 'recent' || tabName === 'playlists';
+    floatingActions?.classList.toggle('visible', isListTab);
+    if (floatSearch) floatSearch.style.display = isListTab ? 'flex' : 'none';
     if (floatToTop) floatToTop.style.display = isListTab ? 'flex' : 'none';
     if (floatToPlaying) floatToPlaying.style.display = isListTab ? 'flex' : 'none';
     
@@ -1826,8 +1977,12 @@ document.addEventListener('DOMContentLoaded', () => {
     if (activeNav) updateSidebarIndicator(activeNav);
   });
 
-  // Ensure floating action bar container is always visible
-  document.getElementById('floating-actions')?.classList.add('visible');
+  // 与评论区、播放列表一样挂到 body 顶层，让玻璃按钮直接采样整页背景。
+  const floatingActions = document.getElementById('floating-actions');
+  if (floatingActions && floatingActions.parentElement !== document.body) {
+    document.body.appendChild(floatingActions);
+  }
+  floatingActions?.classList.remove('visible');
 
   // Wire up list floating actions
   document.getElementById('float-to-top')?.addEventListener('click', () => {
@@ -2096,6 +2251,18 @@ document.addEventListener('DOMContentLoaded', () => {
       lyricsList,
       bubbleEditor,
     });
+    const formatBadge = document.getElementById('lyrics-format-badge');
+    if (formatBadge) {
+      const formatLabels = {
+        ttml: 'TTML',
+        json: '逐字 JSON',
+        'word-lrc': '逐字 LRC',
+        'enhanced-lrc': '逐字 LRC',
+        lrc: 'LRC',
+      };
+      formatBadge.textContent = formatLabels[currentLyricsType] || currentLyricsType.toUpperCase();
+      formatBadge.dataset.format = currentLyricsType;
+    }
   };
 
   const serializeLyricsFromWorkspace = () => serializeEditableLyrics({
@@ -2149,7 +2316,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (viewport) viewport.style.display = 'block';
 
       const rawToggleBtn = document.getElementById('btn-lyrics-raw-toggle');
-      if (rawToggleBtn) rawToggleBtn.textContent = '切换纯文本编辑';
+      if (rawToggleBtn) rawToggleBtn.textContent = '查看原始文本';
 
       const list = parseLyricsFromRawText(lyricsContent);
       currentEditableLyrics = list;
@@ -2161,7 +2328,10 @@ document.addEventListener('DOMContentLoaded', () => {
       }
 
       const lyricsTextarea = document.getElementById('edit-metadata-lyrics');
-      if (lyricsTextarea) lyricsTextarea.value = lyricsContent;
+      if (lyricsTextarea) {
+        lyricsTextarea.value = lyricsContent;
+        lyricsTextarea.dataset.workspaceSnapshot = serializeLyricsFromWorkspace();
+      }
     } catch (error) {
       console.error('[MetadataEditor] Failed to load inline editor:', error);
       showToast('无法读取歌曲信息');
@@ -2404,7 +2574,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (rawContainer) rawContainer.style.display = 'none';
       if (viewport) viewport.style.display = 'block';
       const rawToggleBtn = document.getElementById('btn-lyrics-raw-toggle');
-      if (rawToggleBtn) rawToggleBtn.textContent = '切换纯文本编辑';
+      if (rawToggleBtn) rawToggleBtn.textContent = '查看原始文本';
 
       const list = parseLyricsFromRawText(lyricsContent);
       currentEditableLyrics = list;
@@ -2415,8 +2585,11 @@ document.addEventListener('DOMContentLoaded', () => {
         addLineBtn.style.display = currentLyricsType === 'lrc' ? 'inline-block' : 'none';
       }
 
-            const lyricsTextarea = document.getElementById('edit-metadata-lyrics');
-      if (lyricsTextarea) lyricsTextarea.value = lyricsContent;
+      const lyricsTextarea = document.getElementById('edit-metadata-lyrics');
+      if (lyricsTextarea) {
+        lyricsTextarea.value = lyricsContent;
+        lyricsTextarea.dataset.workspaceSnapshot = serializeLyricsFromWorkspace();
+      }
     } catch (e) {
       console.error('[MetadataEditor] Failed to fetch full metadata/lyrics on load:', e);
       const lyricsTextarea = document.getElementById('edit-metadata-lyrics');
@@ -2462,4 +2635,3 @@ document.addEventListener('DOMContentLoaded', () => {
 
 });
 // HMR refresh trigger
-

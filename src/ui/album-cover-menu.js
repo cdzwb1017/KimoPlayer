@@ -1,3 +1,5 @@
+import { getEffectiveLyricsTheme } from './lyrics-controls.js';
+
 export function initializeAlbumCoverMenu({
   player,
   getCoverSrc,
@@ -74,10 +76,8 @@ export function initializeAlbumCoverMenu({
     const menu = document.createElement('div');
     menu.id = 'kimo-album-context-menu';
     menu.className = 'kimo-context-menu';
-    // 跟随歌词界面深浅色主题
-    const lyricsPanel = document.querySelector('.lyrics-panel');
-    const lyricsTheme = lyricsPanel?.classList.contains('lyrics-theme-light') ? 'light' : 'dark';
-    menu.setAttribute('data-lyrics-theme', lyricsTheme);
+    // 跟随歌词界面深浅色主题（含"跟随软件"模式）
+    menu.setAttribute('data-lyrics-theme', getEffectiveLyricsTheme());
     menu.style.left = `${e.clientX}px`;
     menu.style.top = `${e.clientY}px`;
 

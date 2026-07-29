@@ -101,22 +101,33 @@
   left: 0;
   width: 100%;
   height: 100%;
-  background: rgba(0, 0, 0, 0.35);
+  background: transparent;
   display: flex;
   align-items: center;
   justify-content: center;
+  pointer-events: none;
+  isolation: isolate;
+}
+
+.cover-overlay::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: rgba(0, 0, 0, 0.35);
   opacity: 0;
   transition: opacity 0.4s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 /* Show overlay strictly and elegantly only when hovering directly over the cover image itself */
-.lyrics-cover-wrapper:hover .cover-overlay {
+.lyrics-cover-wrapper:hover .cover-overlay::before {
   opacity: 1;
 }
 
 .cover-overlay-btn {
   width: 52px;
   height: 52px;
+  pointer-events: auto;
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.02);
   border: 1px solid rgba(255, 255, 255, 0.1);
@@ -127,12 +138,20 @@
   align-items: center;
   justify-content: center;
   color: #ffffff;
-  transform: scale(0.85);
-  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  /* Keep the backdrop layer minimally painted while hidden so Chromium does
+     not create the blur compositor only after the button has appeared. */
+  opacity: 0.001;
+  transform: translateZ(0) scale(0.85);
+  will-change: opacity, transform;
+  contain: paint;
+  transition:
+    opacity 0.12s linear,
+    transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 .lyrics-cover-wrapper:hover .cover-overlay-btn {
-  transform: scale(1);
+  opacity: 1;
+  transform: translateZ(0) scale(1);
 }
 
 .cover-overlay-btn svg {
@@ -545,4 +564,75 @@
 
 .lyrics-line.past {
   color: rgba(255, 255, 255, 0.45);
+}
+
+/* Independent x-bg rows are supporting vocals, so keep them visually below
+   the main lyric line instead of giving them the same typographic weight. */
+.lyrics-line.is-background-line {
+  font-size: calc(var(--lyrics-font-size, 22px) * 0.8) !important;
+  line-height: 1.55 !important;
+  max-height: 0 !important;
+  margin-top: 0 !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  opacity: 0 !important;
+  overflow: hidden;
+  pointer-events: none;
+  transition:
+    opacity 0.55s ease,
+    max-height 0.7s cubic-bezier(0.2, 0, 0.2, 1) 0.28s,
+    padding 0.7s cubic-bezier(0.2, 0, 0.2, 1) 0.28s !important;
+}
+
+.lyrics-line.is-background-line .lyrics-word {
+  font-size: 1em;
+}
+
+.lyrics-line.is-background-line .lyrics-main {
+  white-space: nowrap;
+}
+
+.lyrics-line.is-background-line .lyrics-translation {
+  /* Keep the translation proportional to the reduced background row size. */
+  font-size: calc(var(--lyrics-font-size, 22px) * 0.544) !important;
+}
+
+.lyrics-line.is-background-line.active {
+  line-height: 1.55 !important;
+  max-height: calc(var(--lyrics-font-size, 22px) * 4) !important;
+  padding-top: calc(var(--lyrics-font-size, 22px) * 0.32) !important;
+  padding-bottom: calc(var(--lyrics-font-size, 22px) * 0.18) !important;
+  opacity: 0.92 !important;
+  pointer-events: auto;
+  transition:
+    max-height 0.48s cubic-bezier(0.2, 0, 0.2, 1),
+    padding 0.48s cubic-bezier(0.2, 0, 0.2, 1),
+    opacity 0.35s ease 0.08s !important;
+}
+
+.lyrics-word.is-background-word {
+  opacity: 0.58;
+  font-size: 0.88em;
+  font-style: italic;
+}
+
+.lyrics-line.active .lyrics-word.is-background-word {
+  opacity: 0.92;
+}
+
+/* Parallel vocal lines: when TTML has no explicit agent/role, keep
+   simultaneous lines visually separated without changing normal lyric rows.
+   Explicit role classes (role-l1/role-l2/role-both) remain authoritative. */
+.lyrics-line.concurrent-active.concurrent-lane-0:not(.role-l1):not(.role-l2):not(.role-both) {
+  align-self: flex-start;
+  text-align: left;
+  padding-left: 5%;
+  padding-right: 25%;
+}
+
+.lyrics-line.concurrent-active.concurrent-lane-1:not(.role-l1):not(.role-l2):not(.role-both) {
+  align-self: flex-end;
+  text-align: right;
+  padding-left: 25%;
+  padding-right: 5%;
 }

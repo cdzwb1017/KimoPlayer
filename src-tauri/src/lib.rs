@@ -2930,10 +2930,47 @@ async fn download_and_install_update(url: String, app: tauri::AppHandle) -> Resu
     // 静默安装（NSIS 支持 /S 静默模式）
     #[cfg(target_os = "windows")]
     {
-        std::process::Command::new(&download_path)
-            .args(["/S"])
+        use std::os::windows::process::CommandExt;
+
+        let current_exe = std::env::current_exe()
+            .map_err(|e| format!("无法获取当前程序路径: {}", e))?;
+        let quote_ps = |path: &std::path::Path| {
+            path.to_string_lossy().replace('\'', "''")
+        };
+        let installer_path = quote_ps(&download_path);
+        let app_path = quote_ps(&current_exe);
+
+        // Run the installer from a detached hidden helper. The current app
+        // must exit before NSIS can replace its executable; once installation
+        // completes, the helper launches the updated executable from the same
+        // install path.
+        let update_script = format!(
+            "$installer='{}'; $app='{}'; \
+             Start-Sleep -Milliseconds 700; \
+             $process=Start-Process -FilePath $installer -ArgumentList '/S' -PassThru; \
+             $process.WaitForExit(); \
+             Start-Sleep -Milliseconds 900; \
+             if (Test-Path -LiteralPath $app) {{ Start-Process -FilePath $app }}",
+            installer_path,
+            app_path,
+        );
+
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+        std::process::Command::new("powershell.exe")
+            .args([
+                "-NoLogo",
+                "-NoProfile",
+                "-NonInteractive",
+                "-WindowStyle",
+                "Hidden",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-Command",
+                &update_script,
+            ])
+            .creation_flags(CREATE_NO_WINDOW)
             .spawn()
-            .map_err(|e| format!("启动安装程序失败: {}", e))?;
+            .map_err(|e| format!("启动更新助手失败: {}", e))?;
     }
 
     // 关闭当前应用，让安装程序接管
@@ -3003,6 +3040,14 @@ pub fn run() {
             }
 
             if let Some(icon) = app.default_window_icon() {
+                // Explicitly refresh the main window icon on every launch.
+                // The transparent, decoration-free window can otherwise keep
+                // Windows' cached taskbar icon after an in-app update even
+                // though the executable, desktop shortcut and tray are new.
+                if let Some(window) = app.get_webview_window("main") {
+                    let _ = window.set_icon(icon.clone());
+                }
+
                 let menu = build_tray_menu(app.handle())?;
 
                 let _tray = TrayIconBuilder::with_id("main-tray")

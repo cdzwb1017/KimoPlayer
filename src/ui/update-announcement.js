@@ -8,25 +8,34 @@ export function showStartupUpdateAnnouncement() {
 
   const sections = [
     {
-      title: '🎨 专辑封面取色设置',
+      title: '🎵 歌词解析全面升级',
       items: [
-        ['新增取色开关，可一键开启或关闭专辑封面取色，关闭后使用默认蓝色主题'],
-        ['智能取色模式：根据当前主题自动适配最佳亮度，保证界面可读性'],
-        ['手动调节模式：自由调整取色深浅（-50 偏深 ~ +50 偏浅），实时预览'],
+        ['逐字 LRC 与 TTML 统一为明确的行、单元时间模型，相邻单元无缝衔接'],
+        ['修复英文空格、单字母、末尾单词染色及编辑预览不一致问题'],
+        ['完善翻译、共唱与 TTML 背景人声解析'],
       ],
     },
     {
-      title: '🎵 歌词面板修复',
+      title: '✨ 共唱与歌词动效',
       items: [
-        ['修复歌词面板无法进入的问题，恢复正常滑入动画'],
-        ['歌词面板与控制栏弹出框不受 UI 缩放比例影响，始终保持原始尺寸'],
+        ['正确区分真正重叠与首尾相接的歌词，修复共唱滚动抽搐'],
+        ['背景人声在主句下方独立展开并原位收起'],
+        ['缩放还原与上移同步，快速歌词自动缩短切换动画'],
       ],
     },
     {
-      title: '✨ 界面细节优化',
+      title: '📝 元数据编辑器焕新',
       items: [
-        ['移除启动画面与关于页面 logo 的阴影效果，视觉更简洁'],
-        ['GitHub 仓库主页 README 新增 KimoPlayer logo 图标展示'],
+        ['重新设计歌曲信息与歌词编辑窗口，适配主题和 UI 材质'],
+        ['完整展示逐字时间、翻译、声道与背景人声'],
+      ],
+    },
+    {
+      title: '🛠️ 交互与更新修复',
+      items: [
+        ['歌词滑块浮层全区域支持滚轮，抬起幅度上限调整为 5px'],
+        ['播放列表、侧边栏选中滑块与三枚页面悬浮按钮完整适配四套 UI 材质'],
+        ['修复应用内更新后不自动重启以及任务栏保留旧图标的问题'],
       ],
     },
   ];
@@ -49,7 +58,7 @@ export function showStartupUpdateAnnouncement() {
     <div class="kimo-modal-card" style="max-width:460px;width:92%;padding:0;text-align:left;overflow:hidden;">
       <div style="padding:22px 24px 16px;border-bottom:1px solid rgba(255,255,255,0.08);">
         <div style="font-size:18px;font-weight:700;color:var(--text-primary);margin-bottom:4px;">KimoPlayer ${APP_VERSION}</div>
-        <div style="font-size:12px;color:var(--text-secondary);">2026.07.30 取色与界面优化</div>
+        <div style="font-size:12px;color:var(--text-secondary);">2026.07.30 歌词引擎与编辑器升级</div>
       </div>
       <div style="padding:18px 24px 4px;">${sectionsHTML}</div>
       <div style="padding:14px 24px 20px;">

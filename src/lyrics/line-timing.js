@@ -2,7 +2,11 @@ export function updateLyricLineEndTimes(lines) {
   lines.forEach((line, index) => {
     let realWordEnd = line.time + 3.5;
 
-    if (line.charWords && line.charWords.length > 0) {
+    // 逐字 LRC 末尾的空时间戳就是权威行结束边界，不应再由
+    // 渲染阶段调整过的单词时长反推，否则行状态可能出现细小偏差。
+    if (Number.isFinite(line.end) && line.end > line.time) {
+      realWordEnd = line.end;
+    } else if (line.charWords && line.charWords.length > 0) {
       const lastWord = line.charWords[line.charWords.length - 1];
       realWordEnd = lastWord.time + (lastWord.duration || 0.4);
     }

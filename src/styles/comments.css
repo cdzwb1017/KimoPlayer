@@ -7,7 +7,8 @@
 .app-container.ui-style-acrylic .sticky-header,
 .app-container.ui-style-acrylic .context-menu,
 .app-container.ui-style-acrylic .settings-card,
-.app-container.ui-style-acrylic .player-bar {
+.app-container.ui-style-acrylic .player-bar,
+.app-container.ui-style-acrylic .playlist-panel {
   backdrop-filter: blur(var(--ui-blur)) saturate(var(--ui-saturate));
   -webkit-backdrop-filter: blur(var(--ui-blur)) saturate(var(--ui-saturate));
   background: rgba(var(--ui-glass-color), var(--ui-glass-alpha));
@@ -29,7 +30,8 @@
 .app-container.ui-style-gaussian .sticky-header,
 .app-container.ui-style-gaussian .context-menu,
 .app-container.ui-style-gaussian .settings-card,
-.app-container.ui-style-gaussian .player-bar {
+.app-container.ui-style-gaussian .player-bar,
+.app-container.ui-style-gaussian .playlist-panel {
   backdrop-filter: blur(var(--ui-blur)) saturate(var(--ui-saturate));
   -webkit-backdrop-filter: blur(var(--ui-blur)) saturate(var(--ui-saturate));
 }
@@ -39,6 +41,17 @@
 .app-container.ui-style-gaussian .titlebar {
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
+}
+
+/* 高斯模糊：浮动面板需要可见的背景（基础 0.02 透明度不足） */
+.app-container.ui-style-gaussian .playlist-panel {
+  background: rgba(25, 25, 30, 0.85);
+}
+.app-container.ui-style-gaussian.theme-light .playlist-panel,
+.app-container.ui-style-gaussian.theme-grey .playlist-panel {
+  background: rgba(245, 245, 247, 0.82);
+  border-color: rgba(0, 0, 0, 0.08);
+  box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.5), 0 8px 24px rgba(0, 0, 0, 0.08);
 }
 
 .app-container.theme-light .comments-sort-select option:hover {

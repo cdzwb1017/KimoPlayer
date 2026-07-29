@@ -20,8 +20,10 @@ export function aggregateLatinWords(words) {
       const duration = word.duration || 0;
       if (word.time !== null && last.time !== null) {
         last.duration = (word.time + duration) - last.time;
+        last.end = word.end ?? (word.time + duration);
       } else {
         last.duration = (last.duration || 0) + duration;
+        last.end = Number.isFinite(last.time) ? last.time + last.duration : last.end;
       }
       if (word.ruby) {
         last.ruby = (last.ruby || '') + word.ruby;

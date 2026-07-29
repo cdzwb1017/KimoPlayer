@@ -192,15 +192,14 @@ export function cycleTheme() {
 
 export function applyUiStyle(uiStyle) {
   const container = document.querySelector('.app-container');
-  if (!container) return;
 
   // 移除所有 UI 风格类（同时加在 app-container 和 body 上，确保 body 级元素如 toast 也能生效）
-  container.classList.remove('ui-style-acrylic', 'ui-style-gaussian', 'ui-style-liquid', 'ui-style-solid');
+  container?.classList.remove('ui-style-acrylic', 'ui-style-gaussian', 'ui-style-liquid', 'ui-style-solid');
   document.body.classList.remove('ui-style-acrylic', 'ui-style-gaussian', 'ui-style-liquid', 'ui-style-solid');
 
   // 添加当前风格类
   if (uiStyle) {
-    container.classList.add(`ui-style-${uiStyle}`);
+    container?.classList.add(`ui-style-${uiStyle}`);
     document.body.classList.add(`ui-style-${uiStyle}`);
   }
 

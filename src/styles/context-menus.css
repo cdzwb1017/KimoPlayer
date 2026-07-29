@@ -105,9 +105,9 @@
 
 /* 2. 背景/伴唱歌词 (微倾斜、淡化、微型化，形成声场立体透视) */
 .lyrics-line.is-background-line {
-  font-size: 0.88em !important;
+  font-size: calc(var(--lyrics-font-size, 22px) * 0.8) !important;
   font-style: italic !important;
-  opacity: 0.58 !important;
+  opacity: 0 !important;
 }
 
 .lyrics-line.is-background-line.active {

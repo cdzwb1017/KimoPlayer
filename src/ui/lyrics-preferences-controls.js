@@ -8,6 +8,26 @@ function updateSliderFill(slider) {
   slider.style.setProperty('--slider-fill', `${pct}%`);
 }
 
+function bindPopoverWheel(slider, handler) {
+  if (!slider) return;
+  const popover = slider.closest('.slider-popover');
+  const controlItem = popover?.closest('.lyrics-control-item') || slider.closest('.lyrics-control-item');
+  const handleWheel = event => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (event.deltaY === 0) return;
+    handler(event);
+  };
+
+  // The trigger remains hovered while the cursor is on the toolbar button;
+  // once the detached popover is entered, its own listener follows the node.
+  // stopPropagation above prevents a nested popover event from firing twice.
+  (popover || slider).addEventListener('wheel', handleWheel, { passive: false });
+  if (controlItem) {
+    controlItem.addEventListener('wheel', handleWheel, { passive: false });
+  }
+}
+
 export function initializeLyricsPreferencesControls(player) {
   let currentFontSize = parseFloat(localStorage.getItem('kimo-lyrics-font-size')) || 22;
   const fontSizeSlider = document.getElementById('slider-font-size');
@@ -48,8 +68,7 @@ export function initializeLyricsPreferencesControls(player) {
       updateFontSize(nextVal);
       localStorage.setItem('kimo-lyrics-font-size', nextVal);
     };
-    fontSizeSlider.addEventListener('wheel', handleFontSizeWheel, { passive: false });
-    fontSizeSlider.closest('.lyrics-control-item')?.addEventListener('wheel', handleFontSizeWheel, { passive: false });
+    bindPopoverWheel(fontSizeSlider, handleFontSizeWheel);
   }
   updateFontSize(currentFontSize);
 
@@ -100,8 +119,7 @@ export function initializeLyricsPreferencesControls(player) {
       updateFontWeight(nextWeight);
       localStorage.setItem('kimo-lyrics-font-weight', nextWeight);
     };
-    fontWeightSlider.addEventListener('wheel', handleFontWeightWheel, { passive: false });
-    fontWeightSlider.closest('.lyrics-control-item')?.addEventListener('wheel', handleFontWeightWheel, { passive: false });
+    bindPopoverWheel(fontWeightSlider, handleFontWeightWheel);
   }
   updateFontWeight(currentFontWeight);
 
@@ -157,7 +175,7 @@ export function initializeLyricsPreferencesControls(player) {
     lyricOffsetSlider.addEventListener('change', (e) => {
       const val = parseFloat(e.target.value);
       currentTimeOffset = val;
-      localStorage.setItem('kimo-lyrics-time-offset', val);
+      updateLyricsPreference('timeOffset', val);
       updateOffsetLabel(val);
       syncLyricsToCurrentTime();
     });
@@ -171,11 +189,10 @@ export function initializeLyricsPreferencesControls(player) {
       currentTimeOffset = nextVal;
       lyricOffsetSlider.value = nextVal;
       updateOffsetLabel(nextVal);
-      localStorage.setItem('kimo-lyrics-time-offset', nextVal);
+      updateLyricsPreference('timeOffset', nextVal);
       syncLyricsToCurrentTime();
     };
-    lyricOffsetSlider.addEventListener('wheel', handleOffsetWheel, { passive: false });
-    lyricOffsetSlider.closest('.lyrics-control-item')?.addEventListener('wheel', handleOffsetWheel, { passive: false });
+    bindPopoverWheel(lyricOffsetSlider, handleOffsetWheel);
   }
 
   let currentScrollAlign = parseFloat(localStorage.getItem('kimo-lyrics-scroll-align')) || 0.5;
@@ -202,7 +219,7 @@ export function initializeLyricsPreferencesControls(player) {
     const applyScrollAlign = (val) => {
       currentScrollAlign = val;
       updateAlignLabel(val);
-      localStorage.setItem('kimo-lyrics-scroll-align', val);
+      updateLyricsPreference('scrollAlign', val);
       if (player.lyrics) player.lyrics.realign();
     };
 
@@ -218,11 +235,11 @@ export function initializeLyricsPreferencesControls(player) {
       lyricAlignSlider.value = nextVal;
       applyScrollAlign(nextVal);
     };
-    lyricAlignSlider.addEventListener('wheel', handleAlignWheel, { passive: false });
-    lyricAlignSlider.closest('.lyrics-control-item')?.addEventListener('wheel', handleAlignWheel, { passive: false });
+    bindPopoverWheel(lyricAlignSlider, handleAlignWheel);
   }
 
-  let currentLiftAmp = parseFloat(localStorage.getItem('kimo-lyrics-lift-amplitude')) ?? 4.0;
+  const savedLiftAmp = parseFloat(localStorage.getItem('kimo-lyrics-lift-amplitude'));
+  let currentLiftAmp = Math.max(0, Math.min(5, Number.isFinite(savedLiftAmp) ? savedLiftAmp : 4.0));
   const lyricLiftSlider = document.getElementById('slider-lyric-lift');
   const lyricLiftValue = document.getElementById('lyric-lift-value');
 
@@ -237,9 +254,10 @@ export function initializeLyricsPreferencesControls(player) {
     updateLiftLabel(currentLiftAmp);
 
     const applyLift = (val) => {
-      currentLiftAmp = val;
-      updateLiftLabel(val);
-      localStorage.setItem('kimo-lyrics-lift-amplitude', val);
+      currentLiftAmp = Math.max(0, Math.min(5, val));
+      lyricLiftSlider.value = currentLiftAmp;
+      updateLiftLabel(currentLiftAmp);
+      updateLyricsPreference('liftAmplitude', currentLiftAmp);
       syncLyricsToCurrentTime();
     };
 
@@ -250,13 +268,12 @@ export function initializeLyricsPreferencesControls(player) {
       e.preventDefault();
       const delta = e.deltaY < 0 ? 0.5 : -0.5;
       const min = parseFloat(lyricLiftSlider.min) || 0.0;
-      const max = parseFloat(lyricLiftSlider.max) || 40.0;
+      const max = parseFloat(lyricLiftSlider.max) || 5.0;
       const nextVal = Math.max(min, Math.min(max, currentLiftAmp + delta));
       lyricLiftSlider.value = nextVal;
       applyLift(nextVal);
     };
-    lyricLiftSlider.addEventListener('wheel', handleLiftWheel, { passive: false });
-    lyricLiftSlider.closest('.lyrics-control-item')?.addEventListener('wheel', handleLiftWheel, { passive: false });
+    bindPopoverWheel(lyricLiftSlider, handleLiftWheel);
   }
 
   const staggerToggleBtn = document.getElementById('btn-stagger-toggle');
@@ -279,3 +296,4 @@ export function initializeLyricsPreferencesControls(player) {
   document.getElementById('player-meta-trigger')?.addEventListener('click', triggerLyricsShow);
   document.getElementById('player-bar-lyric-trigger')?.addEventListener('click', triggerLyricsShow);
 }
+import { updateLyricsPreference } from '../lyrics/preferences.js';

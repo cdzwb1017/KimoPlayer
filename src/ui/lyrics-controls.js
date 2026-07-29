@@ -4,7 +4,7 @@
  * - If 'follow' mode (no explicit class), inherit from app theme.
  *   (Grey mode also carries theme-light, so it maps to light.)
  */
-function getEffectiveLyricsTheme() {
+export function getEffectiveLyricsTheme() {
   const lyricsPanel = document.querySelector('.lyrics-panel');
   if (!lyricsPanel) return 'dark';
   if (lyricsPanel.classList.contains('lyrics-theme-light')) return 'light';

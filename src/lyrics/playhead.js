@@ -95,7 +95,10 @@ export function calculateKaraokePlayheadState(charWords, currentTime) {
         const t = Math.min(1, Math.max(0, (currentTime - gapStart) / gapDuration));
         inGap = true;
         gapPrevIdx = lastIdx;
-        currentGapT = 1 - (1 - t) * (1 - t);
+        // Keep separator travel linear. Ease-out moved too much at the start
+        // and almost stopped at the end, which was especially visible after
+        // narrow one-letter English words such as "I" or "a".
+        currentGapT = t;
       }
       charC = lastIdx + 1;
     }
@@ -137,12 +140,19 @@ export function projectPlayheadToRow({
       const prevSpan = wordSpans[gapPrevIdx];
       const nextSpan = wordSpans[gapPrevIdx + 1];
       if (prevSpan && nextSpan) {
+        const nextWordIsOnThisRow = row.words.includes(nextSpan);
+        if (!nextWordIsOnThisRow) {
+          // A wrapped line restarts from the opposite horizontal edge. Never
+          // interpolate the completed row toward that coordinate, otherwise
+          // its karaoke fill visibly runs backwards during the inter-row gap.
+          return rowWidth + 1;
+        }
         const prevRight = prevSpan.offsetLeft - rowLeft + prevSpan.offsetWidth;
         const nextLeft = nextSpan.offsetLeft - rowLeft;
         return prevRight + (nextLeft - prevRight) * currentGapT;
       }
       if (prevSpan) {
-        return prevSpan.offsetLeft - rowLeft + prevSpan.offsetWidth;
+        return rowWidth + 1;
       }
       return 0;
     }

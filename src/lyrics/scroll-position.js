@@ -1,5 +1,7 @@
+import { getLyricsPreferences } from './preferences.js';
+
 export function getLyricsScrollAlign() {
-  return parseFloat(localStorage.getItem('kimo-lyrics-scroll-align')) || 0.5;
+  return getLyricsPreferences().scrollAlign;
 }
 
 export function getAlignedScrollTop(container, lineEl, alignOffset = getLyricsScrollAlign()) {

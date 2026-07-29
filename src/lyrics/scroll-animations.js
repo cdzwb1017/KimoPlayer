@@ -1,3 +1,5 @@
+import { getLyricsScrollAlign } from './scroll-position.js';
+
 export function staggeredScrollToLine({
   lineEl,
   scrollTimers,
@@ -9,7 +11,7 @@ export function staggeredScrollToLine({
   const container = document.getElementById('lyrics-scroll');
   const containerRect = container.getBoundingClientRect();
   const lineRect = lineEl.getBoundingClientRect();
-  const alignOffset = parseFloat(localStorage.getItem('kimo-lyrics-scroll-align')) || 0.5;
+  const alignOffset = getLyricsScrollAlign();
   const targetScroll = container.scrollTop + (lineRect.top - containerRect.top) - containerRect.height * alignOffset;
   const totalDiff = targetScroll - container.scrollTop;
 
@@ -62,7 +64,7 @@ export function smoothScrollToLine({
   const container = document.getElementById('lyrics-scroll');
   const containerRect = container.getBoundingClientRect();
   const lineRect = lineEl.getBoundingClientRect();
-  const alignOffset = parseFloat(localStorage.getItem('kimo-lyrics-scroll-align')) || 0.5;
+  const alignOffset = getLyricsScrollAlign();
   const targetScroll = container.scrollTop + (lineRect.top - containerRect.top) - containerRect.height * alignOffset;
   const startScroll = container.scrollTop;
   const diff = targetScroll - startScroll;

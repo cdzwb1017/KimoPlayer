@@ -107,8 +107,11 @@ export function renderTimedLyricWords({
   wordsToRender.forEach((word, wordIndex) => {
     const rawText = word.text || '';
     const leadingMatch = rawText.match(/^(\s+)/);
-    if (leadingMatch && wordIndex > 0) {
-      mainDiv.appendChild(document.createTextNode(leadingMatch[1]));
+    // TTML commonly stores the separator between timed spans as a text node
+    // (or only exposes it through the parser's `spaceBefore` flag). Preserve
+    // that separator when the word text itself has no leading whitespace.
+    if (wordIndex > 0 && (leadingMatch || word.spaceBefore)) {
+      mainDiv.appendChild(document.createTextNode(leadingMatch?.[1] || ' '));
     }
 
     const trailingMatch = rawText.match(/(\s+)$/);
@@ -130,10 +133,19 @@ export function renderTimedLyricWords({
           : (nextLine ? Math.min(word.time + 1.0, nextLine.time) : word.time + 0.5));
     // 保留相邻单元之间的原始时间空档。播放头会在空档内按实际文字几何位置
     // 经过空格；若把空档并入前一单元，高亮会直接跳过词间距。
-    const wordDuration = word.duration || Math.max(0.01, nextWordTime - word.time);
+    const explicitEnd = Number.isFinite(word.end) && word.end > word.time
+      ? word.end
+      : null;
+    const sourceDuration = explicitEnd !== null
+      ? explicitEnd - word.time
+      : (word.duration || Math.max(0.01, nextWordTime - word.time));
+    // 相邻时间单元共用同一个边界：当前单元的 end 就是下一单元的
+    // begin。不要为了可见空格缩短时长，否则会凭空制造停顿。
+    const wordDuration = sourceDuration;
 
     charWords.push({
       time: word.time,
+      end: explicitEnd ?? (word.time + wordDuration),
       duration: wordDuration,
       topoPos: charWords.length,
       text: coreText,
@@ -141,6 +153,9 @@ export function renderTimedLyricWords({
 
     const span = document.createElement('span');
     span.className = 'lyrics-word';
+    if (word.isBackground) {
+      span.classList.add('is-background-word');
+    }
     if (wordDuration >= 0.8) {
       span.classList.add('long-glow');
     }

@@ -31,6 +31,15 @@
   filter: blur(4.5px) !important;
 }
 
+/* Keep this after every depth tier. During an overlap transition a row can
+   briefly carry both `active` and a stale `depth-*` class; the singing state
+   must always win so karaoke text becomes sharp immediately. */
+.has-depth-blur .lyrics-line.active,
+.has-depth-blur .lyrics-line.concurrent-active {
+  opacity: 1 !important;
+  filter: none !important;
+}
+
 .lyrics-line.past-old {
   opacity: 0.3 !important;
   transform: scale(0.95) translateY(-20px) !important;
@@ -284,7 +293,7 @@
   opacity: 0.95;
   transition-property: color, opacity;
   transition-delay: 0s;
-  transition-duration: 1.05s;
+  transition-duration: var(--lyric-motion-duration, 1.05s);
   transition-timing-function: cubic-bezier(0.2, 0, 0.2, 1);
 }
 
@@ -331,8 +340,24 @@
 /* Restore container behavior for lyrics-main */
 .lyrics-main {
   display: inline-block;
+  transform: scale(1);
+  transform-origin: center center;
+  transition: transform var(--lyric-scale-duration, 0.42s) cubic-bezier(0.2, 0, 0.2, 1);
   max-width: 100%; /* 防止 char-level / 长元数据行（如 "Composed by:DAISHIDANCE/..."）撑超父宽 */
   overflow-wrap: break-word; /* 超长无空格词在父宽受限时允许断行 */
+}
+
+.lyrics-line.active:not(.is-background-line) .lyrics-main,
+.lyrics-line.lyric-scale-leaving:not(.is-background-line) .lyrics-main {
+  transform: scale(1.025);
+}
+
+.lyrics-line.role-l1 .lyrics-main {
+  transform-origin: left center;
+}
+
+.lyrics-line.role-l2 .lyrics-main {
+  transform-origin: right center;
 }
 
 /* 
@@ -357,7 +382,7 @@
   --filled-color: rgba(255, 255, 255, 0.95);
   --mid-transition-color: rgba(255, 255, 255, 0.65);
   --unfilled-color: rgba(255, 255, 255, 0.35);
-  --transition-width: 8%; /* 🌟 缩短至精悍锋利的 8% 过渡高光带 🌟 */
+  --transition-width: 8%;
 
   /* GPU accelerated, driven perfectly 1:1 by JS Lerp frame timeline */
   transform: translateY(0px) translateZ(0);
@@ -447,7 +472,7 @@
   --filled-color: rgba(255, 255, 255, 0.78); /* 🌟 纯白→柔和，消除深色模式"色块" 🌟 */
   --mid-transition-color: rgba(255, 255, 255, 0.54);
   --unfilled-color: rgba(255, 255, 255, 0.35);
-  --transition-width: 8%; /* 🌟 缩短至精悍锋利的 8% 过渡高光带 🌟 */
+  --transition-width: 8%;
   
   transition: --filled-color 0.6s ease, --unfilled-color 0.6s ease;
 }
@@ -508,7 +533,7 @@
   --filled-color: rgb(var(--dynamic-color, 0, 0, 0));
   --mid-transition-color: rgba(var(--dynamic-color, 0, 0, 0), 0.58);
   --unfilled-color: rgba(0, 0, 0, 0.22);
-  --transition-width: 8%; /* 🌟 缩短至精悍锋利的 8% 过渡高光带 🌟 */
+  --transition-width: 8%;
 }
 
 .app-container.theme-light .lyrics-word.is-ruby-word.word-singing .lyrics-char-text,
