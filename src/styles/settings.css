@@ -1,4 +1,342 @@
-/* Settings tab panel layout and cards */
+/* Sticky search header container (referencing search page style, transparent background) */
+.settings-search-sticky-header {
+  /* 位于固定工具栏（content-toolbar）内，列表在下方独立滚动、互不重叠，
+     无需 sticky/遮罩（参考搜索页 .search-container / 本地音乐 .local-tabs） */
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 4px 0 10px;
+}
+
+.settings-search-box {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: 1;
+  height: 44px;
+  border-radius: 22px;
+  padding: 0 16px;
+  /* 悬浮按钮同款水晶玻璃材质（随 ui-style 由 floating-surfaces.css 覆盖） */
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.25), 0 8px 24px rgba(0, 0, 0, 0.12);
+  backdrop-filter: blur(12px) saturate(140%);
+  -webkit-backdrop-filter: blur(12px) saturate(140%);
+  transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.app-container.theme-light .settings-search-box {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(0, 0, 0, 0.05);
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.45), 0 8px 24px rgba(0, 0, 0, 0.03);
+}
+
+.settings-search-box:focus-within {
+  border-color: rgba(var(--dynamic-color, 0, 240, 255), 0.45);
+  background: rgba(255, 255, 255, 0.08);
+  box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.35), 0 10px 25px rgba(var(--dynamic-color, 0, 240, 255), 0.22);
+  transform: translateY(-1px);
+}
+
+.app-container.theme-light .settings-search-box:focus-within {
+  background: rgba(255, 255, 255, 0.5);
+  border-color: rgba(var(--dynamic-color, 0, 136, 204), 0.3);
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.8), 0 10px 25px rgba(var(--dynamic-color, 0, 136, 204), 0.12);
+}
+
+.settings-search-icon {
+  color: var(--text-secondary);
+  margin-right: 10px;
+  flex-shrink: 0;
+  transition: color 0.3s ease;
+}
+
+.settings-search-box:focus-within .settings-search-icon {
+  color: rgb(var(--dynamic-color, 0, 240, 255));
+}
+.app-container.theme-light .settings-search-box:focus-within .settings-search-icon {
+  color: rgb(var(--dynamic-color, 0, 136, 204));
+}
+
+.settings-search-input {
+  width: 100%;
+  height: 100%;
+  padding: 0 32px 0 0;
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 13px;
+  outline: none;
+}
+
+.settings-search-clear {
+  position: absolute;
+  right: 12px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+.settings-search-clear:hover {
+  background: rgba(255, 255, 255, 0.25);
+  color: var(--text-primary);
+}
+
+.settings-search-count {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  white-space: nowrap;
+}
+
+.settings-no-results {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 48px 20px;
+  color: var(--text-tertiary);
+  font-size: 13px;
+  text-align: center;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px dashed var(--glass-border);
+  border-radius: 16px;
+}
+.scanned-paths-empty {
+  font-size: 13px;
+  color: var(--text-tertiary, var(--text-secondary));
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px dashed var(--glass-border);
+  border-radius: 8px;
+  text-align: center;
+}
+
+/* ================= 🖥️ 桌面歌词实时预览视口 (Desktop Lyrics Live Preview) ================= */
+.desktop-lyrics-preview-wrapper {
+  margin: 12px 0 20px;
+  padding: 14px;
+  background: linear-gradient(135deg, rgba(20, 26, 38, 0.6) 0%, rgba(10, 14, 22, 0.8) 100%);
+  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.12));
+  border-radius: 14px;
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.08), 0 10px 30px rgba(0, 0, 0, 0.25);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+.app-container.theme-light .desktop-lyrics-preview-wrapper {
+  /* 与浅色主题玻璃卡片协调：低浓度半透明 + 模糊，而非高浓度白底 */
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.42) 0%, rgba(255, 255, 255, 0.16) 100%);
+  border-color: rgba(148, 163, 184, 0.35);
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.9), 0 8px 24px rgba(0, 0, 0, 0.08);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+.desktop-lyrics-preview-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.desktop-lyrics-preview-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 600;
+  background: rgba(var(--dynamic-color, 0, 242, 254), 0.15);
+  color: var(--theme-accent, rgb(var(--dynamic-color, 0, 242, 254)));
+  border: 1px solid rgba(var(--dynamic-color, 0, 242, 254), 0.3);
+}
+
+.desktop-lyrics-preview-box {
+  position: relative;
+  width: 100%;
+  min-height: 140px;
+  border-radius: 10px;
+  overflow: hidden;
+  background-size: cover;
+  background-position: center;
+  /* 假桌子底图模仿真人桌面环境 */
+  background-image: radial-gradient(circle at 50% 50%, rgba(30, 41, 59, 0.7), rgba(15, 23, 42, 0.95)), repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.02) 0, rgba(255, 255, 255, 0.02) 10px, transparent 0, transparent 20px);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  padding: 16px 20px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  user-select: none;
+  transition: all 0.3s ease;
+}
+
+.app-container.theme-light .desktop-lyrics-preview-box {
+  /* 假桌面底图降白：半透明柔和渐变，与浅色主题协调而非纯白实底 */
+  background-image: radial-gradient(circle at 50% 50%, rgba(226, 232, 240, 0.55), rgba(241, 245, 249, 0.28)), repeating-linear-gradient(45deg, rgba(0, 0, 0, 0.015) 0, rgba(0, 0, 0, 0.015) 10px, transparent 0, transparent 20px);
+  border-color: rgba(148, 163, 184, 0.28);
+}
+
+.desktop-lyrics-preview-toolbar-mock {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: 16px;
+  font-size: 11px;
+  background: rgba(16, 20, 28, 0.75);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: rgba(255, 255, 255, 0.85);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  pointer-events: none;
+}
+
+.desktop-lyrics-preview-viewport {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  transition: all 0.2s ease;
+  /* 不用 !important：JS 会设置内联 fontFamily（跟随用户字体选择），需允许覆盖 */
+  font-family: inherit;
+}
+
+.desktop-lyrics-preview-viewport[data-align="left"] {
+  align-items: flex-start;
+  text-align: left;
+}
+
+.desktop-lyrics-preview-viewport[data-align="right"] {
+  align-items: flex-end;
+  text-align: right;
+}
+
+.desktop-lyrics-preview-main {
+  font-size: clamp(16px, calc(var(--preview-size, 34px) * 0.7), 36px);
+  line-height: 1.3;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  word-break: break-word;
+  transition: all 0.2s ease;
+  /* 不用 !important：允许 JS 内联 fontFamily 覆盖 */
+  font-family: inherit;
+}
+
+.desktop-lyrics-preview-sub {
+  margin-top: 4px;
+  font-size: clamp(11px, calc(var(--preview-size, 34px) * 0.42), 20px);
+  line-height: 1.35;
+  font-weight: 600;
+  opacity: 0.85;
+  word-break: break-word;
+  transition: all 0.2s ease;
+  /* 不用 !important：允许 JS 内联 fontFamily 覆盖 */
+  font-family: inherit;
+}
+
+.desktop-lyrics-preview-main .lyrics-word {
+  font-family: inherit;
+}
+
+/* 🌟 预览视口主题与配色渲染规则 🌟 */
+.desktop-lyrics-preview-box[data-theme="follow-app"] {
+  --theme-accent: rgb(var(--dynamic-color, 0, 180, 216));
+  --theme-glow: rgba(var(--dynamic-color, 0, 180, 216), 0.5);
+  --unfilled-color: rgba(255, 255, 255, 0.45);
+}
+
+.desktop-lyrics-preview-box[data-theme="white"] {
+  --theme-accent: #ffffff;
+  --theme-glow: rgba(0, 0, 0, 0.12);
+  --unfilled-color: rgba(255, 255, 255, 0.8);
+}
+
+.desktop-lyrics-preview-box[data-theme="aurora"] {
+  --theme-accent: #00f2fe;
+  --theme-glow: rgba(0, 242, 254, 0.45);
+  --theme-preset-gradient: linear-gradient(135deg, #00f2fe 0%, #4facfe 100%);
+  --unfilled-color: #a1c4fd;
+}
+
+.desktop-lyrics-preview-box[data-theme="cyber"] {
+  --theme-accent: #f355da;
+  --theme-glow: rgba(243, 85, 218, 0.45);
+  --theme-preset-gradient: linear-gradient(135deg, #ff0844 0%, #f355da 100%);
+  --unfilled-color: #ffb199;
+}
+
+.desktop-lyrics-preview-box[data-theme="sunset"] {
+  --theme-accent: #ffe000;
+  --theme-glow: rgba(248, 155, 41, 0.45);
+  --theme-preset-gradient: linear-gradient(135deg, #ffe000 0%, #f89b29 100%);
+  --unfilled-color: #fff1eb;
+}
+
+.desktop-lyrics-preview-box[data-theme="ocean"] {
+  --theme-accent: #38f9d7;
+  --theme-glow: rgba(56, 249, 215, 0.45);
+  --theme-preset-gradient: linear-gradient(135deg, #38f9d7 0%, #a8ff78 100%);
+  --unfilled-color: #8ec5fc;
+}
+
+.desktop-lyrics-preview-main {
+  color: var(--theme-accent, #00f2fe) !important;
+  filter: drop-shadow(0 2px 10px var(--theme-glow, rgba(0, 242, 254, 0.45)));
+}
+
+.desktop-lyrics-preview-box[data-theme="aurora"] .desktop-lyrics-preview-main:not(:has(.lyrics-word)),
+.desktop-lyrics-preview-box[data-theme="cyber"] .desktop-lyrics-preview-main:not(:has(.lyrics-word)),
+.desktop-lyrics-preview-box[data-theme="sunset"] .desktop-lyrics-preview-main:not(:has(.lyrics-word)),
+.desktop-lyrics-preview-box[data-theme="ocean"] .desktop-lyrics-preview-main:not(:has(.lyrics-word)) {
+  background: var(--theme-preset-gradient);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent !important;
+}
+
+.desktop-lyrics-preview-sub {
+  color: var(--unfilled-color, rgba(255, 255, 255, 0.75)) !important;
+  filter: drop-shadow(0 1px 6px rgba(0, 0, 0, 0.6));
+}
+
+.desktop-lyrics-preview-box[data-glow="false"][data-stroke="true"] .desktop-lyrics-preview-main,
+.desktop-lyrics-preview-box[data-glow="false"][data-stroke="true"] .desktop-lyrics-preview-sub,
+.desktop-lyrics-preview-box[data-glow="false"][data-stroke="true"] .lyrics-word {
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.85)) !important;
+  text-shadow: none !important;
+}
+
+.desktop-lyrics-preview-box[data-glow="false"][data-stroke="false"] .desktop-lyrics-preview-main,
+.desktop-lyrics-preview-box[data-glow="false"][data-stroke="false"] .desktop-lyrics-preview-sub,
+.desktop-lyrics-preview-box[data-glow="false"][data-stroke="false"] .lyrics-word {
+  filter: none !important;
+  text-shadow: none !important;
+}
+.settings-no-results svg {
+  opacity: 0.6;
+}
+
 .settings-container {
   display: flex;
   flex-direction: column;
@@ -19,7 +357,7 @@
   background: rgba(0, 0, 0, 0.01);
 }
 .settings-card-title {
-  font-size: 14px;
+  font-size: 16px;
   font-weight: 600;
   color: var(--text-primary);
   display: flex;
@@ -49,7 +387,7 @@
 }
 .setting-label {
   font-size: 13px;
-  font-weight: 500;
+  font-weight: 600;
   color: var(--text-primary);
 }
 .setting-desc {
@@ -310,13 +648,17 @@
 
 #settings-theme-group .setting-radio-active-bg,
 #settings-lyrics-theme-group .setting-radio-active-bg,
-#settings-bg-style-group .setting-radio-active-bg {
+#settings-anim-speed-group .setting-radio-active-bg {
   width: calc(33.333% - 4px);
 }
 
-#settings-ui-style-group .setting-radio-active-bg {
+#settings-bg-style-group .setting-radio-active-bg,
+#settings-ui-style-group .setting-radio-active-bg,
+#settings-window-material-group .setting-radio-active-bg {
   width: calc(25% - 4px);
 }
+#settings-bg-style-group .setting-radio-btn,
+#settings-window-material-group .setting-radio-btn,
 #settings-ui-style-group .setting-radio-btn {
   min-width: 68px;
   text-align: center;
@@ -431,6 +773,198 @@
   }
 }
 
+/* ─── 我的字体（用户字体管理）─── */
+.setting-user-fonts {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  justify-content: end;
+  min-width: 300px;
+}
+
+.setting-user-font-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: var(--glass-bg, rgba(128, 128, 128, 0.08));
+}
+
+.setting-user-font-name {
+  font-size: 12.5px;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.setting-font-remove-btn {
+  flex-shrink: 0;
+  border: none;
+  background: transparent;
+  color: #e5484d;
+  font-size: 12px;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 6px;
+}
+
+.setting-font-remove-btn:hover {
+  background: rgba(229, 72, 77, 0.12);
+}
+
+.setting-font-empty {
+  font-size: 11.5px;
+  color: var(--text-tertiary, var(--text-secondary));
+  text-align: right;
+}
+
+/* ─── 推荐字体（应用内下载）─── */
+.setting-downloadable-fonts {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  justify-content: end;
+  min-width: 300px;
+}
+
+.setting-downloadable-font-item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--glass-bg, rgba(128, 128, 128, 0.08));
+}
+
+.setting-downloadable-font-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.setting-downloadable-font-name {
+  font-size: 12.5px;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.setting-downloadable-font-desc {
+  font-size: 10.5px;
+  color: var(--text-tertiary, var(--text-secondary));
+}
+
+.setting-downloadable-font-action {
+  display: flex;
+  justify-content: flex-end;
+  flex-shrink: 0;
+}
+
+.setting-downloadable-font-action .setting-btn {
+  white-space: nowrap;
+  padding: 4px 12px;
+}
+
+.setting-font-progress {
+  width: 100%;
+  height: 6px;
+  background: var(--glass-bg-strong, rgba(0, 0, 0, 0.1));
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.setting-font-progress-bar {
+  width: 0%;
+  height: 100%;
+  background: var(--accent, #4f8cff);
+  transition: width 0.15s;
+}
+
+.setting-font-progress.hidden {
+  display: none;
+}
+
+@media (max-width: 900px) {
+  .setting-user-fonts,
+  .setting-downloadable-fonts {
+    min-width: 240px;
+  }
+}
+
+/* ─── 字体管理弹窗分区 ─── */
+.font-manager-section {
+  margin-bottom: 20px;
+}
+
+.font-manager-section:last-child {
+  margin-bottom: 0;
+}
+
+.font-manager-section-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.font-manager-section-hint {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--text-tertiary, var(--text-secondary));
+}
+
+.font-manager-add-row {
+  margin-bottom: 10px;
+}
+
+.font-manager-add-row .setting-btn {
+  white-space: nowrap;
+  padding: 5px 14px;
+}
+
+#kimo-font-manager-modal .setting-user-fonts,
+#kimo-font-manager-modal .setting-downloadable-fonts {
+  justify-content: stretch;
+}
+
+#kimo-font-manager-modal .setting-user-font-item,
+#kimo-font-manager-modal .setting-downloadable-font-item {
+  background: var(--glass-bg, rgba(128, 128, 128, 0.08));
+}
+
+/* ─── 桌面歌词自定义颜色选择器 ─── */
+.setting-color-pickers {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.setting-color-picker {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.setting-color-picker input[type="color"] {
+  width: 36px;
+  height: 26px;
+  padding: 1px;
+  border: 1px solid var(--glass-border, rgba(128, 128, 128, 0.25));
+  border-radius: 6px;
+  background: transparent;
+  cursor: pointer;
+}
+
 .app-container.theme-light .setting-select option {
   background: #f5f5f7;
   color: #333;
@@ -496,4 +1030,72 @@
   justify-content: flex-end;
   gap: 10px;
   margin-top: 4px;
+}
+
+/* ════════════════════════════════════════════════
+   桌面歌词预览字元隔离规则
+   lyrics-rendering.css 的 .lyrics-word 是裸类全局规则（!important + 元素级
+   白色变量），会接管设置页预览的字导致主题色/渐变不生效。
+   此处用更高特异性（0,3,0）让预览字恢复由预览容器 data-theme 的
+   --theme-accent / --unfilled-color 主题变量驱动。
+   ════════════════════════════════════════════════ */
+.desktop-lyrics-preview-box .lyrics-word {
+  /* !important：对抗 .app-container.theme-light .lyrics-word（0,3,0）的元素级变量 */
+  --filled-color: var(--theme-accent, #00f2fe) !important;
+  --unfilled-color: revert !important; /* 取消元素级定义，恢复继承预览容器 data-theme 的主题值 */
+  background-image: none !important;
+  background-clip: unset !important;
+  -webkit-background-clip: unset !important;
+  clip-path: unset !important;
+  -webkit-clip-path: unset !important;
+  transform: none !important;
+}
+
+.desktop-lyrics-preview-box .lyrics-word:not(.word-singing):not(.word-active) {
+  color: var(--unfilled-color, rgba(255, 255, 255, 0.45)) !important;
+  -webkit-text-fill-color: var(--unfilled-color, rgba(255, 255, 255, 0.45)) !important;
+}
+
+.desktop-lyrics-preview-box .lyrics-word.word-singing {
+  background-image: linear-gradient(
+    to right,
+    var(--theme-accent, #00f2fe) var(--char-fill, 0%),
+    var(--unfilled-color, rgba(255, 255, 255, 0.45)) var(--char-fill, 0%)
+  ) !important;
+  background-clip: text !important;
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  color: transparent !important;
+}
+
+.desktop-lyrics-preview-box .lyrics-word.word-active {
+  color: var(--theme-accent, #00f2fe) !important;
+  -webkit-text-fill-color: var(--theme-accent, #00f2fe) !important;
+}
+
+/* ── 浅色主题下预览文字可读性 ──
+   降白背景后，白色系 --unfilled-color 会不可见；
+   对齐真实窗口（desktop-lyrics.css）的 light 变体：深色未填色 + 浅色文字阴影 */
+.app-container.theme-light .desktop-lyrics-preview-box {
+  --unfilled-color: rgba(51, 65, 85, 0.55);
+}
+
+.app-container.theme-light .desktop-lyrics-preview-box[data-theme="white"] {
+  --unfilled-color: rgba(51, 65, 85, 0.5);
+  --theme-accent: #1e293b; /* 纯白 accent 在浅色玻璃上不可读，改用深蓝灰 */
+}
+
+.app-container.theme-light .desktop-lyrics-preview-box[data-theme="aurora"],
+.app-container.theme-light .desktop-lyrics-preview-box[data-theme="cyber"],
+.app-container.theme-light .desktop-lyrics-preview-box[data-theme="sunset"],
+.app-container.theme-light .desktop-lyrics-preview-box[data-theme="ocean"] {
+  --unfilled-color: rgba(51, 65, 85, 0.6);
+}
+
+.app-container.theme-light .desktop-lyrics-preview-box .desktop-lyrics-preview-main {
+  filter: drop-shadow(0 1px 3px rgba(255, 255, 255, 0.9)) drop-shadow(0 1px 2px rgba(0, 0, 0, 0.2));
+}
+
+.app-container.theme-light .desktop-lyrics-preview-box .desktop-lyrics-preview-sub {
+  text-shadow: 0 1px 3px rgba(255, 255, 255, 0.85);
 }

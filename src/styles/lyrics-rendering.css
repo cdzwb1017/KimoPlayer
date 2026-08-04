@@ -382,11 +382,24 @@
   --filled-color: rgba(255, 255, 255, 0.95);
   --mid-transition-color: rgba(255, 255, 255, 0.65);
   --unfilled-color: rgba(255, 255, 255, 0.35);
-  --transition-width: 8%;
+  --transition-width: 20%;
 
-  /* GPU accelerated, driven perfectly 1:1 by JS Lerp frame timeline */
-  transform: translateY(0px) translateZ(0);
+  /* GPU accelerated word-lifting animation — 图层按需提升：
+     默认不建合成层（全量 translateZ/will-change 会让每字占 2 个合成层，
+     数千层压垮合成器导致走字卡顿）；仅「正在唱」与「已唱完」的字提升图层：
+     - .word-singing：lift 与卡拉OK渐变每帧更新，必须走合成器
+     - .word-active：唱完静止（lift 恒定后不再写入），多为静止层，GPU 成本低；
+       覆盖 singing→active 的收敛过渡段（该段 lift 仍每帧变化，此前无层 → 每帧整字重绘） */
+  transform: translateY(var(--word-lift, 0px));
+}
+
+.lyrics-word.word-singing,
+.lyrics-word.word-active {
   will-change: transform;
+}
+
+.lyrics-word-content {
+  transform: translateY(var(--word-lift, 0px));
 }
 
 /* Light theme word fill - 100% 原版动态主题提取色体系 */
@@ -394,7 +407,7 @@
   --filled-color: rgb(var(--dynamic-color, 0, 0, 0));
   --mid-transition-color: rgba(var(--dynamic-color, 0, 0, 0), 0.58);
   --unfilled-color: rgba(0, 0, 0, 0.28);
-  --transition-width: 8%;
+  --transition-width: 20%;
 }
 
 /* 🌟 唱词高光与渐变渲染：默认自适应支持整排投影与单字平滑回退，彻底防止文字割裂 🌟 */
@@ -404,15 +417,14 @@
   -webkit-text-fill-color: transparent !important;
   background-repeat: no-repeat !important;
   
-  /* 优先使用整排/整行宽度与坐标，未对齐时自动优雅回退 */
-  background-size: var(--line-width, 100%) 100% !important;
-  background-position: calc(-1 * var(--char-offset, 0px)) 0px !important;
+  background-size: 100% 100% !important;
+  background-position: 0px 0px !important;
   
   background-image: linear-gradient(
     to right,
-    var(--filled-color) var(--line-percent, var(--char-fill, 0%)),
-    var(--mid-transition-color) calc(var(--line-percent, var(--char-fill, 0%)) + var(--transition-width) * 0.45),
-    var(--unfilled-color) calc(var(--line-percent, var(--char-fill, 0%)) + var(--transition-width))
+    var(--filled-color) calc(var(--char-fill, 0%) - var(--transition-width, 20%)),
+    var(--mid-transition-color, var(--filled-color)) var(--char-fill, 0%),
+    var(--unfilled-color) calc(var(--char-fill, 0%) + var(--transition-width, 20%))
   ) !important;
 
   clip-path: inset(0) !important;
@@ -424,13 +436,14 @@
   background-image: none !important;
   -webkit-text-fill-color: var(--filled-color) !important;
   color: var(--filled-color) !important;
-  /* Fallback only: the per-word animation writes the configured lift inline. */
-  transform: translateY(-4px) translateZ(0);
-  transition: transform 0.35s cubic-bezier(0.25, 1, 0.5, 1);
+  /* 唱完字跟随 line-visual-state 写入的 --word-lift（按用户 liftAmplitude 设置），默认 -4px；
+     不使用 transition：JS 每帧写入 --word-lift 时 0.35s 过渡会制造"永远追不上"的粘滞感，
+     平滑由 applyLift 的 22px/s 限速完成 */
+  transform: translateY(var(--word-lift, -4px));
 }
 
 .lyrics-line.past .lyrics-word.word-active {
-  transform: translateY(-4px) translateZ(0);
+  transform: translateY(var(--word-lift, -4px));
 }
 
 .lyrics-word.singing-glow {
@@ -472,7 +485,7 @@
   --filled-color: rgba(255, 255, 255, 0.78); /* 🌟 纯白→柔和，消除深色模式"色块" 🌟 */
   --mid-transition-color: rgba(255, 255, 255, 0.54);
   --unfilled-color: rgba(255, 255, 255, 0.35);
-  --transition-width: 8%;
+  --transition-width: 20%;
   
   transition: --filled-color 0.6s ease, --unfilled-color 0.6s ease;
 }
@@ -491,24 +504,9 @@
   
   background-image: linear-gradient(
     to right,
-    var(--filled-color) var(--char-fill, 0%),
-    var(--mid-transition-color) calc(var(--char-fill, 0%) + var(--transition-width) * 0.45),
-    var(--unfilled-color) calc(var(--char-fill, 0%) + var(--transition-width))
-  ) !important;
-}
-
-/* 🌟 当这一行成功完成物理排版背景对齐后，才启用联觉整行渐变拼接 🌟 */
-.lyrics-line[data-bg-aligned="true"] .lyrics-word.is-ruby-word.word-singing .lyrics-char-text,
-.lyrics-line[data-bg-aligned="true"] .lyrics-word.is-ruby-word.word-singing .lyrics-ruby-suffix {
-  /* Viewport Texture Mapping: 拼接整行渐变 */
-  background-size: var(--line-width) 100% !important;
-  background-position: calc(-1 * var(--char-offset)) 0px !important;
-  
-  background-image: linear-gradient(
-    to right,
-    var(--filled-color) var(--line-percent, 0%),
-    var(--mid-transition-color) calc(var(--line-percent, 0%) + var(--transition-width) * 0.45),
-    var(--unfilled-color) calc(var(--line-percent, 0%) + var(--transition-width))
+    var(--filled-color) calc(var(--char-fill, 0%) - var(--transition-width, 20%)),
+    var(--mid-transition-color, var(--filled-color)) var(--char-fill, 0%),
+    var(--unfilled-color) calc(var(--char-fill, 0%) + var(--transition-width, 20%))
   ) !important;
 }
 
@@ -533,7 +531,7 @@
   --filled-color: rgb(var(--dynamic-color, 0, 0, 0));
   --mid-transition-color: rgba(var(--dynamic-color, 0, 0, 0), 0.58);
   --unfilled-color: rgba(0, 0, 0, 0.22);
-  --transition-width: 8%;
+  --transition-width: 20%;
 }
 
 .app-container.theme-light .lyrics-word.is-ruby-word.word-singing .lyrics-char-text,
@@ -549,24 +547,9 @@
   
   background-image: linear-gradient(
     to right,
-    var(--filled-color) var(--char-fill, 0%),
-    var(--mid-transition-color) calc(var(--char-fill, 0%) + var(--transition-width) * 0.45),
-    var(--unfilled-color) calc(var(--char-fill, 0%) + var(--transition-width))
-  ) !important;
-}
-
-/* 🌟 当这一行成功完成物理排版背景对齐后，才启用联觉整行渐变拼接 🌟 */
-.app-container.theme-light .lyrics-line[data-bg-aligned="true"] .lyrics-word.is-ruby-word.word-singing .lyrics-char-text,
-.app-container.theme-light .lyrics-line[data-bg-aligned="true"] .lyrics-word.is-ruby-word.word-singing .lyrics-ruby-suffix {
-  /* Viewport Texture Mapping: 拼接整行渐变 */
-  background-size: var(--line-width) 100% !important;
-  background-position: calc(-1 * var(--char-offset)) 0px !important;
-  
-  background-image: linear-gradient(
-    to right,
-    var(--filled-color) var(--line-percent, 0%),
-    var(--mid-transition-color) calc(var(--line-percent, 0%) + var(--transition-width) * 0.45),
-    var(--unfilled-color) calc(var(--line-percent, 0%) + var(--transition-width))
+    var(--filled-color) calc(var(--char-fill, 0%) - var(--transition-width, 20%)),
+    var(--mid-transition-color, var(--filled-color)) var(--char-fill, 0%),
+    var(--unfilled-color) calc(var(--char-fill, 0%) + var(--transition-width, 20%))
   ) !important;
 }
 
@@ -796,4 +779,24 @@
 @keyframes bounce-bar {
   0% { height: 2px; }
   100% { height: 12px; }
+}
+
+/* ════════════════════════════════════════════════
+   切歌歌词过渡：整列歌词（含间奏/前奏行）一起上移进入
+   容器级动画——行级 transform（如间奏行的 translateY+scale）
+   独立叠加，不会被覆盖，也不会在动画结束后回弹
+   ════════════════════════════════════════════════ */
+#lyrics-lines.lyrics-track-enter {
+  animation: lyrics-track-enter-up 0.34s cubic-bezier(0.25, 1, 0.5, 1) both;
+}
+
+@keyframes lyrics-track-enter-up {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }

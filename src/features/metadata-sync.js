@@ -34,7 +34,15 @@ export function initializeMetadataSavedSync({
           }
 
           player.playlist[songIdx] = updatedSong;
-          localStorage.setItem('kimo-playlist-cache', JSON.stringify(player.playlist));
+          try {
+            localStorage.setItem('kimo-playlist-cache', JSON.stringify(player.playlist));
+          } catch (e) {
+            try {
+              localStorage.setItem('kimo-playlist-cache', JSON.stringify(player.playlist.map((s) => ({ ...s, cover_image: undefined }))));
+            } catch (e2) {
+              console.warn('[PlaylistCache] 存储空间不足，播放列表缓存未保存');
+            }
+          }
           renderPlaylist(player.playlist);
 
           if (songIdx === player.currentIndex) {
@@ -45,15 +53,15 @@ export function initializeMetadataSavedSync({
             }
 
             if (updatedSong.cover_image) {
-              extractDominantColor(getCoverSrc(updatedSong.cover_image), getColorOptions ? getColorOptions() : undefined).then(color => {
+              extractDominantColor(getCoverSrc(updatedSong), getColorOptions ? getColorOptions() : undefined).then(color => {
                 updatedSong.dominant_color = color;
                 if (player.currentIndex === songIdx) {
-                  applyDynamicColor(color.r, color.g, color.b, getCoverSrc(updatedSong.cover_image));
+                  applyDynamicColor(color.r, color.g, color.b, getCoverSrc(updatedSong));
                 }
               });
             } else {
               const defColor = getDefaultDynamicColor();
-              applyDynamicColor(defColor.r, defColor.g, defColor.b, getCoverSrc(null));
+              applyDynamicColor(defColor.r, defColor.g, defColor.b, getCoverSrc(updatedSong));
             }
           }
         }

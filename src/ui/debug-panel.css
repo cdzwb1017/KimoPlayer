@@ -1,0 +1,597 @@
+/* ═══════════════════════════════════════════════════════════════
+   🔧 Developer Debug Panel
+   ═══════════════════════════════════════════════════════════════ */
+
+#dev-debug-panel {
+  position: fixed;
+  top: 80px;
+  right: 20px;
+  width: 360px;
+  max-height: calc(100vh - 120px);
+  z-index: 99999;
+  background: var(--floating-surface-bg, rgba(20, 20, 20, 0.92));
+  backdrop-filter: blur(40px) saturate(1.4);
+  -webkit-backdrop-filter: blur(40px) saturate(1.4);
+  border: 1px solid var(--floating-surface-border, rgba(255,255,255,0.1));
+  border-radius: 14px;
+  box-shadow: var(--floating-surface-shadow, 0 16px 48px rgba(0,0,0,0.4));
+  color: var(--text-primary, #fff);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  font-size: 12px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  user-select: none;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+#dev-debug-panel.hidden {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-8px) scale(0.98);
+}
+
+/* ── Header / Drag bar ── */
+.debug-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--floating-surface-divider, rgba(255,255,255,0.06));
+  cursor: move;
+  -webkit-app-region: drag;
+}
+
+.debug-header-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: 0.02em;
+}
+
+.debug-header-title .debug-icon {
+  font-size: 15px;
+}
+
+.debug-header-title .debug-fps {
+  font-family: "SF Mono", "Cascadia Code", "Consolas", monospace;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--accent-color, #00b4d8);
+  background: rgba(0, 180, 216, 0.12);
+  padding: 1px 6px;
+  border-radius: 4px;
+  margin-left: 4px;
+}
+
+.debug-close-btn {
+  width: 24px;
+  height: 24px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary, rgba(255,255,255,0.5));
+  cursor: pointer;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  line-height: 1;
+  -webkit-app-region: no-drag;
+  transition: all 0.15s ease;
+}
+
+.debug-close-btn:hover {
+  background: var(--floating-surface-hover, rgba(255,255,255,0.08));
+  color: var(--text-primary, #fff);
+}
+
+/* ── Tab bar ── */
+.debug-tabs {
+  display: flex;
+  padding: 0 8px;
+  gap: 2px;
+  border-bottom: 1px solid var(--floating-surface-divider, rgba(255,255,255,0.06));
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.debug-tabs::-webkit-scrollbar { display: none; }
+
+.debug-tab {
+  padding: 8px 12px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary, rgba(255,255,255,0.5));
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.debug-tab:hover {
+  color: var(--text-primary, #fff);
+}
+
+.debug-tab.active {
+  color: var(--accent-color, #00b4d8);
+  border-bottom-color: var(--accent-color, #00b4d8);
+}
+
+/* ── Content area ── */
+.debug-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px 14px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,255,255,0.15) transparent;
+}
+.debug-content::-webkit-scrollbar { width: 5px; }
+.debug-content::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 3px; }
+
+.debug-tab-panel {
+  display: none;
+}
+.debug-tab-panel.active {
+  display: block;
+}
+
+/* ── Section headers ── */
+.debug-section {
+  margin-bottom: 16px;
+}
+
+.debug-section-title {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-tertiary, rgba(255,255,255,0.3));
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.debug-section-title::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--floating-surface-divider, rgba(255,255,255,0.06));
+}
+
+/* ── Info rows ── */
+.debug-info-grid {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 4px 12px;
+  font-size: 11px;
+  margin-bottom: 8px;
+}
+
+.debug-info-label {
+  color: var(--text-secondary, rgba(255,255,255,0.5));
+}
+
+.debug-info-value {
+  font-family: "SF Mono", "Cascadia Code", "Consolas", monospace;
+  color: var(--text-primary, #fff);
+  text-align: right;
+  font-weight: 600;
+}
+
+.debug-info-value.accent {
+  color: var(--accent-color, #00b4d8);
+}
+
+.debug-info-value.warn {
+  color: #f59e0b;
+}
+
+.debug-info-value.ok {
+  color: #10b981;
+}
+
+/* ── Sliders ── */
+.debug-slider-row {
+  margin-bottom: 10px;
+}
+
+.debug-slider-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 11px;
+  margin-bottom: 4px;
+}
+
+.debug-slider-label span:first-child {
+  color: var(--text-secondary, rgba(255,255,255,0.6));
+}
+
+.debug-slider-label span:last-child {
+  font-family: "SF Mono", "Cascadia Code", "Consolas", monospace;
+  color: var(--accent-color, #00b4d8);
+  font-weight: 600;
+  font-size: 11px;
+}
+
+.debug-slider {
+  width: 100%;
+  height: 4px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: rgba(255,255,255,0.1);
+  border-radius: 2px;
+  outline: none;
+  cursor: pointer;
+}
+
+.debug-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--accent-color, #00b4d8);
+  cursor: pointer;
+  border: 2px solid rgba(255,255,255,0.9);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+  transition: transform 0.1s ease;
+}
+
+.debug-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.2);
+}
+
+.debug-slider::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--accent-color, #00b4d8);
+  cursor: pointer;
+  border: 2px solid rgba(255,255,255,0.9);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+}
+
+/* ── Buttons ── */
+.debug-btn-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.debug-btn {
+  padding: 7px 10px;
+  border: 1px solid var(--floating-surface-border, rgba(255,255,255,0.1));
+  background: var(--floating-surface-hover, rgba(255,255,255,0.06));
+  color: var(--text-primary, #fff);
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+
+.debug-btn:hover {
+  background: rgba(255,255,255,0.12);
+  border-color: rgba(255,255,255,0.2);
+}
+
+.debug-btn:active {
+  transform: scale(0.96);
+}
+
+.debug-btn.danger {
+  border-color: rgba(239, 68, 68, 0.3);
+  color: #f87171;
+}
+
+.debug-btn.danger:hover {
+  background: rgba(239, 68, 68, 0.15);
+  border-color: rgba(239, 68, 68, 0.5);
+}
+
+.debug-btn.accent {
+  border-color: rgba(0, 180, 216, 0.3);
+  color: var(--accent-color, #00b4d8);
+}
+
+.debug-btn.accent:hover {
+  background: rgba(0, 180, 216, 0.12);
+}
+
+.debug-btn.full-width {
+  grid-column: 1 / -1;
+}
+
+/* ── Toggle switches ── */
+.debug-toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 0;
+  font-size: 11px;
+}
+
+.debug-toggle-row span {
+  color: var(--text-secondary, rgba(255,255,255,0.7));
+}
+
+.debug-switch {
+  position: relative;
+  width: 36px;
+  height: 20px;
+  flex-shrink: 0;
+}
+
+.debug-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.debug-switch-slider {
+  position: absolute;
+  inset: 0;
+  background: rgba(255,255,255,0.15);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.debug-switch-slider::before {
+  content: '';
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  left: 2px;
+  top: 2px;
+  background: #fff;
+  border-radius: 50%;
+  transition: transform 0.2s ease;
+}
+
+.debug-switch input:checked + .debug-switch-slider {
+  background: var(--accent-color, #00b4d8);
+}
+
+.debug-switch input:checked + .debug-switch-slider::before {
+  transform: translateX(16px);
+}
+
+/* ── Log console ── */
+.debug-log-panel {
+  background: rgba(0,0,0,0.4);
+  border-radius: 8px;
+  padding: 8px;
+  max-height: 200px;
+  overflow-y: auto;
+  font-family: "SF Mono", "Cascadia Code", "Consolas", monospace;
+  font-size: 10.5px;
+  line-height: 1.5;
+  scrollbar-width: thin;
+}
+.debug-log-panel::-webkit-scrollbar { width: 4px; }
+.debug-log-panel::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 2px; }
+
+.debug-log-entry {
+  padding: 2px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+  word-break: break-all;
+}
+
+.debug-log-entry:last-child {
+  border-bottom: none;
+}
+
+.debug-log-entry.log { color: rgba(255,255,255,0.7); }
+.debug-log-entry.warn { color: #fbbf24; }
+.debug-log-entry.error { color: #f87171; }
+.debug-log-entry.info { color: #60a5fa; }
+
+.debug-log-time {
+  color: rgba(255,255,255,0.3);
+  margin-right: 6px;
+}
+
+/* ── Seek bar in playback tab ── */
+.debug-seek-bar {
+  width: 100%;
+  margin: 8px 0;
+}
+
+.debug-seek-bar .debug-slider {
+  height: 6px;
+}
+
+.debug-time-display {
+  display: flex;
+  justify-content: space-between;
+  font-family: "SF Mono", "Cascadia Code", "Consolas", monospace;
+  font-size: 11px;
+  color: var(--text-secondary, rgba(255,255,255,0.5));
+  margin-bottom: 4px;
+}
+
+.debug-time-display .current {
+  color: var(--accent-color, #00b4d8);
+  font-weight: 700;
+}
+
+/* ── Speed selector ── */
+.debug-speed-row {
+  display: flex;
+  gap: 4px;
+  margin-top: 8px;
+}
+
+.debug-speed-btn {
+  flex: 1;
+  padding: 5px;
+  border: 1px solid var(--floating-surface-border, rgba(255,255,255,0.1));
+  background: transparent;
+  color: var(--text-secondary, rgba(255,255,255,0.5));
+  font-size: 10px;
+  font-weight: 700;
+  font-family: "SF Mono", "Cascadia Code", "Consolas", monospace;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+
+.debug-speed-btn.active {
+  background: var(--accent-color, #00b4d8);
+  border-color: var(--accent-color, #00b4d8);
+  color: #fff;
+}
+
+.debug-speed-btn:hover:not(.active) {
+  background: rgba(255,255,255,0.08);
+  color: var(--text-primary, #fff);
+}
+
+/* ── Debug visual overlay indicators ── */
+body.debug-show-bboxes .lyrics-line {
+  outline: 1px solid rgba(239, 68, 68, 0.4) !important;
+  outline-offset: -1px;
+}
+body.debug-show-bboxes .lyrics-word {
+  outline: 1px solid rgba(34, 197, 94, 0.4) !important;
+  outline-offset: -1px;
+}
+body.debug-show-bboxes .lyrics-ruby-container {
+  outline: 1px solid rgba(168, 85, 247, 0.4) !important;
+  outline-offset: -1px;
+}
+
+body.debug-no-animations .lyrics-line,
+body.debug-no-animations .lyrics-word,
+body.debug-no-animations .lyrics-char,
+body.debug-no-animations .lyrics-scroll {
+  transition: none !important;
+  animation: none !important;
+}
+
+body.debug-show-lift .lyrics-word::after {
+  content: attr(data-lift-dbg);
+  position: absolute;
+  top: -12px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 8px;
+  font-family: monospace;
+  color: #f59e0b;
+  pointer-events: none;
+  z-index: 10;
+}
+
+/* ── Devtools trigger button (small gear icon in corner) ── */
+#dev-debug-trigger {
+  position: fixed;
+  bottom: 16px;
+  right: 16px;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--floating-surface-bg, rgba(20,20,20,0.7));
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--floating-surface-border, rgba(255,255,255,0.1));
+  color: var(--text-secondary, rgba(255,255,255,0.4));
+  cursor: pointer;
+  z-index: 99998;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  transition: all 0.2s ease;
+  opacity: 0.3;
+}
+
+#dev-debug-trigger:hover {
+  opacity: 1;
+  color: var(--accent-color, #00b4d8);
+  border-color: var(--accent-color, #00b4d8);
+  transform: rotate(45deg);
+}
+
+body.debug-panel-open #dev-debug-trigger {
+  opacity: 1;
+  color: var(--accent-color, #00b4d8);
+  border-color: var(--accent-color, #00b4d8);
+}
+
+/* ═══ 独立调试窗口：面板全窗口显示（覆盖浮层定位）═══ */
+body[data-debug-window="true"] #dev-debug-panel {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: auto;
+  height: auto;
+  max-height: none;
+  border-radius: 0;
+  border: none;
+  z-index: 1;
+}
+
+body[data-debug-window="true"] .debug-header {
+  cursor: default;
+}
+
+/* ════════════════════════════════════════════════
+   独立调试窗口：布局优化（分类清晰、控件易用）
+   ════════════════════════════════════════════════ */
+body[data-debug-window="true"] .debug-header {
+  padding: 12px 16px;
+}
+
+body[data-debug-window="true"] .debug-tabs {
+  padding: 4px 12px 0;
+  gap: 6px;
+}
+
+body[data-debug-window="true"] .debug-tab {
+  padding: 10px 14px;
+  font-size: 12.5px;
+}
+
+body[data-debug-window="true"] .debug-content {
+  padding: 16px 18px 24px;
+}
+
+body[data-debug-window="true"] .debug-section {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--floating-surface-divider, rgba(255, 255, 255, 0.06));
+  border-radius: 12px;
+  padding: 14px 16px;
+  margin-bottom: 14px;
+}
+
+body[data-debug-window="true"] .debug-section-title {
+  margin-bottom: 12px;
+}
+
+body[data-debug-window="true"] .debug-btn {
+  padding: 9px 12px;
+  font-size: 12.5px;
+  border-radius: 8px;
+}
+
+body[data-debug-window="true"] .debug-btn:active {
+  transform: scale(0.97);
+}
+
+body[data-debug-window="true"] .debug-toggle-row {
+  padding: 8px 4px;
+  font-size: 12.5px;
+}

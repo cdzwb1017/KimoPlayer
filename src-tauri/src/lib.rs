@@ -8,6 +8,7 @@ use lofty::picture::{Picture, PictureType, MimeType};
 use serde::Serialize;
 use std::path::Path;
 use walkdir::WalkDir;
+use rusqlite::{params, Connection};
 
 // Windows API for preventing sleep
 #[cfg(target_os = "windows")]
@@ -70,8 +71,9 @@ pub struct AudioMetadata {
 
 use std::hash::{Hash, Hasher};
 use std::collections::hash_map::DefaultHasher;
-use std::sync::{Mutex, OnceLock};
-use tauri::{Manager, Emitter};
+use std::sync::{Arc, Mutex, OnceLock};
+use tauri::{AppHandle, Emitter, Manager, Window, Listener};
+use tauri_plugin_dialog::DialogExt;
 use tauri::menu::{Menu, MenuItem, CheckMenuItem, PredefinedMenuItem};
 use tauri::tray::{TrayIcon, TrayIconBuilder};
 
@@ -253,7 +255,7 @@ async fn set_desktop_lyrics_visible(app: tauri::AppHandle, visible: bool) -> Res
         "desktop-lyrics",
         tauri::WebviewUrl::App("desktop-lyrics.html".into()),
     )
-    .title("KiomPlayer 桌面歌词")
+    .title("KimoPlayer 桌面歌词")
     .inner_size(620.0, 104.0)
     .min_inner_size(320.0, 72.0)
     .decorations(false)
@@ -263,10 +265,24 @@ async fn set_desktop_lyrics_visible(app: tauri::AppHandle, visible: bool) -> Res
     .skip_taskbar(true)
     .resizable(true)
     .center()
-    .build()
-    .map_err(|e| e.to_string())?;
+    .build();
+
+    // 竞态容错：并发调用下 label 可能已存在（build 报错），复用已有窗口
+    let window = match window {
+        Ok(w) => w,
+        Err(_) => {
+            if let Some(w) = app.get_webview_window("desktop-lyrics") {
+                let _ = w.set_shadow(false);
+                let _ = w.show();
+                let _ = w.set_focus();
+                return Ok(());
+            }
+            return Err("创建桌面歌词窗口失败".to_string());
+        }
+    };
 
     let _ = window.set_shadow(false);
+    let _ = window.show();
 
     Ok(())
 }
@@ -744,6 +760,413 @@ fn is_sleep_prevented() -> Result<bool, String> {
     {
         Ok(false)
     }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// LunaBeat 局域网音源 HTTP 代理（绕过 CORS + SSRF 防护 + 自动重连）
+// ═══════════════════════════════════════════════════════════════
+
+use std::collections::HashSet;
+
+static LUNA_COOKIE: OnceLock<Mutex<Option<String>>> = OnceLock::new();
+static LUNA_ALLOWED_HOSTS: OnceLock<Mutex<HashSet<String>>> = OnceLock::new();
+static LUNA_HTTP_CLIENT: OnceLock<reqwest::Client> = OnceLock::new();
+
+fn luna_cookie_store() -> &'static Mutex<Option<String>> {
+    LUNA_COOKIE.get_or_init(|| Mutex::new(None))
+}
+
+fn luna_allowed_hosts() -> &'static Mutex<HashSet<String>> {
+    LUNA_ALLOWED_HOSTS.get_or_init(|| Mutex::new(HashSet::new()))
+}
+
+/// 全局复用的 reqwest::Client（连接池 + TLS 会话复用，避免每次请求重建客户端）
+/// 不设全局超时，由各调用方按需用 .timeout() 覆盖
+fn luna_http_client() -> &'static reqwest::Client {
+    LUNA_HTTP_CLIENT.get_or_init(|| {
+        reqwest::Client::builder()
+            .no_proxy()
+            .build()
+            .expect("reqwest::Client 构建失败")
+    })
+}
+
+/// 从 URL 字符串解析 host 与 port（仅支持 http/https），返回 (host, port)
+fn parse_luna_host_port(raw_url: &str) -> Option<(String, u16)> {
+    let after_scheme = if raw_url.starts_with("http://") {
+        &raw_url[7..]
+    } else if raw_url.starts_with("https://") {
+        &raw_url[8..]
+    } else {
+        return None;
+    };
+    let end = after_scheme.find(|c| c == '/' || c == '?' || c == '#').unwrap_or(after_scheme.len());
+    let host_port = &after_scheme[..end];
+    let (host, port) = if let Some(colon_idx) = host_port.rfind(':') {
+        let h = &host_port[..colon_idx];
+        // 支持 [::1]:8080 形式的 IPv6
+        if h.starts_with('[') && h.ends_with(']') {
+            let inner = &h[1..h.len() - 1];
+            let p: u16 = host_port[colon_idx + 1..].parse().ok()?;
+            (inner.to_string(), p)
+        } else {
+            let p: u16 = host_port[colon_idx + 1..].parse().ok()?;
+            (h.to_string(), p)
+        }
+    } else {
+        (host_port.to_string(), if raw_url.starts_with("https://") { 443 } else { 80 })
+    };
+    if host.is_empty() { return None; }
+    Some((host, port))
+}
+
+/// 校验 URL 是否在已认证的 LunaBeat 服务器白名单内（SSRF 防护）
+fn validate_luna_url(raw_url: &str) -> Result<(), String> {
+    if !raw_url.starts_with("http://") && !raw_url.starts_with("https://") {
+        return Err("仅支持 http/https 协议".into());
+    }
+    let (host, port) = parse_luna_host_port(raw_url).ok_or("无效的 URL")?;
+    let host_key = format!("{}:{}", host, port);
+    let hosts = luna_allowed_hosts().lock().map_err(|e| e.to_string())?;
+    if hosts.is_empty() {
+        return Err("LunaBeat 尚未认证".into());
+    }
+    if !hosts.contains(&host_key) {
+        return Err(format!("目标主机不在已认证列表: {}", host_key));
+    }
+    Ok(())
+}
+
+#[tauri::command]
+async fn luna_proxy_get(url: String) -> Result<String, String> {
+    validate_luna_url(&url)?;
+    let client = luna_http_client();
+
+    // 取出 cookie 后立即 drop guard，避免跨 await 持锁
+    let cookie = {
+        let guard = luna_cookie_store().lock().map_err(|e| e.to_string())?;
+        guard.clone()
+    };
+
+    let mut req = client.get(&url).timeout(std::time::Duration::from_secs(30));
+    if let Some(ref c) = cookie {
+        req = req.header("Cookie", c);
+    }
+    let resp = req.send().await.map_err(|e| e.to_string())?;
+
+    // 401 / pairing_required：清除认证态，提示前端重新登录
+    let status = resp.status();
+    if status.as_u16() == 401 {
+        let mut store = luna_cookie_store().lock().map_err(|e| e.to_string())?;
+        *store = None;
+        return Err("pairing_required".into());
+    }
+    let text = resp.text().await.map_err(|e| e.to_string())?;
+    if text.contains("\"pairing_required\"") || text.contains("\"error\":\"pairing_required\"") {
+        let mut store = luna_cookie_store().lock().map_err(|e| e.to_string())?;
+        *store = None;
+        return Err("pairing_required".into());
+    }
+    if !status.is_success() {
+        return Err(format!("HTTP {}: {}", status.as_u16(), text));
+    }
+    Ok(text)
+}
+
+#[tauri::command]
+async fn luna_proxy_post(url: String, body: String) -> Result<String, String> {
+    let (host, port) = parse_luna_host_port(&url).ok_or("无效的 URL".to_string())?;
+    let host_key = format!("{}:{}", host, port);
+    let is_auth_request = url.contains("/api/auth");
+
+    // 非认证请求需要校验白名单；认证请求允许任意 host，成功后再加入白名单
+    if !is_auth_request {
+        validate_luna_url(&url)?;
+    }
+
+    let client = luna_http_client();
+
+    let cookie = {
+        let guard = luna_cookie_store().lock().map_err(|e| e.to_string())?;
+        guard.clone()
+    };
+
+    let mut req = client.post(&url)
+        .timeout(std::time::Duration::from_secs(30))
+        .header("Content-Type", "application/json")
+        .body(body);
+    if let Some(ref c) = cookie {
+        req = req.header("Cookie", c);
+    }
+    let resp = req.send().await.map_err(|e| e.to_string())?;
+
+    // 保存 cookie（加锁后立即释放）
+    if let Some(set_cookie) = resp.headers().get("set-cookie") {
+        if let Ok(cookie_str) = set_cookie.to_str() {
+            let session_cookie = cookie_str.split(';').next().unwrap_or("").to_string();
+            if !session_cookie.is_empty() {
+                let mut store = luna_cookie_store().lock().map_err(|e| e.to_string())?;
+                *store = Some(session_cookie);
+            }
+        }
+    }
+
+    let status = resp.status();
+    let text = resp.text().await.map_err(|e| e.to_string())?;
+
+    // 认证成功：单服务器场景先清空白名单再加入新 host，防止旧 host 残留被滥用
+    if is_auth_request && status.is_success() {
+        if text.contains("\"authenticated\"") && text.contains("true") {
+            let mut hosts = luna_allowed_hosts().lock().map_err(|e| e.to_string())?;
+            hosts.clear();
+            hosts.insert(host_key);
+        }
+    }
+
+    if !status.is_success() {
+        return Err(format!("HTTP {}: {}", status.as_u16(), text));
+    }
+    Ok(text)
+}
+
+#[tauri::command]
+async fn luna_proxy_download(url: String) -> Result<Vec<u8>, String> {
+    validate_luna_url(&url)?;
+    let client = luna_http_client();
+
+    let cookie = {
+        let guard = luna_cookie_store().lock().map_err(|e| e.to_string())?;
+        guard.clone()
+    };
+
+    let mut req = client.get(&url).timeout(std::time::Duration::from_secs(300));
+    if let Some(ref c) = cookie {
+        req = req.header("Cookie", c);
+    }
+    let resp = req.send().await.map_err(|e| e.to_string())?;
+    let status = resp.status();
+    if status.as_u16() == 401 {
+        let mut store = luna_cookie_store().lock().map_err(|e| e.to_string())?;
+        *store = None;
+        return Err("pairing_required".into());
+    }
+    if !status.is_success() {
+        let text = resp.text().await.unwrap_or_default();
+        return Err(format!("HTTP {}: {}", status.as_u16(), text));
+    }
+    let bytes = resp.bytes().await.map_err(|e| e.to_string())?;
+    Ok(bytes.to_vec())
+}
+
+// ═══════════════════════════════════════════════════════════════
+// LunaBeat 本地 HTTP 音频流代理服务器（分段 Range 请求 + 流式播放）
+// ═══════════════════════════════════════════════════════════════
+
+use std::sync::atomic::{AtomicU16, Ordering};
+use tokio::net::TcpListener;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+static LUNA_PROXY_PORT: AtomicU16 = AtomicU16::new(0);
+
+#[tauri::command]
+fn get_luna_proxy_port() -> u16 {
+    LUNA_PROXY_PORT.load(Ordering::Relaxed)
+}
+
+fn percent_decode_url(s: &str) -> String {
+    let mut bytes = Vec::new();
+    let mut chars = s.bytes();
+    while let Some(b) = chars.next() {
+        if b == b'%' {
+            let h1 = chars.next();
+            let h2 = chars.next();
+            if let (Some(h1), Some(h2)) = (h1, h2) {
+                let hex_str = [h1, h2];
+                if let Ok(s) = std::str::from_utf8(&hex_str) {
+                    if let Ok(val) = u8::from_str_radix(s, 16) {
+                        bytes.push(val);
+                        continue;
+                    }
+                }
+            }
+        } else if b == b'+' {
+            bytes.push(b' ');
+        } else {
+            bytes.push(b);
+        }
+    }
+    String::from_utf8_lossy(&bytes).to_string()
+}
+
+/// 在缓冲区中查找 HTTP 请求头结束标志 \r\n\r\n，返回其起始位置
+fn find_header_end(buf: &[u8]) -> Option<usize> {
+    if buf.len() < 4 { return None; }
+    for i in 0..=(buf.len() - 4) {
+        if &buf[i..i + 4] == b"\r\n\r\n" {
+            return Some(i);
+        }
+    }
+    None
+}
+
+fn start_luna_audio_proxy_server() {
+    tauri::async_runtime::spawn(async move {
+        let listener = match TcpListener::bind("127.0.0.1:0").await {
+            Ok(l) => l,
+            Err(e) => {
+                eprintln!("[LunaProxyServer] 无法绑定端口: {}", e);
+                return;
+            }
+        };
+
+        if let Ok(addr) = listener.local_addr() {
+            let port = addr.port();
+            LUNA_PROXY_PORT.store(port, Ordering::Relaxed);
+            println!("[LunaProxyServer] 本地音频流式代理已启动: http://127.0.0.1:{}", port);
+        }
+
+        // 并发限流：用户快速拖动进度条会触发多个 Range 请求，旧连接不主动取消会堆积
+        // 占用文件描述符和上游带宽。最多 4 个并发，超出时排队等待
+        let concurrency_limit = Arc::new(tokio::sync::Semaphore::new(4));
+
+        loop {
+            let (mut socket, _) = match listener.accept().await {
+                Ok(res) => res,
+                Err(_) => continue,
+            };
+
+            let permit_clone = concurrency_limit.clone();
+            tauri::async_runtime::spawn(async move {
+                // 循环读取直到遇到 \r\n\r\n（请求头结束），最多 64KB 避免恶意长头
+                let mut buf: Vec<u8> = Vec::with_capacity(8192);
+                let mut tmp = [0u8; 4096];
+                let header_end_pos;
+                loop {
+                    let n = match socket.read(&mut tmp).await {
+                        Ok(n) if n > 0 => n,
+                        _ => return,
+                    };
+                    buf.extend_from_slice(&tmp[..n]);
+                    if let Some(pos) = find_header_end(&buf) {
+                        header_end_pos = pos;
+                        break;
+                    }
+                    if buf.len() > 65536 {
+                        let _ = socket.write_all(b"HTTP/1.1 431 Request Header Fields Too Large\r\nConnection: close\r\n\r\n").await;
+                        return;
+                    }
+                }
+                let req_str = String::from_utf8_lossy(&buf[..header_end_pos + 4]);
+
+                let first_line = req_str.lines().next().unwrap_or("");
+                if !first_line.starts_with("GET ") {
+                    let _ = socket.write_all(b"HTTP/1.1 400 Bad Request\r\nConnection: close\r\n\r\n").await;
+                    return;
+                }
+
+                // 提取 Range 请求头（用于 HTML5 <audio> 分段拖动 Seeking）
+                let mut range_header: Option<String> = None;
+                for line in req_str.lines() {
+                    let line_lower = line.to_lowercase();
+                    if line_lower.starts_with("range:") {
+                        range_header = Some(line[6..].trim().to_string());
+                        break;
+                    }
+                }
+
+                // 提取 URL 中的 target url
+                let path_and_query = first_line.split_whitespace().nth(1).unwrap_or("");
+                let raw_url = if let Some(idx) = path_and_query.find("url=") {
+                    &path_and_query[idx + 4..]
+                } else {
+                    ""
+                };
+                let target_url = percent_decode_url(raw_url.split('&').next().unwrap_or(raw_url));
+
+                if target_url.is_empty() {
+                    let _ = socket.write_all(b"HTTP/1.1 400 Bad Request\r\nConnection: close\r\n\r\n").await;
+                    return;
+                }
+
+                // SSRF 防护：校验目标 URL 必须在已认证的 LunaBeat 服务器白名单内
+                if let Err(err_msg) = validate_luna_url(&target_url) {
+                    let resp = format!("HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\n{}", err_msg);
+                    let _ = socket.write_all(resp.as_bytes()).await;
+                    return;
+                }
+
+                // 获取并发许可：在所有快速失败检查通过后再占用配额，避免无效请求挤占真实播放请求
+                let _permit = match permit_clone.acquire().await {
+                    Ok(p) => p,
+                    Err(_) => return,
+                };
+
+                let cookie = {
+                    let guard = luna_cookie_store().lock().unwrap_or_else(|e| e.into_inner());
+                    guard.clone()
+                };
+
+                let client = luna_http_client();
+
+                let mut req = client.get(&target_url);
+                if let Some(ref c) = cookie {
+                    req = req.header("Cookie", c);
+                }
+                if let Some(ref r) = range_header {
+                    req = req.header("Range", r);
+                }
+
+                let mut resp = match req.send().await {
+                    Ok(r) => r,
+                    Err(e) => {
+                        let err_resp = format!("HTTP/1.1 502 Bad Gateway\r\nConnection: close\r\n\r\n{}", e);
+                        let _ = socket.write_all(err_resp.as_bytes()).await;
+                        return;
+                    }
+                };
+
+                let status = resp.status();
+                let status_code = status.as_u16();
+                let status_text = status.canonical_reason().unwrap_or("OK");
+
+                let mut response_headers = format!(
+                    "HTTP/1.1 {} {}\r\nAccess-Control-Allow-Origin: *\r\nAccess-Control-Allow-Headers: *\r\n",
+                    status_code, status_text
+                );
+
+                // 检测上游是否使用 Transfer-Encoding: chunked
+                // 若是，则不透传 content-length（reqwest 已解码 chunk，原长度已不匹配）
+                let is_chunked = resp.headers().get("transfer-encoding")
+                    .and_then(|v| v.to_str().ok())
+                    .map(|v| v.to_lowercase().contains("chunked"))
+                    .unwrap_or(false);
+
+                for header_name in &["content-type", "content-length", "content-range", "accept-ranges"] {
+                    if *header_name == "content-length" && is_chunked {
+                        continue;
+                    }
+                    if let Some(val) = resp.headers().get(*header_name) {
+                        if let Ok(v_str) = val.to_str() {
+                            response_headers.push_str(&format!("{}: {}\r\n", header_name, v_str));
+                        }
+                    }
+                }
+                response_headers.push_str("Connection: close\r\n\r\n");
+
+                if socket.write_all(response_headers.as_bytes()).await.is_err() {
+                    return;
+                }
+
+                // 边接收 reqwest 字节块边实时写入 TCP socket，实现流式开播
+                // 写入失败（对端关闭）即跳出，释放 permit 让排队请求继续
+                while let Ok(Some(chunk)) = resp.chunk().await {
+                    if socket.write_all(&chunk).await.is_err() {
+                        break;
+                    }
+                }
+            });
+        }
+    });
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -2851,7 +3274,7 @@ fn update_tray_info(
     let indicator = if state.is_playing { " ▶" } else { " ⏸" };
     let tooltip = match &song_info {
         Some(info) => format!("{}{}", info, indicator),
-        None => "KiomPlayer".to_string(),
+        None => "KimoPlayer".to_string(),
     };
     let _ = tray_state.0.set_tooltip(Some(&tooltip));
 
@@ -2874,6 +3297,147 @@ struct DownloadProgress {
     downloaded: u64,
     total: u64,
     percent: f64,
+}
+
+/// 字体下载进度事件 payload
+#[derive(Clone, serde::Serialize)]
+struct FontDownloadProgress {
+    filename: String,
+    downloaded: u64,
+    total: u64,
+    percent: f64,
+}
+
+/// 应用内下载字体文件到安装目录 resources/fonts（不可写时回退应用数据目录）。
+/// 支持 zip 包内提取（extract 指定条目）；流式下载并推送 font-download-progress 事件。
+#[tauri::command]
+async fn download_font(
+    app: tauri::AppHandle,
+    url: String,
+    filename: String,
+    extract: Option<String>,
+) -> Result<String, String> {
+    use futures_util::StreamExt;
+    use std::io::Write;
+
+    // 目标目录：优先资源目录（安装目录 resources/fonts），
+    // 通过写探针验证可写性（Program Files 等只读位置 create_dir_all 也会成功），失败回退应用数据目录
+    let resource_dir = app.path().resource_dir().map_err(|e| e.to_string())?;
+    let fonts_dir = resource_dir.join("fonts");
+    let data_fallback = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| e.to_string())?
+        .join("fonts");
+
+    fn dir_writable(dir: &std::path::Path) -> bool {
+        let probe = dir.join(".kimo-write-probe");
+        match std::fs::File::create(&probe) {
+            Ok(mut f) => {
+                use std::io::Write;
+                let _ = f.write_all(b"ok");
+                let _ = std::fs::remove_file(&probe);
+                true
+            }
+            Err(_) => false,
+        }
+    }
+
+    let dir = if std::fs::create_dir_all(&fonts_dir).is_ok() && dir_writable(&fonts_dir) {
+        fonts_dir
+    } else {
+        std::fs::create_dir_all(&data_fallback).map_err(|e| e.to_string())?;
+        data_fallback
+    };
+    let target = dir.join(&filename);
+    // 原子写：先写 .part 临时文件，完成后 rename 覆盖——主窗口与其它窗口并发下载时不会交叉写坏目标文件
+    let part_path = dir.join(format!("{filename}.part"));
+
+    // 纵深防御：仅允许纯文件名（拒绝路径分隔符 / ..，防路径穿越）
+    if (filename.contains('/') || filename.contains('\\') || filename.contains("..")) {
+        return Err("非法的文件名".to_string());
+    }
+
+    // 已存在且非空 → 幂等返回
+    if target.exists()
+        && target
+            .metadata()
+            .map(|m| m.len() > 0)
+            .unwrap_or(false)
+    {
+        return Ok(target.to_string_lossy().to_string());
+    }
+
+    // 失败时清理残留文件：避免截断文件被幂等判断误认为已安装
+    let cleanup = |err: String| -> String {
+        let _ = std::fs::remove_file(&part_path);
+        err
+    };
+
+    let client = reqwest::Client::new();
+    let resp = client
+        .get(&url)
+        .send()
+        .await
+        .map_err(|e| cleanup(format!("下载失败：{e}")))?;
+    if !resp.status().is_success() {
+        return Err(cleanup(format!("下载失败：HTTP {}", resp.status())));
+    }
+    let total = resp.content_length().unwrap_or(0);
+    let mut stream = resp.bytes_stream();
+    let mut downloaded: u64 = 0;
+
+    let emit_progress = |downloaded: u64| {
+        let percent = if total > 0 {
+            (downloaded as f64 / total as f64) * 100.0
+        } else {
+            0.0
+        };
+        let _ = app.emit(
+            "font-download-progress",
+            FontDownloadProgress {
+                filename: filename.clone(),
+                downloaded,
+                total,
+                percent,
+            },
+        );
+    };
+
+    if let Some(entry_name) = extract {
+        // zip 包：先下载到内存，再解压出目标条目
+        let mut buf: Vec<u8> = Vec::new();
+        while let Some(chunk) = stream.next().await {
+            let chunk = chunk.map_err(|e| cleanup(format!("下载中断：{e}")))?;
+            buf.extend_from_slice(&chunk);
+            downloaded += chunk.len() as u64;
+            emit_progress(downloaded);
+        }
+        let reader = std::io::Cursor::new(buf);
+        let mut archive =
+            zip::ZipArchive::new(reader).map_err(|e| cleanup(format!("压缩包解析失败：{e}")))?;
+        let mut entry = archive
+            .by_name(&entry_name)
+            .map_err(|e| cleanup(format!("压缩包中未找到 {entry_name}：{e}")))?;
+        let mut file = std::fs::File::create(&part_path).map_err(|e| cleanup(e.to_string()))?;
+        std::io::copy(&mut entry, &mut file).map_err(|e| cleanup(e.to_string()))?;
+    } else {
+        // 普通字体文件：流式写入 .part 临时文件
+        let mut file = std::fs::File::create(&part_path).map_err(|e| cleanup(e.to_string()))?;
+        while let Some(chunk) = stream.next().await {
+            let chunk = chunk.map_err(|e| cleanup(format!("下载中断：{e}")))?;
+            file.write_all(&chunk).map_err(|e| cleanup(e.to_string()))?;
+            downloaded += chunk.len() as u64;
+            emit_progress(downloaded);
+        }
+    }
+    emit_progress(downloaded);
+    // 原子落盘：rename 覆盖目标（Windows 上目标已存在时 replace 更稳）
+    if target.exists() {
+        std::fs::remove_file(&target).map_err(|e| cleanup(e.to_string()))?;
+    }
+    std::fs::rename(&part_path, &target).map_err(|e| cleanup(e.to_string()))?;
+    Ok(target.to_string_lossy().to_string())
 }
 
 /// 下载安装包并静默安装（流式下载 + 进度推送）
@@ -3012,6 +3576,377 @@ fn take_pending_file(state: tauri::State<'_, PendingFile>) -> Option<String> {
     state.0.lock().unwrap().take()
 }
 
+// ══════════════════════════════════════════════════════════════════════════
+// ═══ SQLite 歌库持久化模块 ═══
+// ══════════════════════════════════════════════════════════════════════════
+
+fn db_path(app: &tauri::AppHandle) -> Result<std::path::PathBuf, String> {
+    let data_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    std::fs::create_dir_all(&data_dir).map_err(|e| e.to_string())?;
+    Ok(data_dir.join("library.db"))
+}
+
+fn row_to_metadata(row: &rusqlite::Row) -> rusqlite::Result<AudioMetadata> {
+    Ok(AudioMetadata {
+        file_path: row.get(0)?,
+        title: row.get(1)?,
+        artist: row.get(2)?,
+        album: row.get(3)?,
+        duration: row.get::<_, Option<i64>>(4)?.map(|v| v as u64),
+        year: row.get::<_, Option<i32>>(5)?.map(|v| v as u32),
+        track_number: row.get::<_, Option<i32>>(6)?.map(|v| v as u32),
+        disc_number: row.get::<_, Option<i32>>(7)?.map(|v| v as u32),
+        genre: row.get(8)?,
+        album_artist: row.get(9)?,
+        bitrate: row.get::<_, Option<i32>>(10)?.map(|v| v as u32),
+        sample_rate: row.get::<_, Option<i32>>(11)?.map(|v| v as u32),
+        bit_depth: row.get::<_, Option<i32>>(12)?.map(|v| v as u8),
+        cover_image: row.get(13)?,
+        composer: None,
+        lyricist: None,
+        comment: None,
+        lyrics: None,
+    })
+}
+
+/// 共享的 SQLite 连接状态（惰性初始化 + schema 迁移）
+#[derive(Clone, Default)]
+struct LibraryDb(Arc<Mutex<Option<Connection>>>);
+
+/// 确保数据库连接已初始化（打开、WAL、迁移），返回连接 Arc。
+fn ensure_db(app: &tauri::AppHandle) -> Result<Arc<Mutex<Option<Connection>>>, String> {
+    let db = app.state::<LibraryDb>().inner().0.clone();
+    let mut guard = db.lock().map_err(|e| e.to_string())?;
+    if guard.is_none() {
+        let path = db_path(app)?;
+        let conn = Connection::open(&path).map_err(|e| e.to_string())?;
+        // WAL 提升并发读性能；PRAGMA 只对当前连接生效，因此每次打开都设置
+        conn.execute_batch("PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL;")
+            .map_err(|e| e.to_string())?;
+        migrate_schema(&conn)?;
+        *guard = Some(conn);
+    }
+    drop(guard);
+    Ok(db)
+}
+
+/// 只读访问数据库连接（复用单例，不再每次 open）。
+fn with_db<T>(app: &tauri::AppHandle, f: impl FnOnce(&Connection) -> Result<T, String>) -> Result<T, String> {
+    let db = ensure_db(app)?;
+    let guard = db.lock().map_err(|e| e.to_string())?;
+    f(guard.as_ref().expect("connection initialized"))
+}
+
+/// 可写访问数据库连接。
+fn with_db_mut<T>(app: &tauri::AppHandle, f: impl FnOnce(&mut Connection) -> Result<T, String>) -> Result<T, String> {
+    let db = ensure_db(app)?;
+    let mut guard = db.lock().map_err(|e| e.to_string())?;
+    f(guard.as_mut().expect("connection initialized"))
+}
+
+/// Schema 迁移：基于 PRAGMA user_version 逐级升级。
+/// 旧库（v0，已有 songs 表）会自动补建索引与 FTS5 全文索引，无需删库重扫。
+fn migrate_schema(conn: &Connection) -> Result<(), String> {
+    let version: i64 = conn
+        .query_row("PRAGMA user_version", [], |row| row.get(0))
+        .map_err(|e| e.to_string())?;
+
+    if version < 1 {
+        conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS songs (
+                file_path     TEXT PRIMARY KEY,
+                title         TEXT,
+                artist        TEXT,
+                album         TEXT,
+                duration      INTEGER,
+                year          INTEGER,
+                track_number  INTEGER,
+                disc_number   INTEGER,
+                genre         TEXT,
+                album_artist  TEXT,
+                bitrate       INTEGER,
+                sample_rate   INTEGER,
+                bit_depth     INTEGER,
+                cover_path    TEXT,
+                last_modified INTEGER,
+                indexed_at    INTEGER
+            );
+            CREATE INDEX IF NOT EXISTS idx_artist ON songs(artist);
+            CREATE INDEX IF NOT EXISTS idx_album  ON songs(album);
+            CREATE INDEX IF NOT EXISTS idx_genre  ON songs(genre);
+            -- 列表页按标题排序分页，补一个可用的排序索引
+            CREATE INDEX IF NOT EXISTS idx_title_nocase ON songs(title COLLATE NOCASE);"
+        ).map_err(|e| e.to_string())?;
+
+        // FTS5 全文索引：部分环境可能未编译 FTS5，失败时自动降级为 LIKE 搜索
+        let fts_ok = conn.execute_batch(
+            "CREATE VIRTUAL TABLE IF NOT EXISTS songs_fts USING fts5(title, artist, album, tokenize='unicode61');
+             CREATE TRIGGER IF NOT EXISTS songs_fts_ai AFTER INSERT ON songs BEGIN
+               INSERT INTO songs_fts(rowid, title, artist, album)
+               VALUES (new.rowid, new.title, new.artist, new.album);
+             END;
+             CREATE TRIGGER IF NOT EXISTS songs_fts_ad AFTER DELETE ON songs BEGIN
+               DELETE FROM songs_fts WHERE rowid = old.rowid;
+             END;
+             CREATE TRIGGER IF NOT EXISTS songs_fts_au AFTER UPDATE ON songs BEGIN
+               DELETE FROM songs_fts WHERE rowid = old.rowid;
+               INSERT INTO songs_fts(rowid, title, artist, album)
+               VALUES (new.rowid, new.title, new.artist, new.album);
+             END;
+             -- 回填已有歌曲（旧库升级场景）
+             INSERT INTO songs_fts(rowid, title, artist, album)
+               SELECT rowid, title, artist, album FROM songs;"
+        ).is_ok();
+        if !fts_ok {
+            eprintln!("[library-db] FTS5 unavailable, search falls back to LIKE");
+        }
+
+        conn.execute_batch("PRAGMA user_version = 1;").map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
+#[tauri::command]
+fn init_library_db(app: tauri::AppHandle) -> Result<(), String> {
+    ensure_db(&app)?;
+    Ok(())
+}
+
+#[tauri::command]
+async fn scan_and_index_library(app: tauri::AppHandle, dirs: Vec<String>) -> Result<u32, String> {
+    let db = app.state::<LibraryDb>().inner().0.clone();
+    let app_handle = app.clone();
+    tokio::task::spawn_blocking(move || {
+        // 初始化连接（与 ensure_db 相同逻辑，在 blocking 线程内持锁）
+        let mut guard = db.lock().map_err(|e| e.to_string())?;
+        if guard.is_none() {
+            let path = db_path(&app_handle)?;
+            let conn = Connection::open(&path).map_err(|e| e.to_string())?;
+            conn.execute_batch("PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL;")
+                .map_err(|e| e.to_string())?;
+            migrate_schema(&conn)?;
+            *guard = Some(conn);
+        }
+        let conn = guard.as_mut().expect("connection initialized");
+
+        // 1. 收集所有音频文件
+        let extensions = ["mp3", "flac", "wav", "ape", "m4a", "ogg", "aac", "wma", "opus", "aiff"];
+        let mut all_files: Vec<String> = Vec::new();
+        for dir in &dirs {
+            for entry in WalkDir::new(dir).into_iter().filter_map(|e| e.ok()) {
+                if let Some(ext) = entry.path().extension() {
+                    let ext_lower = ext.to_string_lossy().to_lowercase();
+                    if extensions.contains(&ext_lower.as_str()) {
+                        all_files.push(entry.path().to_string_lossy().into_owned());
+                    }
+                }
+            }
+        }
+        all_files.sort();
+        all_files.dedup();
+
+        let total = all_files.len() as u32;
+        let mut indexed: u32 = 0;
+
+        // 2. 单事务内完成增量索引 + 失效清理，中途失败整体回滚，避免半成品数据
+        let tx = conn.transaction().map_err(|e| e.to_string())?;
+        for (i, file_path) in all_files.iter().enumerate() {
+            let path_obj = std::path::Path::new(file_path);
+            let file_name = path_obj.file_stem()
+                .unwrap_or_default()
+                .to_string_lossy()
+                .to_string();
+
+            // 获取文件 mtime
+            let mtime = std::fs::metadata(path_obj)
+                .and_then(|m| m.modified())
+                .ok()
+                .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+                .map(|d| d.as_secs() as i64)
+                .unwrap_or(0);
+
+            // 检查 DB 中是否已有相同 mtime 的记录
+            let existing_mtime: Option<i64> = tx.query_row(
+                "SELECT last_modified FROM songs WHERE file_path = ?1",
+                [file_path.as_str()],
+                |row| row.get(0),
+            ).ok();
+
+            // 推送扫描进度
+            let _ = app_handle.emit("scan-progress", serde_json::json!({
+                "current": i + 1,
+                "total": total,
+                "title": &file_name,
+                "skipped": existing_mtime == Some(mtime) && mtime > 0
+            }));
+
+            if existing_mtime == Some(mtime) && mtime > 0 {
+                continue; // 文件未修改，跳过
+            }
+
+            // 调用现有函数读取元数据
+            match read_audio_metadata(app_handle.clone(), file_path.clone()) {
+                Ok(meta) => {
+                    let now = chrono::Utc::now().timestamp();
+                    tx.execute(
+                        "INSERT OR REPLACE INTO songs (file_path, title, artist, album, duration, year, track_number, disc_number, genre, album_artist, bitrate, sample_rate, bit_depth, cover_path, last_modified, indexed_at) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16)",
+                        params![
+                            meta.file_path,
+                            meta.title,
+                            meta.artist,
+                            meta.album,
+                            meta.duration.map(|d| d as i64),
+                            meta.year.map(|y| y as i32),
+                            meta.track_number.map(|t| t as i32),
+                            meta.disc_number.map(|d| d as i32),
+                            meta.genre,
+                            meta.album_artist,
+                            meta.bitrate.map(|b| b as i32),
+                            meta.sample_rate.map(|s| s as i32),
+                            meta.bit_depth.map(|b| b as i32),
+                            meta.cover_image,
+                            mtime,
+                            now
+                        ],
+                    ).map_err(|e| e.to_string())?;
+                    indexed += 1;
+                }
+                Err(e) => {
+                    eprintln!("[scan] Failed to read metadata for {}: {}", file_path, e);
+                }
+            }
+        }
+
+        // 3. 清理：用临时表保存现存路径，一次性删除磁盘上已不存在的记录
+        tx.execute_batch(
+            "CREATE TEMP TABLE IF NOT EXISTS _library_keep_paths(path TEXT PRIMARY KEY);
+             DELETE FROM _library_keep_paths;"
+        ).map_err(|e| e.to_string())?;
+        for file_path in &all_files {
+            tx.execute(
+                "INSERT OR IGNORE INTO _library_keep_paths(path) VALUES (?1)",
+                [file_path.as_str()],
+            ).map_err(|e| e.to_string())?;
+        }
+        let removed = tx.execute(
+            "DELETE FROM songs WHERE file_path NOT IN (SELECT path FROM _library_keep_paths)",
+            [],
+        ).map_err(|e| e.to_string())?;
+
+        tx.commit().map_err(|e| e.to_string())?;
+        eprintln!("[scan] indexed={}, removed={}", indexed, removed);
+        Ok(indexed)
+    }).await.map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+fn get_library_songs(app: tauri::AppHandle, offset: u32, limit: u32) -> Result<Vec<AudioMetadata>, String> {
+    with_db(&app, |conn| {
+        let mut stmt = conn.prepare(
+            "SELECT file_path, title, artist, album, duration, year, track_number, disc_number, genre, album_artist, bitrate, sample_rate, bit_depth, cover_path FROM songs ORDER BY title COLLATE NOCASE LIMIT ?1 OFFSET ?2"
+        ).map_err(|e| e.to_string())?;
+
+        let songs: Vec<AudioMetadata> = stmt.query_map(
+            params![limit as i64, offset as i64],
+            row_to_metadata,
+        )
+        .map_err(|e| e.to_string())?
+        .filter_map(|r| r.ok())
+        .collect();
+
+        Ok(songs)
+    })
+}
+
+#[tauri::command]
+fn search_library(app: tauri::AppHandle, query: String, limit: u32) -> Result<Vec<AudioMetadata>, String> {
+    let query = query.trim();
+    if query.is_empty() {
+        return Ok(Vec::new());
+    }
+    with_db(&app, |conn| {
+        // FTS5 可用时走全文索引；否则降级为 LIKE（带通配符转义）
+        let fts_available: bool = conn
+            .query_row(
+                "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'songs_fts'",
+                [],
+                |row| row.get::<_, i64>(0),
+            )
+            .map(|count| count > 0)
+            .unwrap_or(false);
+        if fts_available {
+            match search_library_fts(conn, query, limit) {
+                Ok(songs) => Ok(songs),
+                Err(e) => {
+                    // 纯标点等特殊输入可能触发 FTS5 语法错误，降级为 LIKE 搜索
+                    eprintln!("[library-db] FTS query failed, falling back to LIKE: {}", e);
+                    search_library_like(conn, query, limit)
+                }
+            }
+        } else {
+            search_library_like(conn, query, limit)
+        }
+    })
+}
+
+/// FTS5 全文搜索：查询词按空格拆分、AND 组合，标题/歌手/专辑任一命中，按相关性排序。
+/// unicode61 分词器不切分连续中文，因此所有词使用前缀匹配（"词"*），
+/// 可覆盖中文标题开头、英文词前缀等常见搜索场景。
+fn search_library_fts(conn: &Connection, query: &str, limit: u32) -> Result<Vec<AudioMetadata>, String> {
+    let terms: Vec<String> = query
+        .split_whitespace()
+        .map(|term| format!("\"{}\"*", term.replace('"', "\"\"")))
+        .collect();
+    let match_expr = terms
+        .iter()
+        .map(|term| format!("(title : {term} OR artist : {term} OR album : {term})"))
+        .collect::<Vec<_>>()
+        .join(" AND ");
+
+    let mut stmt = conn.prepare(
+        "SELECT file_path, title, artist, album, duration, year, track_number, disc_number, genre, album_artist, bitrate, sample_rate, bit_depth, cover_path
+         FROM songs WHERE rowid IN (
+             SELECT rowid FROM songs_fts WHERE songs_fts MATCH ?1 ORDER BY rank LIMIT ?2
+         )"
+    ).map_err(|e| e.to_string())?;
+
+    let songs: Vec<AudioMetadata> = stmt.query_map(
+        params![match_expr, limit as i64],
+        row_to_metadata,
+    )
+    .map_err(|e| e.to_string())?
+    .filter_map(|r| r.ok())
+    .collect();
+
+    Ok(songs)
+}
+
+/// LIKE 降级搜索：转义 % _ \ 通配符，避免用户输入被当作模式。
+fn search_library_like(conn: &Connection, query: &str, limit: u32) -> Result<Vec<AudioMetadata>, String> {
+    let escaped = query
+        .replace('\\', "\\\\")
+        .replace('%', "\\%")
+        .replace('_', "\\_");
+    let pattern = format!("%{escaped}%");
+
+    let mut stmt = conn.prepare(
+        "SELECT file_path, title, artist, album, duration, year, track_number, disc_number, genre, album_artist, bitrate, sample_rate, bit_depth, cover_path
+         FROM songs
+         WHERE title LIKE ?1 ESCAPE '\\' OR artist LIKE ?1 ESCAPE '\\' OR album LIKE ?1 ESCAPE '\\'
+         ORDER BY title COLLATE NOCASE LIMIT ?2"
+    ).map_err(|e| e.to_string())?;
+
+    let songs: Vec<AudioMetadata> = stmt.query_map(
+        params![pattern, limit as i64],
+        row_to_metadata,
+    )
+    .map_err(|e| e.to_string())?
+    .filter_map(|r| r.ok())
+    .collect();
+
+    Ok(songs)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -3032,6 +3967,26 @@ pub fn run() {
         }))
         .manage(PendingFile(Mutex::new(None)))
         .setup(|app| {
+            // 注册共享 SQLite 连接状态（惰性初始化，首次访问时打开 + 迁移）
+            app.manage(LibraryDb::default());
+            // 在 setup 阶段 Tokio 运行时已完全准备就绪，安全启动本地 HTTP 音频代理
+            start_luna_audio_proxy_server();
+
+            let handle = app.handle().clone();
+            app.listen("tray-quit", move |_| {
+                handle.exit(0);
+            });
+            let handle_show = app.handle().clone();
+            app.listen("tray-show-main", move |_| {
+                if let Some(window) = handle_show.get_webview_window("main") {
+                    let _ = window.show();
+                    let _ = window.unminimize();
+                    let _ = window.set_focus();
+                }
+                if let Some(tray) = handle_show.get_webview_window("tray-window") {
+                    let _ = tray.hide();
+                }
+            });
             // 检查是否通过文件关联启动（首次启动时前端还未注册监听器）
             let launch_args: Vec<String> = std::env::args().collect();
             if let Some(file_path) = extract_music_file_arg(&launch_args) {
@@ -3048,48 +4003,81 @@ pub fn run() {
                     let _ = window.set_icon(icon.clone());
                 }
 
-                let menu = build_tray_menu(app.handle())?;
+                let tray_window = tauri::WebviewWindowBuilder::new(
+                    app,
+                    "tray-window",
+                    tauri::WebviewUrl::App("tray-window.html".into())
+                )
+                .title("KimoPlayer Tray")
+                .inner_size(280.0, 340.0) // 设置更紧凑的高度避免底部留白过大
+                .decorations(false)
+                .transparent(true)
+                .shadow(true)
+                .always_on_top(true)
+                .skip_taskbar(true)
+                .resizable(false)
+                .visible(false)
+                .build()?;
+
+                let tray_win_clone = tray_window.clone();
+                tray_window.on_window_event(move |event| {
+                    if let tauri::WindowEvent::Focused(false) = event {
+                        let _ = tray_win_clone.hide();
+                    }
+                });
 
                 let _tray = TrayIconBuilder::with_id("main-tray")
                     .icon(icon.clone())
-                    .tooltip("KiomPlayer")
-                    .menu(&menu)
-                    .on_menu_event(|app, event| match event.id.as_ref() {
-                        "tray-quit" => {
-                            app.exit(0);
-                        }
-                        "tray-show" => {
-                            if let Some(window) = app.get_webview_window("main") {
-                                let _ = window.show();
-                                let _ = window.unminimize();
-                                let _ = window.set_focus();
-                            }
-                        }
-                        "tray-play-pause" => {
-                            let _ = app.emit("tray-play", ());
-                        }
-                        "tray-prev" => {
-                            let _ = app.emit("tray-prev", ());
-                        }
-                        "tray-next" => {
-                            let _ = app.emit("tray-next", ());
-                        }
-                        "tray-desktop-lyrics" => {
-                            let _ = app.emit("tray-toggle-desktop-lyrics", ());
-                        }
-                        "tray-settings" => {
-                            let _ = app.emit("tray-open-settings", ());
-                        }
-                        _ => {}
-                    })
+                    .tooltip("KimoPlayer")
                     .on_tray_icon_event(|tray: &tauri::tray::TrayIcon, event: tauri::tray::TrayIconEvent| {
-                        if let tauri::tray::TrayIconEvent::DoubleClick { .. } = event {
-                            let app = tray.app_handle();
-                            if let Some(window) = app.get_webview_window("main") {
-                                let _ = window.show();
-                                let _ = window.unminimize();
-                                let _ = window.set_focus();
+                        let app = tray.app_handle();
+                        match event {
+                            tauri::tray::TrayIconEvent::Click { position, button_state, .. } => {
+                                // 不再区分左右键，只要弹起就显示
+                                if button_state == tauri::tray::MouseButtonState::Up {
+                                    if let Some(window) = app.get_webview_window("tray-window") {
+                                        if window.is_visible().unwrap_or(false) {
+                                            let _ = window.hide();
+                                        } else {
+                                            if let Ok(Some(monitor)) = window.current_monitor() {
+                                                let scale_factor = monitor.scale_factor();
+                                                // 避免隐藏窗口 size = 0 导致溢出，强制计算物理尺寸
+                                                let width = (280.0 * scale_factor) as i32;
+                                                let height = (340.0 * scale_factor) as i32;
+                                                let m_size = monitor.size();
+                                                let m_pos = monitor.position();
+                                                
+                                                let mut x = position.x as i32 - (width / 2);
+                                                let mut y = position.y as i32 - height - 12;
+                                                
+                                                // 防止超出屏幕边界
+                                                if x + width > m_pos.x + (m_size.width as i32) {
+                                                    x = m_pos.x + (m_size.width as i32) - width - 10;
+                                                }
+                                                if x < m_pos.x {
+                                                    x = m_pos.x + 10;
+                                                }
+                                                if y < m_pos.y {
+                                                    y = position.y as i32 + 12;
+                                                }
+                                                
+                                                let _ = window.set_size(tauri::Size::Physical(tauri::PhysicalSize { width: width as u32, height: height as u32 }));
+                                                let _ = window.set_position(tauri::Position::Physical(tauri::PhysicalPosition { x, y }));
+                                            }
+                                            let _ = window.show();
+                                            let _ = window.set_focus();
+                                        }
+                                    }
+                                }
                             }
+                            tauri::tray::TrayIconEvent::DoubleClick { .. } => {
+                                if let Some(window) = app.get_webview_window("main") {
+                                    let _ = window.show();
+                                    let _ = window.unminimize();
+                                    let _ = window.set_focus();
+                                }
+                            }
+                            _ => {}
                         }
                     })
                     .build(app)?;
@@ -3117,6 +4105,7 @@ pub fn run() {
             is_fullscreen,
                         set_prevent_sleep,
             is_sleep_prevented,
+            download_font,
                                                 search_song_for_comments,
             fetch_song_comments,
             fetch_comment_replies,
@@ -3130,7 +4119,15 @@ pub fn run() {
             update_tray_info,
             show_main_window,
             download_and_install_update,
-            take_pending_file
+            take_pending_file,
+            luna_proxy_get,
+            luna_proxy_post,
+            luna_proxy_download,
+            get_luna_proxy_port,
+            init_library_db,
+            scan_and_index_library,
+            get_library_songs,
+            search_library
         ])
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
@@ -3143,4 +4140,108 @@ pub fn run() {
         })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+#[cfg(test)]
+mod library_db_tests {
+    use super::*;
+
+    fn insert_song(conn: &Connection, path: &str, title: &str, artist: &str, album: &str) {
+        conn.execute(
+            "INSERT OR REPLACE INTO songs (file_path, title, artist, album, duration, last_modified, indexed_at)
+             VALUES (?1,?2,?3,?4,0,0,0)",
+            params![path, title, artist, album],
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn migrate_creates_fts_and_version() {
+        let conn = Connection::open_in_memory().unwrap();
+        migrate_schema(&conn).unwrap();
+        let version: i64 = conn.query_row("PRAGMA user_version", [], |r| r.get(0)).unwrap();
+        assert_eq!(version, 1);
+        let fts: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='songs_fts'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(fts, 1);
+        // 幂等：重复迁移不报错
+        migrate_schema(&conn).unwrap();
+    }
+
+    #[test]
+    fn fts_syncs_on_insert_replace_and_delete() {
+        let conn = Connection::open_in_memory().unwrap();
+        migrate_schema(&conn).unwrap();
+        insert_song(&conn, "/a/1.mp3", "海阔天空", "Beyond", "乐与怒");
+        insert_song(&conn, "/a/2.mp3", "真的爱你", "Beyond", "秘密警察");
+        // REPLACE 触发 delete+insert 触发器，FTS 应同步为新值
+        insert_song(&conn, "/a/1.mp3", "海阔天空（remix）", "Beyond", "乐与怒");
+
+        let rows = search_library_fts(&conn, "海阔", 10).unwrap();
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].file_path, "/a/1.mp3");
+        assert_eq!(rows[0].title.as_deref(), Some("海阔天空（remix）"));
+
+        let rows2 = search_library_fts(&conn, "Beyond", 10).unwrap();
+        assert_eq!(rows2.len(), 2);
+
+        // 删除歌曲 → FTS 同步删除
+        conn.execute("DELETE FROM songs WHERE file_path = ?1", ["/a/2.mp3"]).unwrap();
+        let rows3 = search_library_fts(&conn, "Beyond", 10).unwrap();
+        assert_eq!(rows3.len(), 1);
+    }
+
+    #[test]
+    fn like_fallback_escapes_wildcards() {
+        let conn = Connection::open_in_memory().unwrap();
+        migrate_schema(&conn).unwrap();
+        insert_song(&conn, "/a/1.mp3", "100%真爱", "A_B", "x");
+        // 转义后 % 与 _ 按字面量匹配
+        assert_eq!(search_library_like(&conn, "100%", 10).unwrap().len(), 1);
+        assert_eq!(search_library_like(&conn, "A_", 10).unwrap().len(), 1);
+        assert_eq!(search_library_like(&conn, "10_", 10).unwrap().len(), 0);
+    }
+
+    #[test]
+    fn fts_punctuation_query_errors_then_like_still_works() {
+        // 纯标点输入在 FTS5 中不崩溃、返回空结果；LIKE 路径同样安全。
+        // （若某环境 FTS5 对这类输入报语法错误，上层 search_library 会降级 LIKE。）
+        let conn = Connection::open_in_memory().unwrap();
+        migrate_schema(&conn).unwrap();
+        insert_song(&conn, "/a/1.mp3", "!!", "Artist", "Album");
+        assert_eq!(search_library_fts(&conn, "!!", 10).unwrap().len(), 0);
+        assert_eq!(search_library_like(&conn, "!!", 10).unwrap().len(), 1);
+        // 正常词不受影响
+        assert_eq!(search_library_fts(&conn, "Artist", 10).unwrap().len(), 1);
+    }
+
+    #[test]
+    fn legacy_v0_db_upgrades_with_backfill() {
+        // 模拟旧库：只有 songs 表、user_version=0、已有数据
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch(
+            "CREATE TABLE songs (
+                file_path TEXT PRIMARY KEY, title TEXT, artist TEXT, album TEXT,
+                duration INTEGER, year INTEGER, track_number INTEGER, disc_number INTEGER,
+                genre TEXT, album_artist TEXT, bitrate INTEGER, sample_rate INTEGER,
+                bit_depth INTEGER, cover_path TEXT, last_modified INTEGER, indexed_at INTEGER
+            );
+            INSERT INTO songs (file_path, title, artist, album)
+            VALUES ('/old/1.mp3', '老歌', '老歌手', '老专辑');"
+        )
+        .unwrap();
+
+        migrate_schema(&conn).unwrap();
+        let version: i64 = conn.query_row("PRAGMA user_version", [], |r| r.get(0)).unwrap();
+        assert_eq!(version, 1);
+        // 旧数据已回填 FTS
+        let rows = search_library_fts(&conn, "老歌", 10).unwrap();
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].file_path, "/old/1.mp3");
+    }
 }

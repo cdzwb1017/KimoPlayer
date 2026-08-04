@@ -9,6 +9,12 @@ export function updateMarqueeState(element) {
     return;
   }
 
+  // 含音质徽标的容器（如播放条艺术家行）由 CSS ellipsis 截断处理，
+  // 跳过跑马灯——否则 textContent 化会把徽标 HTML 破坏成纯文本
+  if (element.querySelector('.song-audio-badges, .audio-badge')) {
+    return;
+  }
+
   // 获取原始纯文本
   const originalText = element.getAttribute('data-original-text') || element.textContent.trim();
   if (!element.hasAttribute('data-original-text')) {

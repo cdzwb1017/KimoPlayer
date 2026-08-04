@@ -1,5 +1,13 @@
 import { renderAudioQualityBadgesHtml, renderArtistWithBadgesHtml } from '../utils/audio-quality.js';
 
+// 转义文案，防止本地文件元数据（专辑/艺术家/流派名）注入 HTML
+const escapeHtml = (text) => String(text ?? '')
+  .replace(/&/g, '&amp;')
+  .replace(/</g, '&lt;')
+  .replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;')
+  .replace(/'/g, '&#39;');
+
 export const createLocalLibraryPage = ({
   player,
   getCoverSrc,
@@ -99,45 +107,95 @@ export const createLocalLibraryPage = ({
 
   const renderCategoryDetail = (listEl, filter) => {
     let filteredSongs = [];
-    let titleLabel = '';
-    let subtitleLabel = '';
+    let typeLabel = '';
+    let iconSvg = '';
 
     if (filter.type === 'album') {
       filteredSongs = getMusicLibrary().filter(s => (s.album || '未知专辑') === filter.name);
-      titleLabel = filter.name;
-      subtitleLabel = `专辑 · ${filteredSongs.length} 首歌曲`;
+      typeLabel = '专辑';
+      iconSvg = '<rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/>';
     } else if (filter.type === 'artist') {
       filteredSongs = getMusicLibrary().filter(s => (s.artist || '未知艺术家') === filter.name);
-      titleLabel = filter.name;
-      subtitleLabel = `艺术家 · ${filteredSongs.length} 首歌曲`;
+      typeLabel = '艺术家';
+      iconSvg = '<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>';
     } else if (filter.type === 'genre') {
       filteredSongs = getMusicLibrary().filter(s => (s.genre || '未知流派') === filter.name);
-      titleLabel = filter.name;
-      subtitleLabel = `流派 · ${filteredSongs.length} 首歌曲`;
+      typeLabel = '流派';
+      iconSvg = '<path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>';
     }
 
-    const header = document.createElement('div');
-    header.className = 'detail-header';
-    header.innerHTML = `
-      <button class="detail-back-btn" title="返回">
-      </button>
-      <div class="detail-title-info">
-        <div class="detail-title">${titleLabel}</div>
-        <div class="detail-subtitle">${subtitleLabel}</div>
+    const totalSeconds = filteredSongs.reduce((sum, s) => sum + (Number(s.duration) || 0), 0);
+    const fmtDuration = (sec) => {
+      const h = Math.floor(sec / 3600);
+      const m = Math.floor((sec % 3600) / 60);
+      const s = Math.floor(sec % 60);
+      return h > 0
+        ? `${h}小时${String(m).padStart(2, '0')}分`
+        : m > 0 ? `${m}分${String(s).padStart(2, '0')}秒` : `${s}秒`;
+    };
+    const coverSong = filteredSongs[0];
+
+    // 详情页 Hero 头部：渐变背景 + 封面 + 类型徽标 + 统计 + 操作按钮
+    const hero = document.createElement('div');
+    hero.className = 'detail-hero';
+    hero.innerHTML = `
+      <div class="detail-hero-bg"></div>
+      <div class="detail-hero-inner">
+        <button class="detail-back-btn" title="返回" aria-label="返回">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+        </button>
+        <div class="detail-hero-content">
+          <div class="detail-hero-cover${coverSong && coverSong.cover_image ? '' : ' detail-hero-cover--gradient'}">
+            ${coverSong && coverSong.cover_image
+              ? `<img class="detail-hero-img" src="${escapeHtml(getCoverSrc(coverSong))}" alt="" loading="lazy" decoding="async" />`
+              : `<svg width="46" height="46" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">${iconSvg}</svg>`}
+            <div class="detail-hero-cover-play" title="播放全部">
+              <svg width="34" height="34" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+            </div>
+          </div>
+          <div class="detail-hero-info">
+            <div class="detail-hero-type">${typeLabel}</div>
+            <div class="detail-hero-title">${escapeHtml(filter.name)}</div>
+            <div class="detail-hero-stats">${filteredSongs.length} 首歌曲 · 总时长 ${fmtDuration(totalSeconds)}</div>
+            <div class="detail-hero-actions">
+              <button class="detail-hero-btn primary" data-action="play">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                播放全部
+              </button>
+              <button class="detail-hero-btn" data-action="shuffle">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/><polyline points="21 16 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/><line x1="4" y1="4" x2="9" y2="9"/></svg>
+                随机播放
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
     `;
 
-        header.querySelector('.detail-back-btn').addEventListener('click', () => {
+    hero.querySelector('.detail-back-btn').addEventListener('click', () => {
       currentDetailFilter = null;
       renderLocalMusicTab();
       listEl.classList.remove('page-enter');
       void listEl.offsetWidth;
       listEl.classList.add('page-enter');
     });
-    listEl.appendChild(header);
+    const playAll = () => playSongCollection(filteredSongs);
+    hero.querySelector('.detail-hero-cover-play').addEventListener('click', playAll);
+    hero.querySelector('[data-action="play"]').addEventListener('click', playAll);
+    hero.querySelector('[data-action="shuffle"]').addEventListener('click', () => {
+      playSongCollection([...filteredSongs].sort(() => Math.random() - 0.5));
+    });
+    listEl.appendChild(hero);
+
+    renderSongs(filteredSongs);
+  };
+
+  const renderSongs = (filteredSongs) => {
+    const listEl = document.getElementById('music-list');
+    if (!listEl) return;
 
     const songsListContainer = document.createElement('div');
-    songsListContainer.className = 'list-songs-container';
+    songsListContainer.className = 'list-songs-container detail-list-enter';
     listEl.appendChild(songsListContainer);
 
     filteredSongs.forEach(song => {
@@ -150,7 +208,7 @@ export const createLocalLibraryPage = ({
       div.dataset.cover = song.cover_image || '';
       div.dataset.album = song.album || '';
       div.dataset.duration = String(song.duration || 0);
-      const coverSrc = getCoverSrc(song.cover_image);
+      const coverSrc = getCoverSrc(song);
       const isPaused = player.audio.paused;
 
       div.innerHTML = `
@@ -165,13 +223,158 @@ export const createLocalLibraryPage = ({
           <div class="eq-bar"></div>
           <div class="eq-bar"></div>
         </div>
-        <div class="song-duration">${song.duration ? Math.floor(song.duration / 60) + ':' + (song.duration % 60).toString().padStart(2, '0') : ''}</div>
+        <div class="song-duration">${song.duration ? Math.floor(Math.round(song.duration) / 60) + ':' + (Math.round(song.duration) % 60).toString().padStart(2, '0') : ''}</div>
       `;
 
       bindSongRowInteraction(div, song, filteredSongs, filteredSongs.indexOf(song));
-
       songsListContainer.appendChild(div);
     });
+  };
+
+  // ══ 专辑网格分批渲染（仿局域网 LunaBeat 同款机制）══
+  const LOCAL_ALBUM_BATCH = 60;
+
+  /** 创建单张专辑卡片（含点击进入详情 / 播放专辑） */
+  const createLocalAlbumCard = (album) => {
+    const card = document.createElement('div');
+    card.className = 'album-card';
+    const coverSrc = escapeHtml(getCoverSrc(album.cover));
+    card.innerHTML = `
+      <div class="album-cover-wrapper">
+        <img class="album-card-cover" src="${coverSrc}" loading="lazy" decoding="async" />
+        <div class="album-card-play">
+          <div class="album-card-play-btn">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+          </div>
+        </div>
+      </div>
+      <div class="album-card-info">
+        <div class="album-card-title">${escapeHtml(album.name)}</div>
+        <div class="album-card-count">${album.songs.length} 首歌曲</div>
+      </div>
+    `;
+    card.addEventListener('click', (e) => {
+      const playBtn = card.querySelector('.album-card-play-btn');
+      if (playBtn && (playBtn.contains(e.target) || e.target === playBtn)) {
+        e.stopPropagation();
+        playSongCollection(album.songs);
+        return;
+      }
+      currentDetailFilter = { type: 'album', name: album.name };
+      renderLocalMusicTab();
+      const listEl = document.getElementById('music-list');
+      if (listEl) {
+        listEl.classList.remove('page-enter');
+        void listEl.offsetWidth;
+        listEl.classList.add('page-enter');
+      }
+    });
+    return card;
+  };
+
+  /** 批量渲染专辑卡片（DocumentFragment 插入） */
+  const appendLocalAlbumBatch = (grid, albumsList, startIndex) => {
+    const endIndex = Math.min(startIndex + LOCAL_ALBUM_BATCH, albumsList.length);
+    const frag = document.createDocumentFragment();
+    for (let i = startIndex; i < endIndex; i++) {
+      frag.appendChild(createLocalAlbumCard(albumsList[i]));
+    }
+    grid.appendChild(frag);
+  };
+
+  /** 专辑网格滚动哨兵：触底追加下一批卡片 */
+  const setupLocalAlbumsScroll = (grid, albumsList) => {
+    if (albumsList.length <= LOCAL_ALBUM_BATCH) return;
+    let nextStart = LOCAL_ALBUM_BATCH;
+    const sentinel = document.createElement('div');
+    sentinel.className = 'luna-batch-sentinel';
+    sentinel.setAttribute('aria-hidden', 'true');
+    grid.appendChild(sentinel);
+    const observer = new IntersectionObserver((entries) => {
+      for (const entry of entries) {
+        if (!entry.isIntersecting) continue;
+        if (nextStart >= albumsList.length) {
+          observer.disconnect();
+          sentinel.remove();
+          return;
+        }
+        appendLocalAlbumBatch(grid, albumsList, nextStart);
+        nextStart += LOCAL_ALBUM_BATCH;
+        if (sentinel.parentNode === grid) grid.appendChild(sentinel);
+      }
+    }, { root: null, rootMargin: '300px 0px' });
+    observer.observe(sentinel);
+  };
+
+  // ══ 歌曲行分批渲染（全部歌曲视图，仿专辑网格机制）══
+  const LOCAL_SONG_BATCH = 100;
+
+  /** 创建单首歌曲行（含多选/播放绑定，index 用预建 Map 避免 O(n²)） */
+  const createLocalSongRow = (song, index, indexMap) => {
+    const div = document.createElement('div');
+    const currentSongPath = player.playlist[player.currentIndex]?.file_path;
+    const isCurrent = currentSongPath === song.file_path;
+
+    div.className = `song-item${isCurrent ? ' playing' : ''}`;
+    div.setAttribute('data-file-path', song.file_path);
+    div.dataset.cover = song.cover_image || '';
+    div.dataset.album = song.album || '';
+    div.dataset.duration = String(song.duration || 0);
+    div.classList.toggle('is-selected', selectedSongPaths.has(song.file_path));
+    const coverSrc = escapeHtml(getCoverSrc(song));
+    const isPaused = player.audio.paused;
+
+    div.innerHTML = `
+      <img src="${coverSrc}" class="song-cover" loading="lazy" decoding="async" />
+      <div class="song-info">
+        <div class="song-title">${escapeHtml(song.title || 'Unknown')}</div>
+        <div class="song-artist">${renderArtistWithBadgesHtml(song.artist, song)}</div>
+      </div>
+      <div class="eq-animation ${isPaused ? 'paused' : ''}">
+        <div class="eq-bar"></div>
+        <div class="eq-bar"></div>
+        <div class="eq-bar"></div>
+        <div class="eq-bar"></div>
+      </div>
+      <div class="song-duration">${song.duration ? Math.floor(Math.round(song.duration) / 60) + ':' + (Math.round(song.duration) % 60).toString().padStart(2, '0') : ''}</div>
+    `;
+
+    bindSongRowInteraction(div, song, getMusicLibrary(), indexMap.get(song.file_path) ?? index);
+    return div;
+  };
+
+  /** 批量渲染歌曲行（DocumentFragment 插入） */
+  const appendLocalSongBatch = (container, songs, startIndex, indexMap) => {
+    const endIndex = Math.min(startIndex + LOCAL_SONG_BATCH, songs.length);
+    const frag = document.createDocumentFragment();
+    for (let i = startIndex; i < endIndex; i++) {
+      frag.appendChild(createLocalSongRow(songs[i], i, indexMap));
+    }
+    container.appendChild(frag);
+  };
+
+  /** 歌曲列表滚动哨兵：触底追加下一批（避免全量渲染数千行） */
+  const setupLocalSongsScroll = (container, songs, indexMap) => {
+    if (songs.length <= LOCAL_SONG_BATCH) return;
+    let nextStart = LOCAL_SONG_BATCH;
+    const sentinel = document.createElement('div');
+    sentinel.className = 'luna-batch-sentinel';
+    sentinel.setAttribute('aria-hidden', 'true');
+    container.appendChild(sentinel);
+    const observer = new IntersectionObserver((entries) => {
+      for (const entry of entries) {
+        if (!entry.isIntersecting) continue;
+        if (nextStart >= songs.length) {
+          observer.disconnect();
+          sentinel.remove();
+          return;
+        }
+        appendLocalSongBatch(container, songs, nextStart, indexMap);
+        nextStart += LOCAL_SONG_BATCH;
+        if (sentinel.parentNode === container) container.appendChild(sentinel);
+      }
+    }, { root: null, rootMargin: '300px 0px' });
+    observer.observe(sentinel);
   };
 
   const renderLocalMusicTab = () => {
@@ -251,20 +454,6 @@ export const createLocalLibraryPage = ({
           contentEl.classList.remove('page-enter');
           void contentEl.offsetWidth;
           contentEl.classList.add('page-enter');
-          // Stagger children
-          requestAnimationFrame(() => {
-            const items = contentEl.querySelectorAll('.song-item, .album-card, .artist-card, .genre-card');
-            items.forEach((el, i) => {
-              el.style.opacity = '0';
-              el.style.transform = 'translate3d(0, 24px, 0)';
-              el.style.transition = 'none';
-              requestAnimationFrame(() => {
-                el.style.transition = `opacity 0.7s cubic-bezier(0.25, 0.1, 0.25, 1) ${0.06 + i * 0.04}s, transform 0.7s cubic-bezier(0.25, 0.1, 0.25, 1) ${0.06 + i * 0.04}s`;
-                el.style.opacity = '1';
-                el.style.transform = 'translate3d(0, 0, 0)';
-              });
-            });
-          });
         }
       });
     });
@@ -293,7 +482,8 @@ export const createLocalLibraryPage = ({
 
       const renderAllSongs = () => {
         songsListContainer.innerHTML = '';
-        if (getMusicLibrary().length === 0) {
+        const library = getMusicLibrary();
+        if (library.length === 0) {
           songsListContainer.innerHTML = `
             <div class="search-empty-state">
               <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
@@ -303,39 +493,11 @@ export const createLocalLibraryPage = ({
           return;
         }
 
-        getMusicLibrary().forEach((song) => {
-          const div = document.createElement('div');
-          const currentSongPath = player.playlist[player.currentIndex]?.file_path;
-          const isCurrent = currentSongPath === song.file_path;
-
-          div.className = `song-item${isCurrent ? ' playing' : ''}`;
-          div.setAttribute('data-file-path', song.file_path);
-          div.dataset.cover = song.cover_image || '';
-          div.dataset.album = song.album || '';
-          div.dataset.duration = String(song.duration || 0);
-          div.classList.toggle('is-selected', selectedSongPaths.has(song.file_path));
-          const coverSrc = getCoverSrc(song.cover_image);
-          const isPaused = player.audio.paused;
-
-          div.innerHTML = `
-            <img src="${coverSrc}" class="song-cover" />
-            <div class="song-info">
-              <div class="song-title">${song.title || 'Unknown'}</div>
-              <div class="song-artist">${renderArtistWithBadgesHtml(song.artist, song)}</div>
-            </div>
-            <div class="eq-animation ${isPaused ? 'paused' : ''}">
-              <div class="eq-bar"></div>
-              <div class="eq-bar"></div>
-              <div class="eq-bar"></div>
-              <div class="eq-bar"></div>
-            </div>
-            <div class="song-duration">${song.duration ? Math.floor(song.duration / 60) + ':' + (song.duration % 60).toString().padStart(2, '0') : ''}</div>
-          `;
-
-          bindSongRowInteraction(div, song, getMusicLibrary(), getMusicLibrary().findIndex(item => item.file_path === song.file_path));
-
-          songsListContainer.appendChild(div);
-        });
+        // 预建 file_path → index 映射，避免每行 findIndex 造成 O(n²)
+        const indexMap = new Map(library.map((s, i) => [s.file_path, i]));
+        // 分批渲染 + 滚动追加 + 封面懒加载：避免全量渲染数千行导致卡顿
+        appendLocalSongBatch(songsListContainer, library, 0, indexMap);
+        setupLocalSongsScroll(songsListContainer, library, indexMap);
       };
 
       renderAllSongs();
@@ -355,48 +517,16 @@ export const createLocalLibraryPage = ({
         albums[albumName].songs.push(song);
       });
 
+      const albumsList = Object.keys(albums).map(name => albums[name]);
       const albumsGrid = document.createElement('div');
       albumsGrid.className = 'albums-grid';
-      
-      Object.keys(albums).forEach(albumName => {
-        const album = albums[albumName];
-        const card = document.createElement('div');
-        card.className = 'album-card';
-        const coverSrc = getCoverSrc(album.cover);
-        
-        card.innerHTML = `
-          <div class="album-cover-wrapper">
-            <img class="album-card-cover" src="${coverSrc}" />
-            <div class="album-card-play">
-              <div class="album-card-play-btn">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-              </div>
-            </div>
-          </div>
-          <div class="album-card-info">
-            <div class="album-card-title">${albumName}</div>
-            <div class="album-card-count">${album.songs.length} 首歌曲</div>
-          </div>
-        `;
-        
-                card.addEventListener('click', (e) => {
-          const playBtn = card.querySelector('.album-card-play-btn');
-          if (playBtn && (playBtn.contains(e.target) || e.target === playBtn)) {
-            e.stopPropagation();
-            playSongCollection(album.songs);
-            return;
-          }
-          currentDetailFilter = { type: 'album', name: albumName };
-          renderLocalMusicTab();
-          listEl.classList.remove('page-enter');
-          void listEl.offsetWidth;
-          listEl.classList.add('page-enter');
-        });
-        
-        albumsGrid.appendChild(card);
-      });
+      // 分批渲染 + 滚动追加 + 封面懒加载：避免全量渲染几百张卡片导致滚动卡顿
+      appendLocalAlbumBatch(albumsGrid, albumsList, 0);
       listEl.appendChild(albumsGrid);
-
+      setupLocalAlbumsScroll(albumsGrid, albumsList);
+      albumsGrid.classList.remove('page-enter');
+      void albumsGrid.offsetWidth;
+      albumsGrid.classList.add('page-enter');
     } else if (currentSubTab === 'artist') {
       const artists = {};
       getMusicLibrary().forEach(song => {

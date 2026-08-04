@@ -205,12 +205,19 @@ function showUpdateNotification(info) {
   overlay.className = 'kimo-modal-overlay';
   overlay.innerHTML = `
     <div class="kimo-modal-card" style="max-width:420px;width:92%;padding:0;text-align:left;overflow:hidden;">
-      <div style="padding:22px 24px 16px;border-bottom:1px solid rgba(255,255,255,0.08);">
-        <div style="font-size:18px;font-weight:700;color:var(--text-primary);margin-bottom:4px;">
-          发现新版本
-          ${info.isPreRelease ? '<span style="font-size:11px;background:rgba(var(--dynamic-color,0,240,255),0.15);color:rgb(var(--dynamic-color,0,240,255));padding:2px 8px;border-radius:10px;margin-left:8px;">测试版</span>' : ''}
+      <div style="padding:22px 24px 18px;border-bottom:1px solid rgba(255,255,255,0.08);background:linear-gradient(135deg,rgba(var(--dynamic-color,0,180,230),0.12),transparent 62%);">
+        <div style="font-size:11px;font-weight:700;letter-spacing:0.12em;color:rgb(var(--dynamic-color,0,180,230));margin-bottom:8px;">发现新版本</div>
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:9px;">
+          <div style="font-size:25px;line-height:1.1;font-weight:800;letter-spacing:-0.035em;color:var(--text-primary);">KimoPlayer</div>
+          <div style="font-size:17px;line-height:1;font-weight:800;padding:6px 10px;border-radius:9px;background:rgb(var(--dynamic-color,0,180,230));color:#fff;box-shadow:0 6px 18px rgba(var(--dynamic-color,0,180,230),0.22);">v${info.version}</div>
         </div>
-        <div style="font-size:13px;color:var(--text-secondary);">v${info.version} · ${new Date(info.publishedAt).toLocaleDateString('zh-CN')}</div>
+        <div style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text-secondary);">
+          <span>${new Date(info.publishedAt).toLocaleDateString('zh-CN')}</span>
+          <span style="width:3px;height:3px;border-radius:50%;background:currentColor;opacity:0.45;"></span>
+          <span style="padding:2px 7px;border-radius:999px;background:rgba(var(--dynamic-color,0,180,230),0.1);color:rgb(var(--dynamic-color,0,180,230));font-weight:600;">
+            ${info.isPreRelease ? '测试版' : '正式版'}
+          </span>
+        </div>
       </div>
       ${info.body ? `<div style="padding:16px 24px;font-size:12px;color:var(--text-secondary);line-height:1.6;max-height:240px;overflow-y:auto;">${renderMarkdown(info.body.slice(0, 800))}</div>` : ''}
       <div id="update-actions" style="padding:14px 24px 20px;display:flex;gap:10px;">

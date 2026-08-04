@@ -1,6 +1,6 @@
 [package]
 name = "tauri-app"
-version = "1.6.0"
+version = "1.8.1"
 description = "A Tauri App"
 authors = ["you"]
 edition = "2021"
@@ -28,7 +28,11 @@ walkdir = "2"
 tauri-plugin-dialog = "^2"
 tauri-plugin-single-instance = "2"
 tauri-plugin-window-state = "2"
-reqwest = { version = "0.12", features = ["json", "multipart"] }
+reqwest = { version = "0.12", features = ["json", "multipart", "stream"] }
+futures-util = "0.3"
+zip = { version = "2", default-features = false, features = ["deflate"] }
+rusqlite = { version = "0.32", features = ["bundled"] }
+tokio = { version = "1", features = ["net", "rt-multi-thread", "io-util", "sync"] }
 chrono = "0.4"
 
 [profile.release]

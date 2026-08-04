@@ -1,5 +1,7 @@
 import { getCoverSrc } from '../utils/cover.js';
 import { getColorExtractionSettings, readjustColor } from '../utils/color.js';
+import { convertFileSrc } from '@tauri-apps/api/core';
+import { getCurrentWindow, Effect, EffectState } from '@tauri-apps/api/window';
 
 let activeBackgroundLayer = 'a';
 let getPlayer = () => null;
@@ -62,6 +64,11 @@ export function reapplyCurrentColor() {
 export function applyDynamicColor(r, g, b, coverSrc) {
   document.documentElement.style.setProperty('--dynamic-color', `${r}, ${g}, ${b}`);
 
+  // ⭐ 自定义背景模式下：切歌不覆盖用户背景图（背景 src 由 applyBackgroundStyle 管理），
+  // 动态色变量仍正常更新（主题取色不受影响）
+  const appContainer = document.querySelector('.app-container');
+  const isCustomBg = appContainer?.classList.contains('bg-style-custom') === true;
+
   const layerA = document.querySelector('.dynamic-bg-layer.layer-a');
   const layerB = document.querySelector('.dynamic-bg-layer.layer-b');
   const backgroundA = document.getElementById('bg-blur-a');
@@ -75,8 +82,23 @@ export function applyDynamicColor(r, g, b, coverSrc) {
     console.error('Failed to save dynamic color state:', error);
   }
 
-  if (!layerA || !layerB) return;
+  if (!layerA || !layerB) {
+    if (!isCustomBg) {
+      if (backgroundA) backgroundA.src = finalCoverSrc;
+      if (backgroundB) backgroundB.src = finalCoverSrc;
+    }
+    return;
+  }
 
+  // ⭐ 自定义背景模式：锁定 layerA（用户图所在层）可见、layerB 隐藏，
+  // 不执行 A/B 交叉淡入切换——否则切换后 layerA opacity=0，用户背景会消失/显示旧封面
+  if (isCustomBg) {
+    if (layerA.style.opacity !== '1') layerA.style.opacity = '1';
+    if (layerB.style.opacity !== '0') layerB.style.opacity = '0';
+    return;
+  }
+
+  // ⭐ A/B 双背景图层 1.6s 优雅平滑淡入淡出 (Cross-Fade) 渐变动画 ⭐
   if (activeBackgroundLayer === 'a') {
     if (backgroundB) backgroundB.src = finalCoverSrc;
     document.documentElement.style.setProperty('--dynamic-color-b', `${r}, ${g}, ${b}`);
@@ -88,6 +110,8 @@ export function applyDynamicColor(r, g, b, coverSrc) {
     layerB.style.opacity = '0';
     activeBackgroundLayer = 'a';
   }
+  // 材质引擎联动（可选，弱耦合）：背景源内容已变化，需重算
+  window.__materialEngine?.onBackgroundChanged?.();
 }
 
 export function getDefaultDynamicColor() {
@@ -206,18 +230,144 @@ export function applyUiStyle(uiStyle) {
   localStorage.setItem('kimo-ui-style', uiStyle);
 }
 
+/**
+ * 背景遮罩模糊应用：设置 --bg-custom-blur CSS 变量（由 .bg-mask-layer 消费）。
+ * 背景图保持高清直出（不再直设 img filter），模糊由遮罩层 backdrop-filter 承担。
+ */
+export function applyCustomBgBlur(blurPx) {
+  const v = Number.isFinite(blurPx) ? Math.max(0, Math.min(200, blurPx)) : 0;
+  document.documentElement.style.setProperty('--bg-custom-blur', `${v}px`);
+  // 清除历史遗留的内联 filter（旧版直设过 img filter，需清掉否则覆盖高清规则）
+  const img = document.getElementById('bg-blur-a');
+  if (img) img.style.removeProperty('filter');
+}
+
+/**
+ * 窗口透明度：作用于整个窗口（壁纸 + 全部 UI 一起透明），与背景设置无关。
+ * 透明度 < 100% 时 html/body 也需透明（透出桌面而非深色底），= 100% 时移除。
+ */
+export function applyWindowOpacity(percent) {
+  // 下限 5%：保证界面保底可见可操作（透出桌面可达 95%，视觉接近全透明）
+  const v = Number.isFinite(percent) ? Math.max(5, Math.min(100, percent)) / 100 : 1;
+  document.documentElement.style.setProperty('--window-opacity', String(v));
+  // 背景透明状态统一管理（透明度 < 100 或材质开启时透明）
+  syncBgTransparent();
+}
+
+/**
+ * 窗口材质（Windows 系统级底座）：DWM 实时模糊窗口后的真实内容（无自反馈）。
+ * - none   → 无材质（clearEffects）
+ * - acrylic → 亚克力（Windows 10/11）
+ * - mica   → 云母（Windows 11）
+ * - blur   → 模糊（Windows 7/10/11 22H1+）
+ */
+export async function applyWindowMaterial(material) {
+  try {
+    const win = getCurrentWindow();
+    if (!material || material === 'none') {
+      await win.clearEffects();
+      document.documentElement.removeAttribute('data-window-material');
+      syncBgTransparent();
+      return;
+    }
+    const effect = material === 'mica' ? Effect.Mica
+      : material === 'blur' ? Effect.Blur
+      : Effect.Acrylic;
+    // Effects 结构：effects 为 Effect 字符串数组，state 在顶层（macOS only）
+    await win.setEffects({ effects: [effect], state: EffectState.Active });
+    // 材质标记：CSS 据此降低表面背景透明度，让系统材质透过表面可见
+    document.documentElement.setAttribute('data-window-material', material);
+    syncBgTransparent();
+  } catch (err) {
+    console.error('[Material] apply window material failed:', err);
+    // 失败时同步清理标记，避免表面残留半透明而窗口无系统材质
+    document.documentElement.removeAttribute('data-window-material');
+    syncBgTransparent();
+  }
+}
+
+/**
+ * 背景透明状态统一管理：材质非 none 或窗口透明度 < 100% 时设置 data-bg-transparent
+ * （背景层透明化，露出系统材质/桌面）；否则移除。
+ */
+export function syncBgTransparent() {
+  const material = localStorage.getItem('kimo-window-material') || 'none';
+  const opacity = parseFloat(localStorage.getItem('kimo-window-opacity') || '100');
+  const transparent = material !== 'none' || (Number.isFinite(opacity) && opacity < 100);
+  const container = document.querySelector('.app-container');
+  if (transparent) {
+    document.documentElement.setAttribute('data-bg-transparent', 'true');
+    container?.setAttribute('data-bg-transparent', 'true');
+  } else {
+    document.documentElement.removeAttribute('data-bg-transparent');
+    container?.removeAttribute('data-bg-transparent');
+  }
+}
+
 export function applyBackgroundStyle(bgStyle) {
   const container = document.querySelector('.app-container');
   if (!container) return;
 
   // 移除所有背景样式类
-  container.classList.remove('bg-style-none', 'bg-style-static', 'bg-style-dynamic');
+  container.classList.remove('bg-style-none', 'bg-style-static', 'bg-style-dynamic', 'bg-style-custom');
 
   // 读取百分比速率并转换为持续时长：100% → 10s, 50% → 20s, 10% → 100s
   const rotatePct = parseFloat(localStorage.getItem('kimo-bg-rotate-speed')) || 50;
   const rotateDuration = Math.round(1000 / rotatePct);
   document.documentElement.style.setProperty('--bg-rotate-duration', `${rotateDuration}s`);
-  document.documentElement.style.setProperty('--bg-rotate-play-state', 'running');
+
+  if (bgStyle === 'dynamic') {
+    document.documentElement.style.setProperty('--bg-rotate-play-state', 'running');
+  } else {
+    document.documentElement.style.setProperty('--bg-rotate-play-state', 'paused');
+  }
+
+  if (bgStyle === 'custom') {
+    // 标记到 <html>：custom 模式下的背景层状态由 html[data-bg-custom] 规则
+    // 一锤定音（特异性 0,5,1 压过 ui-styles 的任何规则），UI 风格彻底无法影响遮罩
+    document.documentElement.setAttribute('data-bg-custom', 'true');
+    // 自定义背景：遮罩开关（默认关闭 = 图片原样直出，无视模糊/UI 风格）
+    const maskOff = localStorage.getItem('kimo-bg-mask-enabled') !== 'true';
+    if (maskOff) {
+      document.documentElement.setAttribute('data-bg-mask-off', 'true');
+    } else {
+      document.documentElement.removeAttribute('data-bg-mask-off');
+    }
+    // 自定义背景：应用模糊变量，并挂载用户图片到背景图层
+    // 强制 layerA（用户图所在层）可见、layerB 隐藏，防止此前 A/B 切换残留 opacity 0
+    const bgLayerA = document.querySelector('.dynamic-bg-layer.layer-a');
+    const bgLayerB = document.querySelector('.dynamic-bg-layer.layer-b');
+    if (bgLayerA) bgLayerA.style.opacity = '1';
+    if (bgLayerB) bgLayerB.style.opacity = '0';
+    const blurRaw = parseFloat(localStorage.getItem('kimo-bg-custom-blur'));
+    const blur = Number.isFinite(blurRaw) ? Math.max(0, Math.min(200, blurRaw)) : 40;
+    document.documentElement.style.setProperty('--bg-custom-blur', `${blur}px`);
+
+    const customPath = localStorage.getItem('kimo-custom-bg-path');
+    if (customPath) {
+      const img = document.getElementById('bg-blur-a');
+      if (img) {
+        img.src = convertFileSrc(customPath);
+        // 内联直设 filter：blur=0 时绝对清晰（绕开任何 CSS filter 干扰）
+        applyCustomBgBlur(blur);
+      }
+    }
+  } else {
+    document.documentElement.removeAttribute('data-bg-custom');
+    document.documentElement.removeAttribute('data-bg-mask-off');
+    // 注意：data-bg-transparent 由 applyWindowOpacity 统一管理，此处不再触碰
+    // 退出自定义背景：无条件清除内联 filter（否则 blur(0px) 永久压掉 CSS filter）
+    const restoreA = document.getElementById('bg-blur-a');
+    const restoreB = document.getElementById('bg-blur-b');
+    if (restoreA) restoreA.style.filter = '';
+    if (restoreB) restoreB.style.filter = '';
+    // 恢复封面模糊图（此前 custom 挂载的用户图会残留）
+    const lastCover = localStorage.getItem('kimo-last-cover-src');
+    if (lastCover) {
+      if (restoreA) restoreA.src = lastCover;
+      if (restoreB) restoreB.src = lastCover;
+    }
+  }
 
   if (bgStyle) {
     container.classList.add(`bg-style-${bgStyle}`);
@@ -249,4 +399,9 @@ export function applyLyricsTheme(lyricsTheme) {
 export function initLyricsTheme() {
   const lyricsTheme = localStorage.getItem('kimo-lyrics-theme') || 'follow';
   applyLyricsTheme(lyricsTheme);
+}
+
+export function applyAnimationSpeed(mode) {
+  const speed = mode || localStorage.getItem('kimo-anim-speed') || 'slow';
+  document.documentElement.setAttribute('data-anim-speed', speed);
 }

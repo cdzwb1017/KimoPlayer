@@ -4,6 +4,8 @@ const defaults = {
   scrollAlign: 0.5,
   rowFollowEnabled: true,
   blurEnabled: true,
+  filterInfoEnabled: false,
+  rubyPosition: 'above', // 'above' | 'below'
 };
 
 let cachedPreferences = null;
@@ -20,6 +22,8 @@ function loadPreferences() {
     scrollAlign: readNumber('kimo-lyrics-scroll-align', defaults.scrollAlign),
     rowFollowEnabled: localStorage.getItem('kimo-lyrics-row-follow-enabled') !== 'false',
     blurEnabled: localStorage.getItem('kimo-lyrics-blur-enabled') !== 'false',
+    filterInfoEnabled: localStorage.getItem('kimo-lyrics-filter-info-enabled') === 'true',
+    rubyPosition: localStorage.getItem('kimo-lyrics-ruby-position') || defaults.rubyPosition,
   };
 }
 
@@ -38,6 +42,8 @@ export function updateLyricsPreference(name, value) {
     scrollAlign: 'kimo-lyrics-scroll-align',
     rowFollowEnabled: 'kimo-lyrics-row-follow-enabled',
     blurEnabled: 'kimo-lyrics-blur-enabled',
+    filterInfoEnabled: 'kimo-lyrics-filter-info-enabled',
+    rubyPosition: 'kimo-lyrics-ruby-position',
   };
   const storageKey = storageKeys[name];
   if (storageKey) localStorage.setItem(storageKey, String(value));

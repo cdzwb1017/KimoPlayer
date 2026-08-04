@@ -233,9 +233,11 @@
   line-height: 1.3;
   text-align: center;
   display: none;
+  white-space: nowrap !important;
+  word-break: normal !important;
 }
 .player-center-lyrics.mini-show-translation .bar-lyric-translation:not(:empty) {
-  display: block;
+  display: inline-block;
 }
 
 /* ── Right: Action Buttons ── */

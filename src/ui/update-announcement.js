@@ -8,34 +8,23 @@ export function showStartupUpdateAnnouncement() {
 
   const sections = [
     {
-      title: '🎵 歌词解析全面升级',
+      title: '🎨 界面',
       items: [
-        ['逐字 LRC 与 TTML 统一为明确的行、单元时间模型，相邻单元无缝衔接'],
-        ['修复英文空格、单字母、末尾单词染色及编辑预览不一致问题'],
-        ['完善翻译、共唱与 TTML 背景人声解析'],
+        ['字体系统重构：字体下拉直接显示字体名称（思源黑体（默认）等）'],
+        ['新增字体管理弹窗：可添加/删除自选字体，内置字体锁定'],
+        ['新增推荐字体应用内下载（霞鹜文楷、得意黑），带实时进度'],
       ],
     },
     {
-      title: '✨ 共唱与歌词动效',
+      title: '⚡ 性能',
       items: [
-        ['正确区分真正重叠与首尾相接的歌词，修复共唱滚动抽搐'],
-        ['背景人声在主句下方独立展开并原位收起'],
-        ['缩放还原与上移同步，快速歌词自动缩短切换动画'],
+        ['音频格式图标体积压缩 95%，列表加载与滚动更流畅'],
       ],
     },
     {
-      title: '📝 元数据编辑器焕新',
+      title: '🛠️ 其他',
       items: [
-        ['重新设计歌曲信息与歌词编辑窗口，适配主题和 UI 材质'],
-        ['完整展示逐字时间、翻译、声道与背景人声'],
-      ],
-    },
-    {
-      title: '🛠️ 交互与更新修复',
-      items: [
-        ['歌词滑块浮层全区域支持滚轮，抬起幅度上限调整为 5px'],
-        ['播放列表、侧边栏选中滑块与三枚页面悬浮按钮完整适配四套 UI 材质'],
-        ['修复应用内更新后不自动重启以及任务栏保留旧图标的问题'],
+        ['修复启动时偶尔自动弹出开发者工具窗口的问题'],
       ],
     },
   ];
@@ -56,11 +45,20 @@ export function showStartupUpdateAnnouncement() {
   overlay.className = 'kimo-modal-overlay';
   overlay.innerHTML = `
     <div class="kimo-modal-card" style="max-width:460px;width:92%;padding:0;text-align:left;overflow:hidden;">
-      <div style="padding:22px 24px 16px;border-bottom:1px solid rgba(255,255,255,0.08);">
-        <div style="font-size:18px;font-weight:700;color:var(--text-primary);margin-bottom:4px;">KimoPlayer ${APP_VERSION}</div>
-        <div style="font-size:12px;color:var(--text-secondary);">2026.07.30 歌词引擎与编辑器升级</div>
+      <div style="padding:22px 24px 18px;border-bottom:1px solid rgba(255,255,255,0.08);background:linear-gradient(135deg,rgba(var(--dynamic-color,0,180,230),0.12),transparent 62%);">
+        <div style="font-size:11px;font-weight:700;letter-spacing:0.12em;color:rgb(var(--dynamic-color,0,180,230));margin-bottom:8px;">版本更新</div>
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:9px;">
+          <div style="font-size:25px;line-height:1.1;font-weight:800;letter-spacing:-0.035em;color:var(--text-primary);">KimoPlayer</div>
+          <div style="font-size:17px;line-height:1;font-weight:800;padding:6px 10px;border-radius:99px;background:rgb(var(--dynamic-color,0,180,230));color:#fff;box-shadow:0 6px 18px rgba(var(--dynamic-color,0,180,230),0.22);">v${APP_VERSION}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text-secondary);">
+          <span>2026.08.02</span>
+          <span style="width:3px;height:3px;border-radius:50%;background:currentColor;opacity:0.45;"></span>
+          <span style="padding:2px 7px;border-radius:999px;background:rgba(var(--dynamic-color,0,180,230),0.1);color:rgb(var(--dynamic-color,0,180,230));font-weight:600;">正式版</span>
+          <span>歌词渲染同源对齐与设置交互修复</span>
+        </div>
       </div>
-      <div style="padding:18px 24px 4px;">${sectionsHTML}</div>
+      <div style="padding:18px 24px 4px;max-height:min(58vh,470px);overflow-y:auto;">${sectionsHTML}</div>
       <div style="padding:14px 24px 20px;">
         <button id="kimo-update-ok-btn" style="width:100%;padding:10px;font-size:14px;font-weight:600;border:none;border-radius:8px;background:rgb(var(--dynamic-color,16,185,129));color:#fff;cursor:pointer;">开始使用</button>
       </div>

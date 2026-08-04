@@ -105,8 +105,7 @@
   background: transparent;
   scrollbar-width: thin;
   scrollbar-color: rgba(255, 255, 255, 0.12) transparent;
-  transform: translateZ(0);          /* GPU 加速滚动层 */
-  will-change: scroll-position;       /* 预通知浏览器 */
+  overscroll-behavior: contain;       /* 防止滚动传播到父层，避免抖动 */
   -webkit-overflow-scrolling: touch;  /* iOS 顺滑 */
 }
 
@@ -121,7 +120,7 @@
 
 .content-toolbar {
   flex: 0 0 auto;
-  padding: 30px 30px 0;
+  padding: 18px 30px 0;
 }
 
 .content-toolbar:empty { display: none; }

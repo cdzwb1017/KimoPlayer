@@ -14,7 +14,6 @@ export const createDiscoverPage = ({
   player,
   getCoverSrc,
   getRecentPlays,
-  renderPlaylist,
   switchTab,
 }) => {
   let sessionRecommendations = null;
@@ -139,10 +138,16 @@ export const createDiscoverPage = ({
         ranking.forEach((item, idx) => {
           const rankClass = idx < 3 ? `rank-${idx + 1}` : '';
           const medal = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `<span class="rank-num">${idx + 1}</span>`;
+          // 局域网歌曲：携带 lunaId，封面可从持久化缓存异步恢复
+          // （filePath 本身就是 luna://{id}，优先；cover_image 可能是存量 blob URL 或 /api/cover/ 引用）
+          const lunaMatch = (item.filePath || '').match(/luna:\/\/([\w-]+)/)
+            || (item.cover_image || '').match(/luna:\/\/([\w-]+)/)
+            || (item.cover_image || '').match(/\/api\/cover\/([\w-]+)/);
+          const lunaIdAttr = lunaMatch ? ` data-luna-id="${lunaMatch[1]}"` : '';
           html += `
             <div class="stats-rank-item" data-file-path="${item.filePath}">
               <div class="stats-rank-pos">${medal}</div>
-              <img src="${getCoverSrc(item.cover_image)}" class="stats-rank-cover" />
+              <img src="${getCoverSrc(item)}" class="stats-rank-cover"${lunaIdAttr} />
               <div class="stats-rank-info">
                 <div class="stats-rank-title">${item.title || '未知'}</div>
                 <div class="stats-rank-artist">${item.artist || '未知'}</div>
@@ -220,7 +225,7 @@ export const createDiscoverPage = ({
       setTimeout(() => {
         const scrollable = listEl.querySelectorAll('.stats-ranking, .stats-calendar');
         scrollable.forEach(el => {
-          el.addEventListener('wheel', e => e.stopPropagation(), { passive: false });
+          el.addEventListener('wheel', e => e.stopPropagation(), { passive: true });
         });
       }, 0);
     } else {
@@ -246,7 +251,7 @@ export const createDiscoverPage = ({
         const index = playlist.findIndex(item => item.file_path === song.file_path);
         html += `
           <div class="recommend-card" data-index="${index}">
-            <img src="${getCoverSrc(song.cover_image)}" class="recommend-cover" />
+            <img src="${getCoverSrc(song)}" class="recommend-cover" />
             <div class="recommend-info">
               <div class="recommend-title">${song.title || 'Unknown Title'}</div>
               <div class="recommend-artist">${renderArtistWithBadgesHtml(song.artist, song)}</div>
@@ -284,7 +289,7 @@ export const createDiscoverPage = ({
         const index = playlist.findIndex(item => item.file_path === song.file_path);
         html += `
           <div class="recent-item" data-index="${index}" data-file-path="${song.file_path}">
-            <img src="${getCoverSrc(song.cover_image)}" class="recent-cover" />
+            <img src="${getCoverSrc(song)}" class="recent-cover" />
             <div class="recent-info">
               <div class="recent-title">${song.title || 'Unknown Title'}</div>
               <div class="recent-artist">${renderArtistWithBadgesHtml(song.artist, song)}</div>
@@ -352,7 +357,6 @@ export const createDiscoverPage = ({
         const song = recentPreview.find(candidate => candidate.file_path === filePath);
         if (song) {
           player.playlist.push(song);
-          renderPlaylist(player.playlist);
           player.play(player.playlist.length - 1);
         }
       });
@@ -370,8 +374,11 @@ export const createDiscoverPage = ({
           const rankEntry = ranking.find(r => r.filePath === filePath);
           if (rankEntry) {
             const song = { file_path: filePath, title: rankEntry.title, artist: rankEntry.artist, cover_image: rankEntry.cover_image };
+            if (filePath.startsWith('luna://')) {
+              song._source = 'luna';
+              song._lunaId = filePath.replace('luna://', '');
+            }
             player.playlist.push(song);
-            renderPlaylist(player.playlist);
             player.play(player.playlist.length - 1);
           }
         }

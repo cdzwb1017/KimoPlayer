@@ -101,7 +101,10 @@ function adjustColorByMode(r, g, b, options = {}) {
 export function extractDominantColor(imgSrc, options = {}) {
   return new Promise((resolve) => {
     const img = new Image();
-    img.crossOrigin = 'anonymous';
+    // 只有非 blob: 与非 data: 类型的远程 URL 才需要加 crossOrigin = 'anonymous'，避免 blob / data URI 触发 CORS 安全拦截导致 onerror
+    if (typeof imgSrc === 'string' && !imgSrc.startsWith('blob:') && !imgSrc.startsWith('data:')) {
+      img.crossOrigin = 'anonymous';
+    }
 
     img.onload = () => {
       const canvas = document.createElement('canvas');

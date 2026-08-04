@@ -1,0 +1,932 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width,initial-scale=1,viewport-fit=cover"
+    />
+    <title data-i18n="title">LunaBeat</title>
+    <link
+      rel="icon"
+      type="image/webp"
+      href="/lunabeat-logo.webp?v=20260730-4"
+    />
+    <script>
+      try {
+        "true" === localStorage.getItem("lunabeat_sidebar_collapsed") &&
+          document.documentElement.classList.add("sidebar-collapsed");
+        var navViews = [
+            "home",
+            "songs",
+            "artists",
+            "albums",
+            "playlists",
+            "folders",
+            "genres",
+            "settings",
+          ],
+          savedNav = localStorage.getItem("lunabeat_nav_view");
+        document.documentElement.dataset.navView =
+          navViews.indexOf(savedNav) >= 0 ? savedNav : "home";
+      } catch (e) {
+        document.documentElement.dataset.navView = "home";
+      }
+    </script>
+    <link rel="stylesheet" href="/app.css?v=20260730-5" />
+    <link rel="stylesheet" href="/amll-core.css?v=20260730-5" />
+  </head>
+  <body>
+    <div id="sideRaysBg" class="side-rays-bg" aria-hidden="true"></div>
+    <div class="app">
+      <aside id="sidebar" class="sidebar">
+        <div class="brand">
+          <img
+            class="brand-logo"
+            src="/lunabeat-logo.webp?v=20260730-4"
+            width="30"
+            height="30"
+            alt=""
+          />
+          <span class="shiny-text" data-i18n="title">LunaBeat</span>
+        </div>
+        <nav class="nav" id="nav">
+          <button class="nav-item" data-view="home">
+            <svg
+              viewBox="0 0 960 960"
+              width="20"
+              height="20"
+              fill="currentColor"
+            >
+              <path
+                d="M269.23,820L212.31,820Q182,820 161,799Q140,778 140,747.69L140,480Q140,409.23 166.77,347.39Q193.54,285.54 239.54,239.54Q285.54,193.54 347.39,166.77Q409.23,140 480,140Q550.77,140 612.61,166.77Q674.46,193.54 720.46,239.54Q766.46,285.54 793.23,347.39Q820,409.23 820,480L820,747.69Q820,778 799,799Q778,820 747.69,820L690.77,820Q660.85,820 639.66,798.81Q618.46,777.61 618.46,747.69L618.46,609.23Q618.46,579.31 639.66,558.12Q660.85,536.92 690.77,536.92L760,536.92L760,480Q760,363 678.5,281.5Q597,200 480,200Q363,200 281.5,281.5Q200,363 200,480L200,536.92L269.23,536.92Q299.15,536.92 320.34,558.12Q341.54,579.31 341.54,609.23L341.54,747.69Q341.54,777.61 320.34,798.81Q299.15,820 269.23,820ZM269.23,596.92L200,596.92L200,747.69Q200,752.31 203.85,756.15Q207.69,760 212.31,760L269.23,760Q274.61,760 278.08,756.54Q281.54,753.08 281.54,747.69L281.54,609.23Q281.54,603.85 278.08,600.38Q274.61,596.92 269.23,596.92ZM678.46,609.23L678.46,747.69Q678.46,753.08 681.92,756.54Q685.39,760 690.77,760L747.69,760Q752.31,760 756.15,756.15Q760,752.31 760,747.69L760,596.92L690.77,596.92Q685.39,596.92 681.92,600.38Q678.46,603.85 678.46,609.23ZM269.23,596.92Q274.61,596.92 278.08,596.92Q281.54,596.92 281.54,596.92L281.54,596.92Q281.54,596.92 278.08,596.92Q274.61,596.92 269.23,596.92L212.31,596.92Q207.69,596.92 203.85,596.92Q200,596.92 200,596.92L200,596.92L269.23,596.92ZM678.46,596.92Q678.46,596.92 681.92,596.92Q685.39,596.92 690.77,596.92L760,596.92L760,596.92Q760,596.92 756.15,596.92Q752.31,596.92 747.69,596.92L690.77,596.92Q685.39,596.92 681.92,596.92Q678.46,596.92 678.46,596.92Z"
+              />
+            </svg>
+            <span data-i18n="home">主页</span>
+          </button>
+          <div class="nav-divider"></div>
+          <button class="nav-item" data-view="songs">
+            <svg
+              viewBox="0 0 960 960"
+              width="20"
+              height="20"
+              fill="currentColor"
+            >
+              <path
+                d="M240,792.31Q190.5,792.31 155.25,757.06Q120,721.81 120,672.31Q120,622.81 155.25,587.56Q190.5,552.31 240,552.31Q263,552.31 283.65,560.5Q304.31,568.69 320,585.08L320,274.77Q320,262.81 327.58,253.63Q335.15,244.46 346.85,242.46L724.54,174.92Q739.46,172.69 750.88,181.88Q762.31,191.06 762.31,206.23L762.31,592.31Q762.31,641.81 727.06,677.06Q691.81,712.31 642.31,712.31Q592.81,712.31 557.56,677.06Q522.31,641.81 522.31,592.31Q522.31,542.81 557.56,507.56Q592.81,472.31 642.31,472.31Q665.31,472.31 685.96,480.5Q706.62,488.69 722.31,505.08L722.31,323.92L360,392.31L360,672.31Q360,721.81 324.75,757.06Q289.5,792.31 240,792.31Z"
+              />
+            </svg>
+            <span data-i18n="songs">歌曲</span>
+          </button>
+          <button class="nav-item" data-view="artists">
+            <svg
+              viewBox="0 0 960 960"
+              width="20"
+              height="20"
+              fill="currentColor"
+            >
+              <path
+                d="M700.02,772.31Q662.23,772.31 636.12,746.21Q610,720.12 610,682.33Q610,644.54 636.1,618.42Q662.2,592.31 700,592.31Q710.31,592.31 720.88,594.96Q731.46,597.61 742.31,604.15L742.31,433.08Q742.31,417.71 752.7,407.32Q763.1,396.92 778.46,396.92L834.61,396.92Q849.31,396.92 859.65,407.1Q870,417.27 870,432.31Q870,447 859.65,457.35Q849.31,467.69 834.61,467.69L790,467.69L790,682.31Q790,720.11 763.91,746.21Q737.81,772.31 700.02,772.31ZM166.15,772.31Q150.79,772.31 140.39,761.91Q130,751.52 130,736.15L130,683.38Q130,653.38 145.96,628.65Q161.92,603.92 188.62,590.46Q248.69,561 308.65,546.65Q368.61,532.31 430,532.31Q454.54,532.31 478.35,534.39Q502.15,536.46 525.15,541.46Q540.77,544.69 546.46,554.85Q552.15,565 550.54,576.15Q548.92,587.31 540.19,595.23Q531.46,603.15 517.85,600.31Q496.85,596.31 474.81,594.31Q452.77,592.31 430,592.31Q374.92,592.31 321.46,605.54Q268,618.77 216.15,644Q204.08,650.15 197.04,660.69Q190,671.23 190,683.38L190,712.31L496.46,712.31Q511.46,712.31 518.96,721.66Q526.46,731.01 526.46,742.24Q526.46,753.46 518.96,762.88Q511.46,772.31 496.46,772.31L166.15,772.31ZM430,467.69Q372.25,467.69 331.13,426.57Q290,385.44 290,327.69Q290,269.94 331.13,228.82Q372.25,187.69 430,187.69Q487.75,187.69 528.87,228.82Q570,269.94 570,327.69Q570,385.44 528.87,426.57Q487.75,467.69 430,467.69ZM430,407.69Q463,407.69 486.5,384.19Q510,360.69 510,327.69Q510,294.69 486.5,271.19Q463,247.69 430,247.69Q397,247.69 373.5,271.19Q350,294.69 350,327.69Q350,360.69 373.5,384.19Q397,407.69 430,407.69ZM430,327.69Q430,327.69 430,327.69Q430,327.69 430,327.69Q430,327.69 430,327.69Q430,327.69 430,327.69Q430,327.69 430,327.69Q430,327.69 430,327.69Q430,327.69 430,327.69Q430,327.69 430,327.69ZM430,712.31L430,712.31L430,712.31Q430,712.31 430,712.31Q430,712.31 430,712.31Q430,712.31 430,712.31Q430,712.31 430,712.31Q430,712.31 430,712.31Q430,712.31 430,712.31Q430,712.31 430,712.31Q430,712.31 430,712.31Z"
+              />
+            </svg>
+            <span data-i18n="artists">艺人</span>
+          </button>
+          <button class="nav-item" data-view="albums">
+            <svg
+              viewBox="0 0 960 960"
+              width="20"
+              height="20"
+              fill="currentColor"
+            >
+              <path
+                d="M480,640Q546.92,640 593.46,593.46Q640,546.92 640,480Q640,413.08 593.46,366.54Q546.92,320 480,320Q413.08,320 366.54,366.54Q320,413.08 320,480Q320,546.92 366.54,593.46Q413.08,640 480,640ZM480,520Q463,520 451.5,508.5Q440,497 440,480Q440,463 451.5,451.5Q463,440 480,440Q497,440 508.5,451.5Q520,463 520,480Q520,497 508.5,508.5Q497,520 480,520ZM480.07,860Q401.23,860 331.86,830.08Q262.49,800.16 211.18,748.87Q159.87,697.58 129.93,628.24Q100,558.9 100,480.07Q100,401.23 129.92,331.86Q159.84,262.49 211.13,211.18Q262.42,159.87 331.76,129.93Q401.1,100 479.93,100Q558.77,100 628.14,129.92Q697.51,159.84 748.82,211.13Q800.13,262.42 830.07,331.76Q860,401.1 860,479.93Q860,558.77 830.08,628.14Q800.16,697.51 748.87,748.82Q697.58,800.13 628.24,830.07Q558.9,860 480.07,860ZM480,800Q614,800 707,707Q800,614 800,480Q800,346 707,253Q614,160 480,160Q346,160 253,253Q160,346 160,480Q160,614 253,707Q346,800 480,800ZM480,480Q480,480 480,480Q480,480 480,480Q480,480 480,480Q480,480 480,480Q480,480 480,480Q480,480 480,480Q480,480 480,480Q480,480 480,480Z"
+              />
+            </svg>
+            <span data-i18n="albums">专辑</span>
+          </button>
+          <button class="nav-item" data-view="playlists">
+            <svg
+              viewBox="0 0 960 960"
+              width="20"
+              height="20"
+              fill="currentColor"
+            >
+              <path
+                d="M460,594.61Q520.15,594.61 566.96,558.58Q613.77,522.54 629.31,466.15Q631.31,460.54 626.88,456.42Q622.46,452.31 616.85,454.31L349.08,529.46Q342.23,531.46 340.73,538Q339.23,544.54 344.23,549.15Q367.69,570.46 397.39,582.54Q427.08,594.61 460,594.61ZM295.54,445.38L396.15,416.92Q399.38,391.62 382.54,372.73Q365.69,353.85 340,353.85Q316.54,353.85 300.19,370.19Q283.85,386.54 283.85,410Q283.85,419.85 287.27,428.5Q290.69,437.15 295.54,445.38ZM535.54,375.38L636.15,346.92Q640,321.62 622.85,302.73Q605.69,283.85 580,283.85Q556.54,283.85 540.19,300.19Q523.85,316.54 523.85,340Q523.85,349.85 527.27,358.5Q530.69,367.15 535.54,375.38ZM212.31,820Q182,820 161,799Q140,778 140,747.69L140,212.31Q140,182 161,161Q182,140 212.31,140L747.69,140Q778,140 799,161Q820,182 820,212.31L820,601.61Q820,616.08 814.38,629.42Q808.77,642.77 798.92,652.61L652.61,798.92Q642.77,808.77 629.42,814.38Q616.08,820 601.61,820L212.31,820ZM600,760L600,680Q600,647 623.5,623.5Q647,600 680,600L760,600L760,212.31Q760,207.69 756.15,203.85Q752.31,200 747.69,200L212.31,200Q207.69,200 203.85,203.85Q200,207.69 200,212.31L200,747.69Q200,752.31 203.85,756.15Q207.69,760 212.31,760L600,760ZM600,760L600,760L600,760Q600,760 600,760Q600,760 600,760ZM200,760L200,760Q200,760 200,756.15Q200,752.31 200,747.69L200,212.31Q200,207.69 200,203.85Q200,200 200,200L200,200Q200,200 200,203.85Q200,207.69 200,212.31L200,600L200,600Q200,600 200,623.5Q200,647 200,680L200,760Z"
+              />
+            </svg>
+            <span data-i18n="playlists">歌单</span>
+          </button>
+          <button class="nav-item" data-view="folders">
+            <svg
+              viewBox="0 0 960 960"
+              width="20"
+              height="20"
+              fill="currentColor"
+            >
+              <path
+                d="M172.31,780Q142,780 121,759Q100,738 100,707.69L100,252.31Q100,222 121,201Q142,180 172.31,180L362,180Q376.46,180 389.81,185.62Q403.15,191.23 413,201.08L471.92,260L787.69,260Q818,260 839,281Q860,302 860,332.31L860,707.69Q860,738 839,759Q818,780 787.69,780L172.31,780ZM172.31,720L787.69,720Q793.08,720 796.54,716.54Q800,713.08 800,707.69L800,332.31Q800,326.92 796.54,323.46Q793.08,320 787.69,320L447.38,320L370.85,243.46Q368.92,241.54 366.81,240.77Q364.69,240 362.38,240L172.31,240Q166.92,240 163.46,243.46Q160,246.92 160,252.31L160,707.69Q160,713.08 163.46,716.54Q166.92,720 172.31,720ZM160,720Q160,720 160,716.54Q160,713.08 160,707.69L160,252.31Q160,246.92 160,243.46Q160,240 160,240L160,240Q160,240 160,240.77Q160,241.54 160,243.46L160,320L160,320Q160,320 160,323.46Q160,326.92 160,332.31L160,707.69Q160,713.08 160,716.54Q160,720 160,720Z"
+              />
+            </svg>
+            <span data-i18n="folders">文件夹</span>
+          </button>
+          <button class="nav-item" data-view="genres">
+            <svg
+              viewBox="0 0 960 960"
+              width="20"
+              height="20"
+              fill="currentColor"
+            >
+              <path
+                d="M401.45,713.85Q448.85,713.85 482.12,680.64Q515.38,647.44 515.38,600L515.38,316.92L596.92,316.92Q611.61,316.92 621.96,306.75Q632.31,296.58 632.31,281.54Q632.31,266.85 621.96,256.5Q611.61,246.15 596.92,246.15L503.08,246.15Q488.39,246.15 478.04,256.5Q467.69,266.85 467.69,281.54L467.69,508.31Q452.92,498 436.17,492.08Q419.41,486.15 401.54,486.15Q354.1,486.15 320.9,519.33Q287.69,552.51 287.69,599.91Q287.69,647.31 320.87,680.58Q354.05,713.85 401.45,713.85ZM480.07,860Q401.23,860 331.86,830.08Q262.49,800.16 211.18,748.87Q159.87,697.58 129.93,628.24Q100,558.9 100,480.07Q100,401.23 129.92,331.86Q159.84,262.49 211.13,211.18Q262.42,159.87 331.76,129.93Q401.1,100 479.93,100Q558.77,100 628.14,129.92Q697.51,159.84 748.82,211.13Q800.13,262.42 830.07,331.76Q860,401.1 860,479.93Q860,558.77 830.08,628.14Q800.16,697.51 748.87,748.82Q697.58,800.13 628.24,830.07Q558.9,860 480.07,860ZM480,800Q614,800 707,707Q800,614 800,480Q800,346 707,253Q614,160 480,160Q346,160 253,253Q160,346 160,480Q160,614 253,707Q346,800 480,800ZM480,480Q480,480 480,480Q480,480 480,480Q480,480 480,480Q480,480 480,480Q480,480 480,480Q480,480 480,480Q480,480 480,480Q480,480 480,480Z"
+              />
+            </svg>
+            <span data-i18n="genres">流派</span>
+          </button>
+        </nav>
+        <div class="sidebar-footer">
+          <button
+            type="button"
+            id="sidebarSettingsBtn"
+            class="nav-item sidebar-settings-btn"
+            data-view="settings"
+          >
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+              <path
+                d="M19.14 12.94c.04-.31.06-.63.06-.94 0-.31-.02-.63-.06-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.49.49 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.48.48 0 0 0-.48-.41h-3.84a.48.48 0 0 0-.48.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96a.49.49 0 0 0-.59.22L2.74 8.87a.48.48 0 0 0 .12.61l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.48-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32a.49.49 0 0 0-.12-.61l-2.03-1.58zM12 15.6A3.6 3.6 0 1 1 12 8.4a3.6 3.6 0 0 1 0 7.2z"
+              />
+            </svg>
+            <span data-i18n="settings">设置</span>
+          </button>
+          <div class="sidebar-server-info" id="serverInfo"></div>
+        </div>
+      </aside>
+      <main class="main">
+        <header
+          class="main-header"
+          style="display: flex; align-items: center; margin-bottom: 18px"
+        >
+          <button
+            id="sidebarToggle"
+            class="icon-btn"
+            style="margin-right: 12px; margin-left: -8px"
+          >
+            <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
+              <path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z" />
+            </svg>
+          </button>
+          <img
+            class="mobile-brand-logo"
+            src="/lunabeat-logo.webp?v=20260730-4"
+            width="38"
+            height="38"
+            alt="LunaBeat"
+          />
+          <h1 id="pageTitle" style="margin: 0; flex: 1">主页</h1>
+          <input
+            id="songSearchInput"
+            class="song-search-input"
+            type="search"
+            autocomplete="off"
+            placeholder="搜索歌曲、歌手或专辑"
+            data-i18n-placeholder="search"
+            aria-label="搜索歌曲、歌手或专辑"
+            data-i18n-aria="search"
+          />
+          <script>
+            !(function () {
+              var t = document.documentElement.dataset.navView || "home",
+                e = document.getElementById("pageTitle");
+              (e &&
+                (e.setAttribute("data-i18n", t),
+                (e.textContent =
+                  {
+                    home: "主页",
+                    songs: "歌曲",
+                    artists: "艺人",
+                    albums: "专辑",
+                    playlists: "歌单",
+                    folders: "文件夹",
+                    genres: "流派",
+                    settings: "设置",
+                  }[t] || t)),
+                document.querySelectorAll(".nav-item").forEach(function (e) {
+                  e.classList.toggle(
+                    "active",
+                    e.getAttribute("data-view") === t,
+                  );
+                }));
+            })();
+          </script>
+          <div
+            id="sortContainer"
+            style="display: none; align-items: center; gap: 8px"
+          >
+            <select
+              id="sortSelect"
+              style="
+                background: rgba(255, 255, 255, 0.1);
+                color: #fff;
+                border: none;
+                padding: 6px 12px;
+                border-radius: 6px;
+                outline: 0;
+                cursor: pointer;
+                font-size: 0.85rem;
+              "
+            ></select>
+            <button
+              id="sortOrderBtn"
+              class="icon-btn"
+              style="width: 32px; height: 32px"
+              title="切换排序方向"
+              data-i18n-title="sort_order"
+            >
+              <svg
+                viewBox="0 0 24 24"
+                width="18"
+                height="18"
+                fill="currentColor"
+              >
+                <path
+                  d="M20 12l-1.41-1.41L13 16.17V4h-2v12.17l-5.58-5.59L4 12l8 8 8-8z"
+                />
+              </svg>
+            </button>
+          </div>
+        </header>
+        <div class="content" id="content"></div>
+      </main>
+    </div>
+    <div class="mini-player glass" id="miniPlayer">
+      <div class="mini-transport">
+        <button
+          id="btnShuffle"
+          type="button"
+          class="icon-btn"
+          title="随机播放"
+          data-i18n-title="repeat_shuffle"
+          aria-label="随机播放"
+          data-i18n-aria="repeat_shuffle"
+        >
+          <svg
+            class="icon-rep-shuf"
+            viewBox="0 0 24 24"
+            width="18"
+            height="18"
+            fill="currentColor"
+          >
+            <path
+              d="M10.59 9.17 5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z"
+            />
+          </svg>
+        </button>
+        <button
+          id="btnPrev"
+          type="button"
+          class="icon-btn"
+          title="上一首"
+          data-i18n-title="prev"
+          aria-label="上一首"
+          data-i18n-aria="prev"
+        >
+          <svg viewBox="0 0 32 28" width="18" height="18" fill="currentColor">
+            <g transform="translate(32, 0) scale(-1, 1)">
+              <path
+                d="M18.14 20.68c.365 0 .672-.107 1.038-.323l8.508-4.997c.623-.365.938-.814.938-1.37 0-.564-.307-.988-.938-1.361l-8.508-4.997c-.366-.216-.68-.324-1.046-.324-.73 0-1.337.556-1.337 1.569v4.773c-.108-.399-.406-.73-.904-1.021L7.382 7.632c-.357-.216-.672-.324-1.037-.324-.73 0-1.345.556-1.345 1.569v10.235c0 1.013.614 1.569 1.345 1.569.365 0 .68-.108 1.037-.324l8.509-4.997c.49-.29.796-.631.904-1.038v4.79c0 1.013.615 1.569 1.345 1.569z"
+              />
+            </g>
+          </svg>
+        </button>
+        <button
+          id="btnPlay"
+          type="button"
+          class="play-btn"
+          title="播放/暂停"
+          data-i18n-title="play_pause"
+          aria-label="播放/暂停"
+          data-i18n-aria="play_pause"
+        >
+          <svg
+            class="icon-play"
+            viewBox="0 0 960 960"
+            width="18"
+            height="18"
+            fill="currentColor"
+          >
+            <path
+              d="M320,702v-450q0,-14 9,-22t21,-8q4,0 8,1t8,3l354,226q7,5 10.5,11t3.5,14q0,8 -3.5,14T720,502L366,728q-4,2 -8,3t-8,1q-12,0 -21,-8t-9,-22Z"
+            />
+          </svg>
+          <svg
+            class="icon-pause"
+            viewBox="0 0 960 960"
+            width="18"
+            height="18"
+            fill="currentColor"
+            hidden
+          >
+            <path
+              d="M615,760q-24.75,0 -42.38,-17.63T555,700v-440q0,-24.75 17.63,-42.38T615,200h55q24.75,0 42.38,17.63T730,260v440q0,24.75 -17.63,42.38T670,760h-55ZM290,760q-24.75,0 -42.38,-17.63T230,700v-440q0,-24.75 17.63,-42.38T290,200h55q24.75,0 42.38,17.63T405,260v440q0,24.75 -17.63,42.38T345,760h-55Z"
+            />
+          </svg>
+        </button>
+        <button
+          id="btnNext"
+          type="button"
+          class="icon-btn"
+          title="下一首"
+          data-i18n-title="next"
+          aria-label="下一首"
+          data-i18n-aria="next"
+        >
+          <svg viewBox="0 0 32 28" width="18" height="18" fill="currentColor">
+            <path
+              d="M18.14 20.68c.365 0 .672-.107 1.038-.323l8.508-4.997c.623-.365.938-.814.938-1.37 0-.564-.307-.988-.938-1.361l-8.508-4.997c-.366-.216-.68-.324-1.046-.324-.73 0-1.337.556-1.337 1.569v4.773c-.108-.399-.406-.73-.904-1.021L7.382 7.632c-.357-.216-.672-.324-1.037-.324-.73 0-1.345.556-1.345 1.569v10.235c0 1.013.614 1.569 1.345 1.569.365 0 .68-.108 1.037-.324l8.509-4.997c.49-.29.796-.631.904-1.038v4.79c0 1.013.615 1.569 1.345 1.569z"
+            />
+          </svg>
+        </button>
+        <button
+          id="btnRepeat"
+          type="button"
+          class="icon-btn"
+          title="列表循环"
+          data-i18n-title="repeat_all"
+          aria-label="列表循环"
+          data-i18n-aria="repeat_all"
+        >
+          <svg
+            class="icon-rep-all"
+            viewBox="0 0 24 24"
+            width="18"
+            height="18"
+            fill="currentColor"
+          >
+            <path
+              d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z"
+            />
+          </svg>
+          <svg
+            class="icon-rep-one"
+            viewBox="0 0 24 24"
+            width="18"
+            height="18"
+            fill="currentColor"
+            hidden
+          >
+            <path
+              d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4zm-4-2V9h-1l-2 1.5v1.2l2-1.5v4.8h1z"
+            />
+          </svg>
+        </button>
+      </div>
+      <div class="mini-divider" aria-hidden="true"></div>
+      <button
+        type="button"
+        class="mini-now"
+        id="btnOpenNow"
+        title="打开播放页"
+        data-i18n-title="open_now_playing"
+      >
+        <img id="nowCover" class="mini-cover" alt="" />
+        <div class="mini-meta">
+          <div id="nowTitle" class="mini-title">未播放</div>
+          <div id="nowArtist" class="mini-artist">—</div>
+        </div>
+      </button>
+      <div class="mini-divider" aria-hidden="true"></div>
+      <div class="mini-utils">
+        <button
+          id="btnLyric"
+          type="button"
+          class="icon-btn"
+          title="歌词"
+          data-i18n-title="lyric"
+          aria-label="歌词"
+          data-i18n-aria="lyric"
+        >
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+            <path
+              d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H5.2L4 17.2V4h16v12zM7 9h10v2H7V9zm0-3h10v2H7V6zm0 6h7v2H7v-2z"
+            />
+          </svg>
+        </button>
+        <button
+          id="btnQueue"
+          type="button"
+          class="icon-btn"
+          title="播放列表"
+          data-i18n-title="queue_title"
+          aria-label="播放列表"
+          data-i18n-aria="queue_title"
+        >
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+            <path
+              d="M15 6H3v2h12V6zm0 4H3v2h12v-2zM3 16h8v-2H3v2zM17 6v8.18c-.31-.11-.65-.18-1-.18-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3V8h3V6h-5z"
+            />
+          </svg>
+        </button>
+        <div class="mini-volume">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+            <path
+              d="M3 10v4h4l5 5V5L7 10H3zm13.5 2c0-1.8-1-3.3-2.5-4v8c1.5-.7 2.5-2.2 2.5-4z"
+            />
+          </svg>
+          <input
+            id="volume"
+            type="range"
+            min="0"
+            max="1"
+            step="0.01"
+            value="1"
+            title="音量"
+            data-i18n-title="volume"
+          />
+        </div>
+      </div>
+      <audio id="audio" preload="metadata"></audio>
+    </div>
+    <div id="nowPlaying" class="now-playing hidden" aria-hidden="true">
+      <canvas
+        id="npFlowLight"
+        class="np-flow-light"
+        aria-hidden="true"
+      ></canvas>
+      <div class="np-bg" id="npBg" aria-hidden="true"></div>
+      <video
+        id="npVideoBg"
+        class="np-video-bg hidden"
+        autoplay
+        muted
+        loop
+        playsinline
+        aria-hidden="true"
+      ></video>
+      <div class="np-veil" aria-hidden="true"></div>
+      <button
+        type="button"
+        class="np-close"
+        id="npClose"
+        title="收起"
+        data-i18n-title="collapse"
+        aria-label="收起"
+        data-i18n-aria="collapse"
+      >
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
+          <path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z" />
+        </svg>
+      </button>
+      <div class="np-layout">
+        <section class="np-left">
+          <div class="np-cover-wrap is-paused">
+            <img id="npCover" class="np-cover" alt="" /><video
+              id="npVideoCover"
+              class="np-video-cover hidden"
+              autoplay
+              muted
+              loop
+              playsinline
+              aria-hidden="true"
+            ></video>
+          </div>
+          <div class="np-seek">
+            <div class="np-times">
+              <span id="curTime">0:00</span>
+              <span class="np-quality" hidden></span>
+              <span id="remainTime">-0:00</span>
+            </div>
+            <input id="seek" type="range" min="0" max="1000" value="0" />
+          </div>
+          <div class="np-meta">
+            <div class="np-meta-text">
+              <div id="npTitle" class="np-title">未播放</div>
+              <div id="npSubtitle" class="np-subtitle">—</div>
+            </div>
+          </div>
+          <div class="np-controls">
+            <button
+              id="npShuffleBtn"
+              type="button"
+              class="icon-btn"
+              title="随机播放"
+              data-i18n-title="repeat_shuffle"
+            >
+              <svg
+                viewBox="0 0 24 24"
+                width="22"
+                height="22"
+                fill="currentColor"
+              >
+                <path
+                  d="M10.59 9.17 5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z"
+                />
+              </svg>
+            </button>
+            <button
+              id="npPrev"
+              type="button"
+              class="icon-btn lg"
+              title="上一首"
+              data-i18n-title="prev"
+            >
+              <svg
+                viewBox="0 0 32 28"
+                width="32"
+                height="32"
+                fill="currentColor"
+              >
+                <g transform="translate(32, 0) scale(-1, 1)">
+                  <path
+                    d="M18.14 20.68c.365 0 .672-.107 1.038-.323l8.508-4.997c.623-.365.938-.814.938-1.37 0-.564-.307-.988-.938-1.361l-8.508-4.997c-.366-.216-.68-.324-1.046-.324-.73 0-1.337.556-1.337 1.569v4.773c-.108-.399-.406-.73-.904-1.021L7.382 7.632c-.357-.216-.672-.324-1.037-.324-.73 0-1.345.556-1.345 1.569v10.235c0 1.013.614 1.569 1.345 1.569.365 0 .68-.108 1.037-.324l8.509-4.997c.49-.29.796-.631.904-1.038v4.79c0 1.013.615 1.569 1.345 1.569z"
+                  />
+                </g>
+              </svg>
+            </button>
+            <button
+              id="npPlay"
+              type="button"
+              class="play-btn lg"
+              title="播放/暂停"
+              data-i18n-title="play_pause"
+            >
+              <svg
+                class="icon-play"
+                viewBox="0 0 960 960"
+                width="32"
+                height="32"
+                fill="currentColor"
+              >
+                <path
+                  d="M320,702v-450q0,-14 9,-22t21,-8q4,0 8,1t8,3l354,226q7,5 10.5,11t3.5,14q0,8 -3.5,14T720,502L366,728q-4,2 -8,3t-8,1q-12,0 -21,-8t-9,-22Z"
+                />
+              </svg>
+              <svg
+                class="icon-pause"
+                viewBox="0 0 960 960"
+                width="32"
+                height="32"
+                fill="currentColor"
+                hidden
+              >
+                <path
+                  d="M615,760q-24.75,0 -42.38,-17.63T555,700v-440q0,-24.75 17.63,-42.38T615,200h55q24.75,0 42.38,17.63T730,260v440q0,24.75 -17.63,42.38T670,760h-55ZM290,760q-24.75,0 -42.38,-17.63T230,700v-440q0,-24.75 17.63,-42.38T290,200h55q24.75,0 42.38,17.63T405,260v440q0,24.75 -17.63,42.38T345,760h-55Z"
+                />
+              </svg>
+            </button>
+            <button
+              id="npNext"
+              type="button"
+              class="icon-btn lg"
+              title="下一首"
+              data-i18n-title="next"
+            >
+              <svg
+                viewBox="0 0 32 28"
+                width="32"
+                height="32"
+                fill="currentColor"
+              >
+                <path
+                  d="M18.14 20.68c.365 0 .672-.107 1.038-.323l8.508-4.997c.623-.365.938-.814.938-1.37 0-.564-.307-.988-.938-1.361l-8.508-4.997c-.366-.216-.68-.324-1.046-.324-.73 0-1.337.556-1.337 1.569v4.773c-.108-.399-.406-.73-.904-1.021L7.382 7.632c-.357-.216-.672-.324-1.037-.324-.73 0-1.345.556-1.345 1.569v10.235c0 1.013.614 1.569 1.345 1.569.365 0 .68-.108 1.037-.324l8.509-4.997c.49-.29.796-.631.904-1.038v4.79c0 1.013.615 1.569 1.345 1.569z"
+                />
+              </svg>
+            </button>
+            <button
+              id="npRepeat"
+              type="button"
+              class="icon-btn"
+              title="列表循环"
+              data-i18n-title="repeat_all"
+            >
+              <svg
+                class="icon-rep-all"
+                viewBox="0 0 24 24"
+                width="22"
+                height="22"
+                fill="currentColor"
+              >
+                <path
+                  d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z"
+                />
+              </svg>
+              <svg
+                class="icon-rep-one"
+                viewBox="0 0 24 24"
+                width="22"
+                height="22"
+                fill="currentColor"
+                hidden
+              >
+                <path
+                  d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4zm-4-2V9h-1l-2 1.5v1.2l2-1.5v4.8h1z"
+                />
+              </svg>
+            </button>
+          </div>
+          <div class="np-volume">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+              <path d="M3 10v4h4l5 5V5L7 10H3z" />
+            </svg>
+            <input
+              id="npVolume"
+              type="range"
+              min="0"
+              max="1"
+              step="0.01"
+              value="1"
+              title="音量"
+              data-i18n-title="volume"
+            />
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+              <path
+                d="M3 10v4h4l5 5V5L7 10H3zm13.5 2c0-1.8-1-3.3-2.5-4v8c1.5-.7 2.5-2.2 2.5-4z"
+              />
+            </svg>
+          </div>
+          <div
+            style="
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              gap: 24px;
+              width: min(420px, 100%);
+              margin-top: 32px;
+            "
+          >
+            <button
+              id="npLyric"
+              class="icon-btn active"
+              title="歌词"
+              data-i18n-title="lyric"
+            >
+              <svg
+                viewBox="0 0 24 24"
+                width="22"
+                height="22"
+                fill="currentColor"
+              >
+                <path
+                  d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H5.2L4 17.2V4h16v12zM7 9h10v2H7V9zm0-3h10v2H7V6zm0 6h7v2H7v-2z"
+                />
+              </svg>
+            </button>
+            <button
+              id="npQueue"
+              class="icon-btn"
+              title="播放列表"
+              data-i18n-title="queue_title"
+            >
+              <svg
+                viewBox="0 0 24 24"
+                width="22"
+                height="22"
+                fill="currentColor"
+              >
+                <path
+                  d="M15 6H3v2h12V6zm0 4H3v2h12v-2zM3 16h8v-2H3v2zM17 6v8.18c-.31-.11-.65-.18-1-.18-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3V8h3V6h-5z"
+                />
+              </svg>
+            </button>
+            <button
+              type="button"
+              id="npSettings"
+              class="icon-btn"
+              title="更多"
+              data-i18n-title="more"
+            >
+              <svg
+                viewBox="0 0 24 24"
+                width="22"
+                height="22"
+                fill="currentColor"
+              >
+                <path
+                  d="M6 10c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm12 0c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm-6 0c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"
+                />
+              </svg>
+            </button>
+          </div>
+        </section>
+        <section class="np-right">
+          <div id="lyricMount" class="lyric-mount"></div>
+        </section>
+      </div>
+    </div>
+    <div id="queueSidebar" class="queue-sidebar hidden" aria-hidden="true">
+      <div class="queue-header">
+        <h2 data-i18n="queue_title">播放列表</h2>
+        <button
+          type="button"
+          class="icon-btn"
+          id="btnLocateQueue"
+          title="定位当前播放"
+          data-i18n-title="locate_current"
+          style="margin-left: auto"
+        >
+          <svg viewBox="0 0 960 960" width="20" height="20" fill="currentColor">
+            <path
+              d="M450,858L450,818.77Q325,805.92 239.54,720.46Q154.08,635 141.23,510L102,510Q89.25,510 80.63,501.37Q72,492.74 72,479.99Q72,467.23 80.63,458.62Q89.25,450 102,450L141.23,450Q154.08,325 239.54,239.54Q325,154.08 450,141.23L450,102Q450,89.25 458.63,80.63Q467.26,72 480.01,72Q492.77,72 501.38,80.63Q510,89.25 510,102L510,141.23Q635,154.08 720.46,239.54Q805.92,325 818.77,450L858,450Q870.75,450 879.37,458.63Q888,467.26 888,480.01Q888,492.77 879.37,501.38Q870.75,510 858,510L818.77,510Q805.92,635 720.46,720.46Q635,805.92 510,818.77L510,858Q510,870.75 501.37,879.37Q492.74,888 479.99,888Q467.23,888 458.62,879.37Q450,870.75 450,858ZM480,760Q596,760 678,678Q760,596 760,480Q760,364 678,282Q596,200 480,200Q364,200 282,282Q200,364 200,480Q200,596 282,678Q364,760 480,760ZM480,620Q422.25,620 381.13,578.87Q340,537.75 340,480Q340,422.25 381.13,381.13Q422.25,340 480,340Q537.75,340 578.87,381.13Q620,422.25 620,480Q620,537.75 578.87,578.87Q537.75,620 480,620ZM480,560Q513,560 536.5,536.5Q560,513 560,480Q560,447 536.5,423.5Q513,400 480,400Q447,400 423.5,423.5Q400,447 400,480Q400,513 423.5,536.5Q447,560 480,560ZM480,480Q480,480 480,480Q480,480 480,480Q480,480 480,480Q480,480 480,480Q480,480 480,480Q480,480 480,480Q480,480 480,480Q480,480 480,480Z"
+            />
+          </svg>
+        </button>
+        <button
+          type="button"
+          class="icon-btn"
+          id="btnCloseQueue"
+          title="关闭"
+          data-i18n-title="close"
+          style="margin-left: 8px"
+        >
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+            <path
+              d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"
+            />
+          </svg>
+        </button>
+      </div>
+      <div class="queue-list" id="queueList"></div>
+    </div>
+    <div id="settingsSidebar" class="queue-sidebar hidden" aria-hidden="true">
+      <div class="queue-header">
+        <h2 data-i18n="playback_settings">播放设置</h2>
+        <button
+          type="button"
+          class="icon-btn"
+          id="btnCloseSettings"
+          title="关闭"
+          data-i18n-title="close"
+          style="margin-left: auto"
+        >
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+            <path
+              d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"
+            />
+          </svg>
+        </button>
+      </div>
+      <div class="settings-content" style="padding: 16px">
+        <div class="setting-item" style="margin-bottom: 24px">
+          <label
+            for="lyricSizeSlider"
+            style="font-weight: 600; display: block"
+            data-i18n="lyric_font_size"
+            >歌词字体大小</label
+          >
+          <input
+            type="range"
+            id="lyricSizeSlider"
+            min="20"
+            max="60"
+            step="1"
+            value="32"
+            style="width: 100%; margin-top: 12px; cursor: pointer"
+          />
+          <div
+            id="lyricSizeDisplay"
+            style="
+              text-align: right;
+              font-size: 0.9em;
+              opacity: 0.8;
+              margin-top: 4px;
+            "
+          >
+            32px
+          </div>
+        </div>
+        <div class="setting-item" style="margin-bottom: 24px">
+          <label
+            for="lyricPosSlider"
+            style="font-weight: 600; display: block"
+            data-i18n="lyric_vertical_align"
+            >歌词垂直对齐位置</label
+          >
+          <input
+            type="range"
+            id="lyricPosSlider"
+            min="10"
+            max="80"
+            step="1"
+            value="32"
+            style="width: 100%; margin-top: 12px; cursor: pointer"
+          />
+          <div
+            id="lyricPosDisplay"
+            style="
+              text-align: right;
+              font-size: 0.9em;
+              opacity: 0.8;
+              margin-top: 4px;
+            "
+          >
+            32vh
+          </div>
+        </div>
+        <div
+          class="setting-item"
+          style="
+            margin-bottom: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+          "
+        >
+          <label
+            for="lyricBlurToggle"
+            style="font-weight: 600"
+            data-i18n="lyric_blur_inactive"
+            >模糊未唱歌词</label
+          >
+          <input
+            type="checkbox"
+            id="lyricBlurToggle"
+            checked="checked"
+            style="width: 18px; height: 18px; cursor: pointer"
+          />
+        </div>
+        <div
+          class="setting-item"
+          style="
+            margin-bottom: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+          "
+        >
+          <label
+            for="lyricElasticToggle"
+            style="font-weight: 600"
+            data-i18n="lyric_elastic_scroll"
+            >开启弹性滚动动画</label
+          >
+          <input
+            type="checkbox"
+            id="lyricElasticToggle"
+            checked="checked"
+            style="width: 18px; height: 18px; cursor: pointer"
+          />
+        </div>
+        <div
+          class="setting-item"
+          style="
+            margin-bottom: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+          "
+        >
+          <label
+            for="lyricHideExtraToggle"
+            style="font-weight: 600; flex: 1"
+            data-i18n="lyric_hide_extra_info"
+            >隐藏翻译、音译和创作者信息</label
+          >
+          <input
+            type="checkbox"
+            id="lyricHideExtraToggle"
+            style="width: 18px; height: 18px; cursor: pointer; flex-shrink: 0"
+          />
+        </div>
+        <div class="setting-item" style="margin-bottom: 24px">
+          <label
+            for="npPadXSlider"
+            style="font-weight: 600; display: block"
+            data-i18n="np_side_padding"
+            >宽屏播放页左右留白</label
+          >
+          <input
+            type="range"
+            id="npPadXSlider"
+            min="100"
+            max="200"
+            step="4"
+            value="100"
+            style="width: 100%; margin-top: 12px; cursor: pointer"
+          />
+          <div
+            id="npPadXDisplay"
+            style="
+              text-align: right;
+              font-size: 0.9em;
+              opacity: 0.8;
+              margin-top: 4px;
+            "
+          >
+            100px
+          </div>
+        </div>
+      </div>
+    </div>
+    <button
+      id="debugLogToggle"
+      class="debug-toggle hidden"
+      type="button"
+      hidden
+      data-i18n="debug_log"
+    >
+      日志
+    </button>
+    <pre id="debugLog" class="debug-log hidden"></pre>
+    <script type="module" src="/app.js?v=20260730-6"></script>
+  </body>
+</html>

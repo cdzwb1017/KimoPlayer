@@ -5,6 +5,7 @@ import { extractDominantColor } from '../utils/color.js';
 import { getCoverSrc } from '../utils/cover.js';
 import { renderAudioQualityBadgesHtml, renderArtistWithBadgesHtml } from '../utils/audio-quality.js';
 import { recordPlay } from '../storage/play-stats.js';
+import { getLunaBeatAdapter } from '../features/luna-beat/luna-beat-adapter-utils.js';
 
 export class PlaybackController {
   constructor({ createLyricsController }) {
@@ -50,7 +51,12 @@ export class PlaybackController {
         const progress = Math.min(100, Math.max(0, (this.audio.currentTime / duration) * 100));
         
         try {
-          localStorage.setItem('kimo-last-played-time', this.audio.currentTime.toString());
+          // 节流：距上次保存 ≥5 秒（墙上时间，seek 后退不影响）才写 localStorage
+          const savedAt = Date.now();
+          if (this._lastTimeSavedAtMs === undefined || savedAt - this._lastTimeSavedAtMs >= 5000) {
+            this._lastTimeSavedAtMs = savedAt;
+            localStorage.setItem('kimo-last-played-time', this.audio.currentTime.toString());
+          }
         } catch (e) {
           console.error('Failed to save last played time:', e);
         }
@@ -127,6 +133,12 @@ export class PlaybackController {
     if (index < 0 || index >= this.playlist.length) return;
     this.currentIndex = index;
     let song = this.playlist[index];
+    if (!song) return;
+
+    // ⭐ 如果是 LunaBeat 局域网歌曲，自动转发给 playFromLunaBeat 处理 ⭐
+    if (song._source === 'luna' || (song.file_path && song.file_path.startsWith('luna://'))) {
+      return this.playFromLunaBeat(index);
+    }
 
     // Save last played song path to localStorage
     try {
@@ -181,14 +193,14 @@ export class PlaybackController {
           const songItems = document.querySelectorAll('.song-item');
           if (songItems[index]) {
             const coverImg = songItems[index].querySelector('.song-cover');
-            if (coverImg) coverImg.src = getCoverSrc(song.cover_image);
+            if (coverImg) coverImg.src = getCoverSrc(song);
           }
 
           // Asynchronously extract and cache color
-          extractDominantColor(getCoverSrc(song.cover_image), getColorOptions()).then(color => {
+          extractDominantColor(getCoverSrc(song), getColorOptions()).then(color => {
             song.dominant_color = color;
             if (index === this.currentIndex) {
-              applyDynamicColor(color.r, color.g, color.b, getCoverSrc(song.cover_image));
+              applyDynamicColor(color.r, color.g, color.b, getCoverSrc(song));
             }
           });
         }
@@ -199,12 +211,12 @@ export class PlaybackController {
 
     // Dynamic color matching (fully non-blocking background task with caching)
     if (song.dominant_color) {
-      applyDynamicColor(song.dominant_color.r, song.dominant_color.g, song.dominant_color.b, getCoverSrc(song.cover_image));
+      applyDynamicColor(song.dominant_color.r, song.dominant_color.g, song.dominant_color.b, getCoverSrc(song));
     } else if (song.cover_image) {
-      extractDominantColor(getCoverSrc(song.cover_image), getColorOptions()).then(color => {
+      extractDominantColor(getCoverSrc(song), getColorOptions()).then(color => {
         song.dominant_color = color;
         if (index === this.currentIndex) {
-          applyDynamicColor(color.r, color.g, color.b, getCoverSrc(song.cover_image));
+          applyDynamicColor(color.r, color.g, color.b, getCoverSrc(song));
         }
       });
     } else {
@@ -216,6 +228,92 @@ export class PlaybackController {
     this.lyrics.load(song.file_path);
 
     // ⭐ 实时更新播放列表面板当前播放标记 ⭐
+    if (typeof window.updatePlaylistPanelCurrent === 'function') {
+      window.updatePlaylistPanelCurrent();
+    }
+  }
+
+  /**
+   * 播放 LunaBeat 局域网歌曲
+   * 通过 Rust 后端代理下载音频 → Blob → objectURL → audio.src
+   */
+  async playFromLunaBeat(index) {
+    if (index < 0 || index >= this.playlist.length) return;
+    const song = this.playlist[index];
+    // 与 play() 的分流判断对齐：luna:// 路径（如从月度榜单恢复的记录）也能播放
+    if (!song || (song._source !== 'luna' && !(song.file_path && song.file_path.startsWith('luna://')))) return;
+    // 恢复记录可能缺少 _source/_lunaId，按需补齐
+    if (song._source !== 'luna') song._source = 'luna';
+    if (!song._lunaId) song._lunaId = song.file_path.replace('luna://', '');
+
+    this.currentIndex = index;
+
+    try {
+      localStorage.setItem('kimo-last-played-path', `luna://${song._lunaId}`);
+      localStorage.setItem('kimo-last-played-time', '0');
+    } catch (e) {}
+
+    this.isSwitchingTrack = true;
+
+    // 1. 0ms 优先检索全局单例缓存中的已加载 Blob 封面，即刻更新 UI
+    //    优先 LARGE(1440)，没有再退回 SMALL(480)，避免首帧显示成低清图
+    let validCover = (song.cover_image && (song.cover_image.startsWith('blob:') || song.cover_image.startsWith('data:'))) ? song.cover_image : null;
+    if (!validCover && window.__lunaBeatAdapter && song._lunaId) {
+      const lunaId = String(song._lunaId);
+      const cache = window.__lunaBeatAdapter._coverUrlCache;
+      if (cache) {
+        const largeKey = `${lunaId}::1440`;
+        const smallKey = `${lunaId}::480`;
+        if (cache.has(largeKey)) {
+          validCover = cache.get(largeKey);
+          song.cover_image = validCover;
+        } else if (cache.has(smallKey)) {
+          validCover = cache.get(smallKey);
+          song.cover_image = validCover;
+        }
+      }
+    }
+
+    this.updateUI({
+      ...song,
+      cover_image: validCover,
+      duration: song.durationMs ? song.durationMs / 1000 : song.duration || 0,
+    });
+
+    // 2. 派发切歌事件
+    window.dispatchEvent(new CustomEvent('kimo-song-changed', { detail: { song, index } }));
+
+    // 3. 封面 blob 预取与动态颜色刷新统一由 playLunaBeatSong 内的 applyCoverAndColor 处理，
+    //    避免多入口重复触发封面请求与颜色闪烁
+
+    try {
+      const { playLunaBeatSong } = await import('../features/luna-beat/luna-beat-adapter-utils.js');
+      await playLunaBeatSong(this, song);
+
+      this.isSwitchingTrack = false;
+      if ('mediaSession' in navigator) {
+        navigator.mediaSession.playbackState = 'playing';
+      }
+    } catch (e) {
+      this.isSwitchingTrack = false;
+      console.error('[LunaBeat] 播放失败:', e);
+    }
+
+    // 最近播放
+    if (window.addToRecentPlays) {
+      window.addToRecentPlays(song);
+    }
+    recordPlay(song);
+
+    // 加载歌词（LunaBeat 使用在线歌词）
+    this.lyrics.loadLunaBeat(song);
+
+    // 无缓存封面时先应用默认颜色，封面加载完成后由 applyCoverAndColor 覆盖
+    if (!validCover) {
+      const defColor = getDefaultDynamicColor();
+      applyDynamicColor(defColor.r, defColor.g, defColor.b, getCoverSrc(null));
+    }
+
     if (typeof window.updatePlaylistPanelCurrent === 'function') {
       window.updatePlaylistPanelCurrent();
     }
@@ -277,14 +375,14 @@ export class PlaybackController {
   updateUI(song) {
     const title = song.title || 'Unknown Title';
     const artist = song.artist || 'Unknown Artist';
-    const cover = getCoverSrc(song.cover_image);
-    const miniCover = getCoverSrc(song.cover_image);
+    const cover = getCoverSrc(song);
+    const miniCover = getCoverSrc(song);
 
     // ══ Windows Native Toast Notifications (Silent for uninterrupted audio experience) ══
     if (window.Notification && this.lastNotifiedFilePath !== song.file_path) {
       this.lastNotifiedFilePath = song.file_path;
       const triggerNotification = () => {
-        new Notification("KiomPlayer 正在播放", {
+        new Notification("KimoPlayer 正在播放", {
           body: `${title} - ${artist}`,
           silent: true
         });
@@ -310,7 +408,7 @@ export class PlaybackController {
         album: song.album || 'Unknown Album',
         artwork: song.cover_image ? [
           {
-            src: getCoverSrc(song.cover_image),
+            src: getCoverSrc(song),
             sizes: '512x512',
             type: 'image/jpeg'
           }
@@ -352,7 +450,11 @@ export class PlaybackController {
 
     document.querySelectorAll('.song-item').forEach((el) => {
       const filePath = el.getAttribute('data-file-path');
-      const isCurrent = filePath && this.playlist[this.currentIndex] && filePath === this.playlist[this.currentIndex].file_path;
+      const currentSong = this.playlist[this.currentIndex];
+      const isCurrent = filePath && currentSong && (
+        filePath === currentSong.file_path ||
+        (currentSong._lunaId != null && filePath === String(currentSong._lunaId))
+      );
       el.classList.toggle('playing', isCurrent);
       const eq = el.querySelector('.eq-animation');
       if (eq) {

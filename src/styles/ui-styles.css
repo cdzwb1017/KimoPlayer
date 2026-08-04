@@ -140,6 +140,7 @@
 .app-container.ui-style-solid.theme-dark .settings-card,
 .app-container.ui-style-solid.theme-dark .content-toolbar,
 .app-container.ui-style-solid.theme-dark .sticky-header,
+.app-container.ui-style-solid.theme-dark .settings-search-sticky-header,
 .app-container.ui-style-solid.theme-dark .context-menu,
 .app-container.ui-style-solid.theme-dark .playlist-panel {
   background: #070708 !important;
@@ -152,6 +153,7 @@
 .app-container.ui-style-solid.theme-light .settings-card,
 .app-container.ui-style-solid.theme-light .content-toolbar,
 .app-container.ui-style-solid.theme-light .sticky-header,
+.app-container.ui-style-solid.theme-light .settings-search-sticky-header,
 .app-container.ui-style-solid.theme-light .context-menu,
 .app-container.ui-style-solid.theme-light .playlist-panel {
   background: #f5f5f7 !important;
@@ -164,6 +166,7 @@
 .app-container.ui-style-solid.theme-grey .settings-card,
 .app-container.ui-style-solid.theme-grey .content-toolbar,
 .app-container.ui-style-solid.theme-grey .sticky-header,
+.app-container.ui-style-solid.theme-grey .settings-search-sticky-header,
 .app-container.ui-style-solid.theme-grey .context-menu,
 .app-container.ui-style-solid.theme-grey .playlist-panel {
   background: #e3e3e8 !important;

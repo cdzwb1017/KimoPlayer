@@ -256,3 +256,30 @@ body:has(#metadata-editor-modal.active) .floating-actions {
     width: calc(100vw - 24px);
   }
 }
+
+/* ── UI 风格适配：搜索框（悬浮按钮同款材质，跟随 ui-style × theme）── */
+:is(.app-container, body)[class*="ui-style-"] .search-box,
+:is(.app-container, body)[class*="ui-style-"] .settings-search-box {
+  background: var(--floating-surface-bg) !important;
+  border-color: var(--floating-surface-border) !important;
+  box-shadow: var(--floating-surface-shadow) !important;
+  backdrop-filter: blur(var(--floating-surface-blur)) saturate(var(--floating-surface-saturate)) !important;
+  -webkit-backdrop-filter: blur(var(--floating-surface-blur)) saturate(var(--floating-surface-saturate)) !important;
+}
+
+/* 聚焦状态：在材质之上叠加动态色高亮（不被上述 !important 材质规则压掉） */
+:is(.app-container, body)[class*="ui-style-"] .search-box:focus-within,
+:is(.app-container, body)[class*="ui-style-"] .settings-search-box:focus-within {
+  /* 材质基础上轻微加深，保留聚焦层次感 */
+  background: color-mix(in srgb, var(--floating-surface-bg) 92%, rgba(255, 255, 255, 0.12)) !important;
+  border-color: rgba(var(--dynamic-color, 0, 240, 255), 0.45) !important;
+  box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.35), 0 10px 25px rgba(var(--dynamic-color, 0, 240, 255), 0.22) !important;
+  transform: translateY(-1px) !important;
+}
+
+/* 浅色主题：聚焦高亮柔和化（对齐原 search.css light 变体的强度） */
+:is(.app-container, body)[class*="ui-style-"]:is([class*="theme-light"], [class*="theme-grey"]) .search-box:focus-within,
+:is(.app-container, body)[class*="ui-style-"]:is([class*="theme-light"], [class*="theme-grey"]) .settings-search-box:focus-within {
+  border-color: rgba(var(--dynamic-color, 0, 136, 204), 0.3) !important;
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.8), 0 10px 25px rgba(var(--dynamic-color, 0, 136, 204), 0.12) !important;
+}

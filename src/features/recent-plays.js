@@ -15,14 +15,18 @@ export const getRecentPlays = () => {
 
 export const addRecentPlay = (song) => {
   const recents = getRecentPlays().filter(item => item.file_path !== song.file_path);
-  recents.unshift(song);
+  const lunaId = song._lunaId || (song.file_path?.startsWith('luna://') ? song.file_path.replace('luna://', '') : null);
+  const cleanSong = {
+    ...song,
+    cover_image: lunaId ? `luna://${lunaId}` : ((typeof song.cover_image === 'string' && (song.cover_image.startsWith('blob:') || song.cover_image.startsWith('data:'))) ? null : song.cover_image),
+  };
+  recents.unshift(cleanSong);
   localStorage.setItem(RECENT_PLAYS_KEY, JSON.stringify(recents.slice(0, MAX_RECENT_PLAYS)));
 };
 
 export const createRecentPlaysRenderer = ({
   player,
   getCoverSrc,
-  renderPlaylist,
   isRecentTab,
 }) => {
   const renderRecentPlaysTab = () => {
@@ -45,12 +49,13 @@ export const createRecentPlaysRenderer = ({
       const div = document.createElement('div');
       const isCurrent = player.currentIndex >= 0
         && player.playlist[player.currentIndex]?.file_path === song.file_path;
+      const lunaId = song._lunaId || (song.file_path?.startsWith('luna://') ? song.file_path.replace('luna://', '') : '');
 
       div.className = `song-item${isCurrent ? ' playing' : ''}`;
       div.setAttribute('data-file-path', song.file_path);
       const isPaused = player.audio.paused;
       div.innerHTML = `
-        <img src="${getCoverSrc(song.cover_image)}" class="song-cover" />
+        <img src="${getCoverSrc(song)}" data-luna-id="${lunaId}" class="song-cover" />
         <div class="song-info">
           <div class="song-title">${song.title || 'Unknown'}</div>
           <div class="song-artist">${renderArtistWithBadgesHtml(song.artist, song)}</div>
@@ -61,7 +66,7 @@ export const createRecentPlaysRenderer = ({
           <div class="eq-bar"></div>
           <div class="eq-bar"></div>
         </div>
-        <div class="song-duration">${song.duration ? Math.floor(song.duration / 60) + ':' + (song.duration % 60).toString().padStart(2, '0') : ''}</div>
+        <div class="song-duration">${song.duration ? Math.floor(Math.round(song.duration) / 60) + ':' + (Math.round(song.duration) % 60).toString().padStart(2, '0') : ''}</div>
       `;
 
       div.addEventListener('click', () => {
@@ -70,7 +75,6 @@ export const createRecentPlaysRenderer = ({
           player.play(playlistIndex);
         } else {
           player.playlist.push(song);
-          renderPlaylist(player.playlist);
           player.play(player.playlist.length - 1);
         }
 

@@ -26,7 +26,6 @@ import {
 } from './lyrics/sync-state.js';
 import {
   calculateKaraokePlayheadState,
-  calculateSimpleCharProgress,
 } from './lyrics/playhead.js';
 import { alignLyricRows } from './lyrics/row-layout.js';
 import {
@@ -43,6 +42,7 @@ import {
 } from './lyrics/mini-bar.js';
 import { updateLyricLineEndTimes } from './lyrics/line-timing.js';
 import { getLyricsPreferences, updateLyricsPreference } from './lyrics/preferences.js';
+import { filterLyricInformationLines } from './lyrics/info-filter.js';
 import { renderTimedLyricWords } from './lyrics/line-renderer.js';
 import { updateInactiveLineFixedState } from './lyrics/line-visual-state.js';
 import {
@@ -60,7 +60,14 @@ import {
   showCalibrationModal,
 } from './lyrics/calibration.js';
 import { getCurrentWindow } from '@tauri-apps/api/window';
+import { WebviewWindow } from '@tauri-apps/api/webviewWindow';
 import { initializeWindowControls } from './core/window-controls.js';
+import { MaterialEngine } from './engine/scheduler/material-engine.js';
+import { MaterialLayer } from './engine/layer/material-layer.js';
+import { MaterialRegistry } from './engine/material/material-registry.js';
+import { MaterialThemeBridge } from './engine/bridge/material-theme-bridge.js';
+import { FrostedGlassMaterial } from './engine/presets/frosted-glass.js';
+import { GlassOverlayMaterial } from './engine/presets/glass-overlay.js';
 import {
   getLikedPlaylist,
   isSongLiked,
@@ -70,6 +77,7 @@ import { initializePlaylistPanel } from './features/playlist-panel.js';
 import { toggleCommentsPanel, isCommentsPanelVisible, updateCommentsPanel } from './features/comments-panel.js';
 import { createDiscoverPage } from './features/discover-page.js';
 import { createLocalLibraryPage } from './features/local-library-page.js';
+import { createLunaBeatPage } from './features/luna-beat/luna-beat-page.js';
 import { initializeMetadataSavedSync } from './features/metadata-sync.js';
 import { createPlaylistsPage } from './features/playlists-page.js';
 
@@ -91,6 +99,7 @@ import {
   createRecentPlaysRenderer,
   getRecentPlays,
 } from './features/recent-plays.js';
+import { cleanupOldStats } from './storage/play-stats.js';
 import { createSettingsPage } from './features/settings-page.js';
 import { PlaybackController } from './player/playback-controller.js';
 import { createSearchController } from './search/search-controller.js';
@@ -104,18 +113,18 @@ import { initializeLyricsPreferencesControls } from './ui/lyrics-preferences-con
 import { initializeCustomContextMenu } from './ui/context-menu.js';
 import { initializePlayerControls } from './ui/player-controls.js';
 import { initializeProgressScrubbing } from './ui/progress-scrubbing.js';
-import { initializeContentAreaWheelFix } from './ui/scroll-fix.js';
 import { createDesktopLyricsController } from './ui/desktop-lyrics-controller.js';
 import { showToast } from './ui/toast.js';
+import { renderLoadingPlaceholder } from './ui/loading-state.js';
 import { initializeVolumeControls } from './ui/volume-controls.js';
-import { applyStoredInterfaceFont } from './ui/interface-font.js';
+import { applyStoredInterfaceFont, applyStoredLyricsFont, ensureUserFonts, ensureBuiltinFonts, ensureDefaultFont } from './ui/interface-font.js';
 import {
   applyMiniLyricsTranslationSetting,
   initializeLyricsSettingsToolbar,
 } from './ui/lyrics-controls.js';
 import { showStartupUpdateAnnouncement } from './ui/update-announcement.js';
 import { startupUpdateCheck } from './ui/update-checker.js';
-import { getCoverSrc } from './utils/cover.js';
+import { getCoverSrc, getSongCoverSrc } from './utils/cover.js';
 import { extractDominantColor } from './utils/color.js';
 import { transitionContent } from './ui/transitions.js';
 import {
@@ -124,6 +133,9 @@ import {
   applyLyricsTheme,
   applyUiStyle,
   applyBackgroundStyle,
+  applyWindowOpacity,
+  applyWindowMaterial,
+  applyAnimationSpeed,
   initLyricsTheme,
   configureThemePlayer,
   configureThemeDesktopLyrics,
@@ -169,6 +181,32 @@ function getAnimatedLyricRows(allLines, targetIndex, previousAnimatedRows = new 
   return animatedRows;
 }
 
+function trackInterludeLayout(controller, duration = 760) {
+  cancelAnimationFrame(controller._interludeLayoutTracker);
+  const startedAt = performance.now();
+
+  const keepAnchorStable = (now) => {
+    if (!controller.isUserScrolling) {
+      const container = document.getElementById('lyrics-scroll');
+      const lineEl = controller._cachedAllLines?.[controller.currentScrollIndex];
+      if (container && lineEl) {
+        container.scrollTop = clampScrollTop(
+          container,
+          getAlignedScrollTop(container, lineEl),
+        );
+      }
+    }
+
+    if (now - startedAt < duration) {
+      controller._interludeLayoutTracker = requestAnimationFrame(keepAnchorStable);
+    } else {
+      controller._interludeLayoutTracker = null;
+    }
+  };
+
+  controller._interludeLayoutTracker = requestAnimationFrame(keepAnchorStable);
+}
+
 // ══ Early Shell Window Controls (Rust-Command Driven) ══
 initializeWindowControls();
 
@@ -198,6 +236,7 @@ class LyricsController {
     this._lastAnimatedScrollRows = new Set();
     this._concurrentScrollGroup = null;
     this._concurrentScrollAnchor = -1;
+    this._manualSeekScrollIndex = -1;
     this._hasPositionedCurrentLyrics = false;
     // Cache lyric row nodes to avoid repeated DOM tree scans.
     this._cachedAllLines = null;
@@ -378,11 +417,11 @@ class LyricsController {
     return synthesizePerCharWords(line, this.lines[idx + 1]);
   }
 
-  syncBarSpans(wordSpans, charC, totalChars) {
+  syncBarSpans(wordSpans, charWords, currentTime) {
     this._barWordSpans = syncMiniBarSpans({
       cachedSpans: this._barWordSpans,
-      charC,
-      totalChars,
+      charWords,
+      currentTime,
     });
   }
 
@@ -398,6 +437,20 @@ class LyricsController {
     this.desktopLyricsController = controller;
   }
 
+  // 切歌到无歌词音乐时清空桌面歌词，避免残留上一曲内容
+  _clearDesktopLyrics() {
+    this.desktopLyricsController?.sync({
+      text: '',
+      translation: '',
+      nextText: '',
+      nextTranslation: '',
+      words: null,
+      currentTime: 0,
+      lineStart: 0,
+      lineEnd: 0,
+    });
+  }
+
   async load(audioPath) {
     const loadGeneration = ++this._loadGeneration;
     this.audioPath = audioPath;
@@ -406,6 +459,7 @@ class LyricsController {
     this._lastAnimatedScrollRows.clear();
     this._concurrentScrollGroup = null;
     this._concurrentScrollAnchor = -1;
+    this._manualSeekScrollIndex = -1;
     this._hasPositionedCurrentLyrics = false;
     this.currentScrollIndex = -1;
     this._lastActiveIndicesKey = '';
@@ -441,6 +495,7 @@ class LyricsController {
         linesEl.innerHTML = '<div class="lyrics-line" style="text-align:center; color:var(--text-secondary);">暂无歌词</div>';
         if (barLyric1) barLyric1.textContent = '暂无歌词';
         if (barLyric2) barLyric2.textContent = '';
+        this._clearDesktopLyrics();
         return;
       }
 
@@ -452,10 +507,16 @@ class LyricsController {
         this.lines = parseJSONLyrics(result.content);
       }
 
+      this.lines = filterLyricInformationLines(this.lines, {
+        enabled: getLyricsPreferences().filterInfoEnabled,
+        song: this.player.playlist?.[this.player.currentIndex] || null,
+      });
+
       if (this.lines.length === 0) {
         linesEl.innerHTML = '<div class="lyrics-line" style="text-align:center; color:var(--text-secondary);">暂无歌词</div>';
         if (barLyric1) barLyric1.textContent = '暂无歌词';
         if (barLyric2) barLyric2.textContent = '';
+        this._clearDesktopLyrics();
         return;
       }
 
@@ -469,6 +530,8 @@ class LyricsController {
                    newLines.push({
                        time: 0,
                        end: line.time - 0.3,
+                       endTime: line.time - 0.3,
+                       role: line.role,
                        isInterlude: true,
                        text: '...'
                    });
@@ -477,9 +540,18 @@ class LyricsController {
                const prevLine = this.lines[i-1];
                const prevEnd = prevLine.end || (prevLine.words && prevLine.words.length > 0 ? prevLine.words[prevLine.words.length - 1].time + 1.0 : prevLine.time + 2.0);
                if (line.time - prevEnd > 8.0) {
+                   let layoutSource = line;
+                   for (let sourceIndex = i; sourceIndex < this.lines.length; sourceIndex += 1) {
+                       if (!this.lines[sourceIndex].isBackground) {
+                           layoutSource = this.lines[sourceIndex];
+                           break;
+                       }
+                   }
                    newLines.push({
                        time: prevEnd + 1.0,
                        end: line.time - 0.3,
+                       endTime: line.time - 0.3,
+                       role: layoutSource.role,
                        isInterlude: true,
                        text: '...'
                    });
@@ -494,6 +566,14 @@ class LyricsController {
       // this.lines.forEach((l, i) => console.log(`  [${i}] "${l.text}" | trans: "${l.translation || '-'}" | words: ${l.words ? l.words.length : 0} | interlude: ${!!l.isInterlude}`));
 
       this.render();
+      // 切歌过渡：新歌词整列上移进入动画（渲染完成后触发，无清空时序风险）
+      linesEl.classList.remove('lyrics-track-enter');
+      void linesEl.offsetWidth;
+      linesEl.classList.add('lyrics-track-enter');
+      clearTimeout(this._trackEnterTimer);
+      this._trackEnterTimer = setTimeout(() => {
+        linesEl.classList.remove('lyrics-track-enter');
+      }, 380);
       // Force update of player bar lyrics immediately after loading completes,
       // ensuring the cloned nodes/spans are rendered instantly instead of falling back.
       const currentActive = this.activeIndex >= 0 ? this.activeIndex : 0;
@@ -507,6 +587,102 @@ class LyricsController {
       linesEl.innerHTML = '<div class="lyrics-line" style="text-align:center; color:var(--text-secondary);">暂无歌词</div>';
       if (barLyric1) barLyric1.textContent = '暂无歌词';
       if (barLyric2) barLyric2.textContent = '';
+      this._clearDesktopLyrics();
+    }
+  }
+
+  /** 加载 LunaBeat 在线歌词 */
+  async loadLunaBeat(song) {
+    const loadGeneration = ++this._loadGeneration;
+    this.audioPath = `luna://${song._lunaId}`;
+    this.lines = [];
+    this._timeIndex = null;
+    this._lastAnimatedScrollRows.clear();
+    this._concurrentScrollGroup = null;
+    this._concurrentScrollAnchor = -1;
+    this._manualSeekScrollIndex = -1;
+    this._hasPositionedCurrentLyrics = false;
+    this.currentScrollIndex = -1;
+    this._lastActiveIndicesKey = '';
+    this._lastVisualScrollIndex = -1;
+    this._lastViewActiveKey = '';
+    clearTimeout(this._scrollCleanup);
+    this.isAutoScrolling = false;
+    this.activeIndex = -1;
+    this.miniBarIndex = -1;
+    this._barWordSpans = null;
+    const linesEl = document.getElementById('lyrics-lines');
+    if (!linesEl) return;
+    linesEl.innerHTML = '';
+    const barLyric1 = document.getElementById('bar-lyric-text-1');
+    const barLyric2 = document.getElementById('bar-lyric-text-2');
+    if (barLyric1) barLyric1.textContent = '';
+    if (barLyric2) barLyric2.textContent = '';
+
+    try {
+      const { loadLunaBeatLyrics } = await import('./features/luna-beat/luna-beat-adapter-utils.js');
+      const lunaLines = await loadLunaBeatLyrics(song);
+
+      if (loadGeneration !== this._loadGeneration || this.audioPath !== `luna://${song._lunaId}`) return;
+      if (!lunaLines || lunaLines.length === 0) {
+        linesEl.innerHTML = '<div class="lyrics-line" style="text-align:center; color:var(--text-secondary);">暂无歌词</div>';
+        if (barLyric1) barLyric1.textContent = '暂无歌词';
+        if (barLyric2) barLyric2.textContent = '';
+        this._clearDesktopLyrics();
+        return;
+      }
+
+      this.lines = filterLyricInformationLines(lunaLines, {
+        enabled: getLyricsPreferences().filterInfoEnabled,
+        song: this.player.playlist?.[this.player.currentIndex] || null,
+      });
+
+      // 插入间奏行
+      if (this.lines.length > 0) {
+        const newLines = [];
+        for (let i = 0; i < this.lines.length; i++) {
+          const line = this.lines[i];
+          if (i === 0) {
+            if (line.time > 8.0) {
+              newLines.push({ time: 0, end: line.time - 0.3, endTime: line.time - 0.3, isInterlude: true, text: '...' });
+            }
+          } else {
+            const prevLine = this.lines[i - 1];
+            const prevEnd = prevLine.end || (prevLine.words && prevLine.words.length > 0 ? prevLine.words[prevLine.words.length - 1].time + 1.0 : prevLine.time + 2.0);
+            if (line.time - prevEnd > 8.0) {
+              newLines.push({ time: prevEnd + 1.0, end: line.time - 0.3, endTime: line.time - 0.3, isInterlude: true, text: '...' });
+            }
+          }
+          newLines.push(line);
+        }
+        this.lines = newLines;
+      }
+
+      if (this.lines.length === 0) {
+        linesEl.innerHTML = '<div class="lyrics-line" style="text-align:center; color:var(--text-secondary);">暂无歌词</div>';
+        this._clearDesktopLyrics();
+        return;
+      }
+
+      this.render();
+      // 切歌过渡：与本地歌词一致，新歌词整列上移进入动画
+      linesEl.classList.remove('lyrics-track-enter');
+      void linesEl.offsetWidth;
+      linesEl.classList.add('lyrics-track-enter');
+      clearTimeout(this._trackEnterTimer);
+      this._trackEnterTimer = setTimeout(() => {
+        linesEl.classList.remove('lyrics-track-enter');
+      }, 380);
+      const currentActive = this.activeIndex >= 0 ? this.activeIndex : 0;
+      this.updateBarLyrics(currentActive);
+      this.startSync();
+    } catch (e) {
+      if (loadGeneration !== this._loadGeneration || this.audioPath !== `luna://${song._lunaId}`) return;
+      console.error('[LunaBeat] Lyrics load error:', e);
+      linesEl.innerHTML = '<div class="lyrics-line" style="text-align:center; color:var(--text-secondary);">暂无歌词</div>';
+      if (barLyric1) barLyric1.textContent = '暂无歌词';
+      if (barLyric2) barLyric2.textContent = '';
+      this._clearDesktopLyrics();
     }
   }
 
@@ -582,8 +758,20 @@ class LyricsController {
         div.classList.add('has-translation');
       }
 
+      // ⭐ Roman / Furigana 整行注音（和 translation 同款独立行，但放在「正文 mainDiv 的上方」，
+      //    与 LunaBeat / Apple Music 整行 romanLyric 显示一致，颜色透明度对齐逐字 ruby 的 .lyrics-rt-text）
+      if (line.romanLyric) {
+        const romanDiv = document.createElement('div');
+        romanDiv.className = 'lyrics-roman-lyric';
+        romanDiv.textContent = line.romanLyric;
+        // 放在 translation 之前，mainDiv 之后（这样 DOM 顺序是：main → roman? → translation?）
+        // CSS 里会让 lyrics-roman-lyric 显示在 main 上方，就像逐字注音那样。
+        div.insertBefore(romanDiv, div.querySelector('.lyrics-translation') || div.lastChild.nextSibling || null);
+        div.classList.add('has-roman-lyric');
+      }
+
       div.addEventListener('click', () => {
-        this.player.audio.currentTime = line.time;
+        this.seekToLine(line, idx);
       });
       
       // Bind the context-menu shortcut for single-line AI calibration.
@@ -610,9 +798,35 @@ class LyricsController {
       clientX,
       clientY,
       onCalibrate: lineIndex => this.startSingleLineCalibration(lineIndex),
-      onSeek: line => { this.player.audio.currentTime = line.time; },
+      onSeek: line => this.seekToLine(line, idx),
       onViewFullLyrics: () => this.viewFullLyrics(),
     });
+  }
+
+  seekToLine(line, targetIndex = this.lines.indexOf(line)) {
+    if (!line || !Number.isFinite(line.time)) return;
+
+    // syncToTime() applies the configured lyric offset when rendering. Seek
+    // to its inverse so the requested lyric starts visually at the same
+    // instant instead of leaving the previous row fully highlighted.
+    const { timeOffset } = getLyricsPreferences();
+    const duration = Number.isFinite(this.player.audio.duration)
+      ? this.player.audio.duration
+      : Infinity;
+    const audioTime = Math.max(0, Math.min(duration, line.time - timeOffset));
+
+    this.player.audio.currentTime = audioTime;
+
+    // Drop overlap/physics state from the old playback position and render
+    // the requested time immediately. Restarting the clock also prevents one
+    // stale extrapolated frame from repainting the previous line.
+    this._previousLyricTime = undefined;
+    this._prevPhysicsNow = performance.now();
+    this._concurrentScrollGroup = null;
+    this._concurrentScrollAnchor = -1;
+    this._manualSeekScrollIndex = Math.max(0, targetIndex);
+    this.syncToTime(audioTime, this._prevPhysicsNow);
+    this.startSync();
   }
 
   viewFullLyrics() {
@@ -792,14 +1006,20 @@ class LyricsController {
     const { activeIndices, activeIndex } = lineState;
     let { scrollIndex } = lineState;
 
-    // Treat simultaneous foreground lines as one scroll group. If one voice
-    // has a slightly shorter tail, do not briefly re-anchor to the remaining
-    // voice and then immediately to the following lyric.
-    const foregroundActiveIndices = activeIndices.filter(index => !this.lines[index].isBackground);
+    // Treat foreground rows as concurrent only while their real timestamp
+    // ranges are simultaneously active. A row may overlap both its previous
+    // and next neighbours, so membership must be allowed to advance.
+    const foregroundActiveIndices = activeIndices.filter(index => (
+      !this.lines[index].isBackground && !this.lines[index].isInterlude
+    ));
+    const hasActiveInterlude = activeIndices.some(index => this.lines[index].isInterlude);
+    if (this._concurrentScrollGroup && hasActiveInterlude) {
+      this._concurrentScrollGroup = null;
+      this._concurrentScrollAnchor = -1;
+    }
     if (this._concurrentScrollGroup) {
-      const hasActiveGroupMember = foregroundActiveIndices.some(index => this._concurrentScrollGroup.has(index));
-      const hasNewForeground = foregroundActiveIndices.some(index => !this._concurrentScrollGroup.has(index));
-      if (!hasActiveGroupMember && hasNewForeground) {
+      const anchorStillActive = foregroundActiveIndices.includes(this._concurrentScrollAnchor);
+      if (!anchorStillActive) {
         this._concurrentScrollGroup = null;
         this._concurrentScrollAnchor = -1;
       }
@@ -811,9 +1031,41 @@ class LyricsController {
         : activeIndex;
     }
     if (this._concurrentScrollGroup
-      && (foregroundActiveIndices.length === 0
-        || foregroundActiveIndices.some(index => this._concurrentScrollGroup.has(index)))) {
+      && foregroundActiveIndices.includes(this._concurrentScrollAnchor)) {
       scrollIndex = this._concurrentScrollAnchor;
+    }
+
+    // A clicked lyric is an explicit positioning request. During its phrase,
+    // keep that row on the playback line even if a preceding phrase still
+    // overlaps in time and would normally remain the duet scroll anchor.
+    if (this._manualSeekScrollIndex >= 0) {
+      const manualIndex = this._manualSeekScrollIndex;
+      const manualLine = this.lines[manualIndex];
+      let nextScrollTime = Infinity;
+
+      for (let nextIndex = manualIndex + 1; nextIndex < this.lines.length; nextIndex += 1) {
+        const nextLine = this.lines[nextIndex];
+        if (
+          !nextLine.isBackground
+          && nextLine.time > manualLine.time + 0.01
+        ) {
+          // Interludes are real scroll destinations too. Releasing only at
+          // the next sung phrase would pin a completed clicked row throughout
+          // the entire instrumental gap.
+          nextScrollTime = nextLine.time;
+          break;
+        }
+      }
+
+      if (
+        manualLine
+        && currentTime >= manualLine.time - 0.1
+        && currentTime < nextScrollTime
+      ) {
+        scrollIndex = manualIndex;
+      } else {
+        this._manualSeekScrollIndex = -1;
+      }
     }
 
     // Mini lyrics should follow the newest line that has actually started.
@@ -827,14 +1079,34 @@ class LyricsController {
     }
 
     if (miniBarIndex >= 0) {
-      const miniLine = this.lines[miniBarIndex];
+      const rawMiniLine = this.lines[miniBarIndex];
+      let miniLine = rawMiniLine;
+      let nextLine = this.lines[miniBarIndex + 1];
+      let isInterlude = !!(rawMiniLine?.isInterlude || rawMiniLine?.text === '...');
+      let targetStartTime = rawMiniLine?.end || rawMiniLine?.time || 0;
+
+      // 若当前行是间奏占位行，将桌面歌词要显示的 text 自动升格指向下一句要唱的真实歌词
+      if (isInterlude) {
+        for (let k = miniBarIndex + 1; k < this.lines.length; k++) {
+          if (!this.lines[k].isInterlude && this.lines[k].text !== '...') {
+            miniLine = this.lines[k];
+            nextLine = this.lines[k + 1] || null;
+            targetStartTime = miniLine.time;
+            break;
+          }
+        }
+      }
+
       this.desktopLyricsController?.sync({
         text: this._getLineText(miniLine),
         translation: miniLine?.translation || '',
+        nextText: nextLine ? this._getLineText(nextLine) : '',
+        nextTranslation: nextLine?.translation || '',
         words: miniLine?.words || null,
         currentTime,
-        lineStart: miniLine?.time || 0,
-        lineEnd: miniLine?.end || 0,
+        lineStart: rawMiniLine?.time || 0,
+        lineEnd: isInterlude ? targetStartTime : (miniLine?.end || 0),
+        isInterlude,
       });
     }
 
@@ -844,21 +1116,38 @@ class LyricsController {
         this.miniBarIndex = miniBarIndex;
       }
       if (miniBarIndex >= 0 && this.lines[miniBarIndex] && this.lines[miniBarIndex].charWords && this.lines[miniBarIndex].charWords.length > 0) {
-        const lineData = this.lines[miniBarIndex];
-        const totalChars = lineData.charWords.length;
-        const charC = calculateSimpleCharProgress(lineData.charWords, currentTime);
-        this.syncBarSpans(null, charC, totalChars);
+        const rawLineData = this.lines[miniBarIndex];
+        let lineData = rawLineData;
+        let isInterlude = !!(rawLineData?.isInterlude || rawLineData?.text === '...');
+        let nextLine = this.lines[miniBarIndex + 1];
+        let targetStartTime = rawLineData?.end || rawLineData?.time || 0;
+        if (isInterlude) {
+          for (let k = miniBarIndex + 1; k < this.lines.length; k++) {
+            if (!this.lines[k].isInterlude && this.lines[k].text !== '...') {
+              lineData = this.lines[k];
+              nextLine = this.lines[k + 1] || null;
+              targetStartTime = lineData.time;
+              break;
+            }
+          }
+        }
+        this.syncBarSpans(null, lineData.charWords, currentTime);
 
         // 同步桌面歌词进度，直接克隆已经构建好的底栏迷你歌词 spans HTML
         if (this.desktopLyricsController) {
           const barLyricEl = document.getElementById('bar-lyric-text-1');
           const barHtml = barLyricEl?.innerHTML || '';
+          const { charC, totalChars } = calculateKaraokePlayheadState(lineData.charWords, currentTime);
           this.desktopLyricsController.syncKaraokeProgress({
             html: barHtml,
             charC,
             totalChars,
             text: this._getLineText(lineData),
             translation: lineData.translation || '',
+            nextText: nextLine ? this._getLineText(nextLine) : '',
+            nextTranslation: nextLine?.translation || '',
+            lineStart: isInterlude ? targetStartTime : (lineData.time || 0),
+            isInterlude,
           });
         }
       }
@@ -1001,7 +1290,7 @@ class LyricsController {
               el.style.setProperty('--lyric-motion-duration', `${opacityDuration.toFixed(3)}s`);
               el.style.setProperty('--lyric-scale-duration', `${motionDuration.toFixed(3)}s`);
               // Row motion and fading progress together; depth blur still reacts quickly.
-              el.style.transition = `transform ${motionDuration.toFixed(3)}s cubic-bezier(0.2, 0, 0.2, 1) ${delay.toFixed(3)}s, opacity ${opacityDuration.toFixed(3)}s cubic-bezier(0.2, 0, 0.2, 1) 0s, filter 0.32s ease 0s`;
+              el.style.transition = `transform ${motionDuration.toFixed(3)}s cubic-bezier(0.26, 1.12, 0.42, 1) ${delay.toFixed(3)}s, opacity ${opacityDuration.toFixed(3)}s cubic-bezier(0.2, 0, 0.2, 1) 0s, filter 0.32s ease 0s`;
               el.style.transform = 'translateY(0)';
 
               if (el.classList.contains('has-translation')) {
@@ -1080,6 +1369,7 @@ class LyricsController {
       
       allLines.forEach((el, idx) => {
         const wasActive = el.classList.contains('active');
+        const wasPast = el.classList.contains('past');
         const willBeActive = activeIndices.includes(idx);
 
         if (willBeActive) {
@@ -1121,8 +1411,11 @@ class LyricsController {
           const EXIT_DUR = 0.6;
 
           if (currentTime < lineData.time) {
+            if (wasActive || wasPast) trackInterludeLayout(this);
             el._wasPast = false;
           } else if (currentTime >= lineData.time && currentTime < targetTime) {
+            if (!wasActive) trackInterludeLayout(this);
+            el._wasPast = false;
             if (currentTime >= targetTime - EXIT_DUR) {
               el.classList.add('active', 'is-exiting');
             } else {
@@ -1134,27 +1427,7 @@ class LyricsController {
             el._wasPast = true;
 
             if (justEnteredPast) {
-              const collapseStartTime = performance.now();
-              const trackerFn = (now) => {
-                if (now - collapseStartTime < 650) {
-                  const currentActive = document.querySelector('.lyrics-line.active');
-                  if (currentActive && !this.isUserScrolling) {
-                    const scrollIndex = this.currentScrollIndex;
-                    const container = document.getElementById('lyrics-scroll');
-                    if (container && scrollIndex >= 0) {
-                      const allLines = Array.from(document.querySelectorAll('#lyrics-lines .lyrics-line'));
-                      const lineEl = allLines[scrollIndex];
-                      if (lineEl) {
-                        container.scrollTop = getAlignedScrollTop(container, lineEl);
-                      }
-                    }
-                  }
-                  this._interludeCollapseTracker = requestAnimationFrame(trackerFn);
-                } else {
-                  cancelAnimationFrame(this._interludeCollapseTracker);
-                }
-              };
-              cancelAnimationFrame(this._interludeCollapseTracker);
+              trackInterludeLayout(this);
             }
           }
           return;
@@ -1213,22 +1486,38 @@ class LyricsController {
           
           const {
             charC,
-            inGap,
-            gapPrevIdx,
-            currentGapT,
             totalChars,
           } = calculateKaraokePlayheadState(lineData.charWords, currentTime);
 
           if (idx === this.activeIndex) {
-            this.syncBarSpans(wordSpans, charC, totalChars);
+            const rawActiveData = lineData;
+            let activeLineData = rawActiveData;
+            let isInterlude = !!(rawActiveData?.isInterlude || rawActiveData?.text === '...');
+            let nextLine = this.lines[idx + 1];
+            let targetStartTime = rawActiveData?.end || rawActiveData?.time || 0;
+            if (isInterlude) {
+              for (let k = idx + 1; k < this.lines.length; k++) {
+                if (!this.lines[k].isInterlude && this.lines[k].text !== '...') {
+                  activeLineData = this.lines[k];
+                  nextLine = this.lines[k + 1] || null;
+                  targetStartTime = activeLineData.time;
+                  break;
+                }
+              }
+            }
+            this.syncBarSpans(wordSpans, activeLineData.charWords || lineData.charWords, currentTime);
             if (this.desktopLyricsController) {
-              const mainHtml = domLine.querySelector('.lyrics-main')?.innerHTML || '';
+              const barLyricEl = document.getElementById('bar-lyric-text-1');
               this.desktopLyricsController.syncKaraokeProgress({
-                html: mainHtml,
+                html: barLyricEl?.innerHTML || '',
                 charC,
                 totalChars,
-                text: this._getLineText(lineData),
-                translation: lineData.translation || '',
+                text: this._getLineText(activeLineData),
+                translation: activeLineData.translation || '',
+                nextText: nextLine ? this._getLineText(nextLine) : '',
+                nextTranslation: nextLine?.translation || '',
+                lineStart: isInterlude ? targetStartTime : (activeLineData.time || 0),
+                isInterlude,
               });
             }
           }
@@ -1237,37 +1526,37 @@ class LyricsController {
             return;
           }
 
-          const longIndices = collectLongGlowIndices(wordSpans);
+          // long-glow 类在歌词渲染时确定、播放中不变：缓存到行元素，避免每帧遍历
+          const longIndices = domLine._longIndices
+            || (domLine._longIndices = collectLongGlowIndices(wordSpans));
 
-          if (domLine.rowsData && domLine.rowsData.length > 0) {
-            renderRowKaraokeProgress({
-              rowsData: domLine.rowsData,
-              wordSpans,
-              charC,
-              totalChars,
-              inGap,
-              gapPrevIdx,
-              currentGapT,
-            });
-          } else {
-            renderClassicCharProgress({
-              wordSpans,
-              charWords: lineData.charWords,
-              currentTime,
-              charC,
-              totalChars,
-            });
-          }
-          
-          renderWordMotionEffects({
+          // 统一采用与桌面歌词同源的高效逐字（--char-fill）线性卡拉OK渲染逻辑，
+          // 彻底解决 DOM 测量像素与换行偏差造成的走字跳变/卡顿问题
+          renderClassicCharProgress({
             wordSpans,
             charWords: lineData.charWords,
+            currentTime,
             charC,
-            liftAmplitude: liftAmp,
-            isBackground: lineData.isBackground,
-            deltaTime: dt,
-            longIndices,
+            totalChars,
           });
+
+          // 深度模糊行（filter: blur 生效中）冻结字运动效果：
+          // blur 层内部若每帧有 transform 变化会强制整行重算模糊（昂贵），
+          // 冻结后模糊层静止，只保留卡拉OK填充，消除每帧重绘
+          const isDepthBlurred = domLine.classList.contains('depth-1')
+            || domLine.classList.contains('depth-2')
+            || domLine.classList.contains('depth-3');
+          if (!isDepthBlurred) {
+            renderWordMotionEffects({
+              wordSpans,
+              charWords: lineData.charWords,
+              charC,
+              liftAmplitude: liftAmp,
+              isBackground: lineData.isBackground,
+              deltaTime: dt,
+              longIndices,
+            });
+          }
 
         }
       }
@@ -1311,7 +1600,7 @@ class LyricsController {
     if (this.player.currentIndex >= 0) {
       const song = this.player.playlist[this.player.currentIndex];
       if (song) {
-        const cover = getCoverSrc(song.cover_image);
+        const cover = getCoverSrc(song);
         const largeCoverEl = document.getElementById('lyrics-large-cover');
         if (largeCoverEl && largeCoverEl.src !== cover) {
           transitionContent(largeCoverEl, cover, true);
@@ -1350,7 +1639,7 @@ const player = new PlaybackController({
 configureThemePlayer(() => player);
 
 // ══ Init ══
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
   window.addEventListener('error', (event) => {
     alert(`JS 运行异常: ${event.message}\n文件: ${event.filename}\n行号: ${event.lineno}`);
   });
@@ -1374,14 +1663,7 @@ document.addEventListener('DOMContentLoaded', () => {
     } catch (e) {}
   }
 
-  // Remove the splash after the first render.
-  setTimeout(() => {
-    const splash = document.getElementById('app-splash-screen');
-    if (splash) {
-      splash.classList.add('fade-out');
-      setTimeout(() => splash.remove(), 500);
-    }
-  }, 600);
+  // 启动页关闭逻辑已移至默认字体下载处（splash 等待字体初始化完成后关闭）
 
   // Restore default lyric lift amplitude to 4.0 on version 1.2.2 launch (word lift animation)
   if (localStorage.getItem('kimo-lyrics-lift-amplitude-migrated-122') !== 'true') {
@@ -1411,7 +1693,63 @@ document.addEventListener('DOMContentLoaded', () => {
   // 加载已保存的背景样式
   const savedBgStyle = localStorage.getItem('kimo-bg-style') || 'static';
   applyBackgroundStyle(savedBgStyle);
+  // 迁移旧设置：此前「背景透明度」存于 kimo-bg-custom-opacity（0-1 格式），
+  // 迁移为整窗口透明度（0-100 格式，需 ×100；<0.1 视为测试残留，重置为 100 防卡死）
+  if (localStorage.getItem('kimo-window-opacity') === null && localStorage.getItem('kimo-bg-custom-opacity') !== null) {
+    const oldVal = parseFloat(localStorage.getItem('kimo-bg-custom-opacity'));
+    const migrated = Number.isFinite(oldVal) && oldVal >= 0.1 ? Math.round(oldVal * 100) : 100;
+    localStorage.setItem('kimo-window-opacity', String(migrated));
+    localStorage.removeItem('kimo-bg-custom-opacity');
+  }
+  // 窗口透明度（整窗口概念，与背景设置无关）：启动时应用保存值；
+  // 异常低值（<5）保护性重置为 100，避免 UI 完全不可见无法操作
+  const savedWindowOpacity = localStorage.getItem('kimo-window-opacity');
+  const parsedOpacity = savedWindowOpacity !== null && Number.isFinite(parseFloat(savedWindowOpacity))
+    ? parseFloat(savedWindowOpacity)
+    : 100;
+  if (parsedOpacity < 5) {
+    localStorage.setItem('kimo-window-opacity', '100');
+    applyWindowOpacity(100);
+  } else {
+    applyWindowOpacity(parsedOpacity);
+  }
+  // 窗口材质（Windows 系统级底座）：启动时应用保存值
+  applyWindowMaterial(localStorage.getItem('kimo-window-material') || 'none');
+  initializeMaterialEngine();
+  // 内置字体（生产环境 resources 目录）+ 用户字体（注册表）注册，随后应用存储的字体
+  await Promise.allSettled([ensureBuiltinFonts(), ensureUserFonts()]);
   applyStoredInterfaceFont();
+  applyStoredLyricsFont();
+
+  // 默认字体（思源黑体）首次启动自动下载：不进安装包，未安装时在启动页展示下载进度
+  const splashEl = document.getElementById('app-splash-screen');
+  const splashStatusText = document.getElementById('splash-status-text');
+  const hideSplash = () => {
+    if (!splashEl) return;
+    splashEl.classList.add('fade-out');
+    setTimeout(() => splashEl.remove(), 500);
+  };
+
+  const defaultFontDownload = ensureDefaultFont({
+    onProgress: (p) => {
+      const pct = Math.round(p.percent || 0);
+      if (splashStatusText) {
+        splashStatusText.textContent = `正在下载默认字体（思源黑体）… ${pct}%`;
+      }
+    },
+  });
+
+  // 首帧渲染后：若无需下载（字体已安装），按时关闭启动页；
+  // 若正在下载默认字体，启动页保持展示进度，完成后短暂提示再关闭
+  setTimeout(async () => {
+    const downloaded = await defaultFontDownload;
+    if (downloaded) {
+      if (splashStatusText) splashStatusText.textContent = '默认字体下载完成，正在启动…';
+      setTimeout(hideSplash, 500);
+    } else {
+      hideSplash();
+    }
+  }, 600);
 
   if (localStorage.getItem('kimo-performance-mode') === 'true') {
     document.body.classList.add('perf-mode');
@@ -1458,6 +1796,32 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     updateBlurUI();
   }
+
+  // Ruby position toggle (注音位置: 上方/下方).
+  const rubyPosBtn = document.getElementById('btn-ruby-pos-toggle');
+  const rubyPosVal = document.getElementById('lyric-ruby-pos-value');
+  const lyricsPanel = document.querySelector('.lyrics-panel');
+  const updateRubyPosUI = () => {
+    const pos = getLyricsPreferences().rubyPosition || 'above';
+    const aboveSpan = rubyPosBtn?.querySelector('.ruby-pos-above');
+    const belowSpan = rubyPosBtn?.querySelector('.ruby-pos-below');
+    const isBelow = pos === 'below';
+    if (aboveSpan) aboveSpan.style.display = isBelow ? 'none' : '';
+    if (belowSpan) belowSpan.style.display = isBelow ? '' : 'none';
+    if (rubyPosVal) rubyPosVal.textContent = isBelow ? '注音: 下方' : '注音: 上方';
+    if (lyricsPanel) {
+      lyricsPanel.setAttribute('data-ruby-position', pos);
+    }
+  };
+  if (rubyPosBtn) {
+    rubyPosBtn.addEventListener('click', () => {
+      const currentPos = getLyricsPreferences().rubyPosition || 'above';
+      const nextPos = currentPos === 'above' ? 'below' : 'above';
+      updateLyricsPreference('rubyPosition', nextPos);
+      updateRubyPosUI();
+    });
+    updateRubyPosUI();
+  }
   // ══ 监听子窗口元数据/歌词修改保存事件 ══
   initializeImmersiveMode();
 
@@ -1477,7 +1841,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  initializeContentAreaWheelFix();
+  // scroll-fix 已移除：手动 scrollTop += deltaY 会覆盖浏览器原生平滑滚动，导致顿挫感
 
   initializePlayerControls(player);
 
@@ -1548,7 +1912,7 @@ document.addEventListener('DOMContentLoaded', () => {
       div.dataset.cover = song.cover_image || '';
       div.dataset.album = song.album || '';
       div.dataset.duration = String(song.duration || 0);
-      const coverSrc = getCoverSrc(song.cover_image);
+      const coverSrc = getCoverSrc(song);
       
       const isPaused = player.audio.paused;
       div.innerHTML = `
@@ -1563,7 +1927,7 @@ document.addEventListener('DOMContentLoaded', () => {
           <div class="eq-bar"></div>
           <div class="eq-bar"></div>
         </div>
-        <div class="song-duration">${song.duration ? Math.floor(song.duration / 60) + ':' + (song.duration % 60).toString().padStart(2, '0') : ''}</div>
+        <div class="song-duration">${song.duration ? Math.floor(Math.round(song.duration) / 60) + ':' + (Math.round(song.duration) % 60).toString().padStart(2, '0') : ''}</div>
       `;
       div.addEventListener('click', () => {
         if ((localStorage.getItem('kimo-song-play-mode') || 'single') === 'single') player.play(idx);
@@ -1611,17 +1975,17 @@ document.addEventListener('DOMContentLoaded', () => {
               if (songItems[index]) {
                 const coverImg = songItems[index].querySelector('.song-cover');
                 if (coverImg) {
-                  coverImg.src = getCoverSrc(song.cover_image);
+                  coverImg.src = getCoverSrc(song);
                 }
               }
 
               // Update the active player UI covers if this song happens to be the active one
               if (index === player.currentIndex) {
                 player.updateUI(song);
-                extractDominantColor(getCoverSrc(song.cover_image), getColorOptions()).then(color => {
+                extractDominantColor(getCoverSrc(song), getColorOptions()).then(color => {
                   song.dominant_color = color;
                   if (index === player.currentIndex) {
-                    applyDynamicColor(color.r, color.g, color.b, getCoverSrc(song.cover_image));
+                    applyDynamicColor(color.r, color.g, color.b, getCoverSrc(song));
                   }
                 });
               }
@@ -1736,14 +2100,17 @@ document.addEventListener('DOMContentLoaded', () => {
     toggleCommentsPanel(player, track?.album || '');
   });
 
-  const desktopLyrics = createDesktopLyricsController({ showToast, player });
-  desktopLyrics.setPlayer(player);
-  configureThemeDesktopLyrics(() => desktopLyrics);
-  player.lyrics?.setDesktopLyricsController(desktopLyrics);
-  player.audio?.addEventListener('play', () => desktopLyrics.notifyPlaybackState(true));
-  player.audio?.addEventListener('pause', () => desktopLyrics.notifyPlaybackState(false));
-  if (localStorage.getItem('kimo-desktop-lyrics-enabled') === 'true') {
-    desktopLyrics.setVisible(true, { silent: true });
+  let desktopLyrics = null;
+  if (!isStandaloneEditor) {
+    desktopLyrics = createDesktopLyricsController({ showToast, player });
+    desktopLyrics.setPlayer(player);
+    configureThemeDesktopLyrics(() => desktopLyrics);
+    player.lyrics?.setDesktopLyricsController(desktopLyrics);
+    player.audio?.addEventListener('play', () => desktopLyrics.notifyPlaybackState(true));
+    player.audio?.addEventListener('pause', () => desktopLyrics.notifyPlaybackState(false));
+    if (localStorage.getItem('kimo-desktop-lyrics-enabled') === 'true') {
+      desktopLyrics.setVisible(true, { silent: true });
+    }
   }
 
   // ══ 系统托盘状态同步 ══
@@ -1756,16 +2123,36 @@ document.addEventListener('DOMContentLoaded', () => {
       desktopLyricsEnabled: lyricsEnabled,
       songInfo,
     }).catch(() => {});
+
+    // 同步给自定义 Web 托盘窗口
+    if (song) {
+      localStorage.setItem('kimo-tray-state', JSON.stringify({
+        title: song.title || '未知标题',
+        artist: song.artist || '未知歌手',
+        coverSrc: getCoverSrc(song),
+        isPlaying: player.isPlaying,
+        playMode: player.playMode
+      }));
+    } else {
+      localStorage.setItem('kimo-tray-state', JSON.stringify(null));
+    }
   };
 
   // 监听托盘菜单事件 → 驱动播放控制
   listen('tray-play', () => { player.toggle(); }).catch(() => {});
   listen('tray-prev', () => { player.prev(); }).catch(() => {});
   listen('tray-next', () => { player.next(); }).catch(() => {});
+  listen('tray-toggle-play-mode', () => { 
+    player.cyclePlayMode(); 
+    syncTrayState(); 
+  }).catch(() => {});
   listen('tray-toggle-desktop-lyrics', () => {
     const enabled = localStorage.getItem('kimo-desktop-lyrics-enabled') !== 'true';
     desktopLyrics.setVisible(enabled);
     syncTrayState();
+  }).catch(() => {});
+  listen('tray-toggle-desktop-lyrics-lock', () => {
+    emit('desktop-lyrics-action', { action: 'toggle-lock' }).catch(() => {});
   }).catch(() => {});
   listen('tray-open-settings', () => { switchTab('settings'); }).catch(() => {});
 
@@ -1784,6 +2171,24 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // 初始同步一次
   syncTrayState();
+
+  // 🌟 智能软件后台休眠系统 (Smart Background Sleep System) 🌟
+  // 当软件最小化、切入后台或隐藏时，彻底暂停动画与无用重绘，拯救 CPU 与 GPU 显存
+  document.addEventListener('visibilitychange', () => {
+    const container = document.querySelector('.app-container');
+    if (document.hidden) {
+      container?.classList.add('app-paused-state');
+      document.documentElement.style.setProperty('--bg-rotate-play-state', 'paused');
+    } else {
+      container?.classList.remove('app-paused-state');
+      const currentBgStyle = localStorage.getItem('kimo-bg-style') || 'static';
+      if (currentBgStyle === 'dynamic') {
+        document.documentElement.style.setProperty('--bg-rotate-play-state', 'running');
+      } else {
+        document.documentElement.style.setProperty('--bg-rotate-play-state', 'paused');
+      }
+    }
+  });
 
   // ========== 歌单 UI ==========
   const { renderPlaylistsTab } = createPlaylistsPage({
@@ -1823,7 +2228,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const renderRecentPlaysTab = createRecentPlaysRenderer({
     player,
     getCoverSrc,
-    renderPlaylist,
     isRecentTab: () => currentTab === 'recent',
   });
 
@@ -1834,9 +2238,22 @@ document.addEventListener('DOMContentLoaded', () => {
     player,
     getCoverSrc,
     getRecentPlays,
-    renderPlaylist,
     switchTab: tabName => switchTab(tabName),
   });
+
+  // ===== LunaBeat 局域网曲库 =====
+  const ensureLunaBeatPage = () => {
+    if (window.__lunaBeatPage) return Promise.resolve(window.__lunaBeatPage);
+    const page = createLunaBeatPage({
+      player,
+      getCoverSrc,
+      showToast,
+      switchTab: tabName => switchTab(tabName),
+      getCurrentTab: () => currentTab,
+    });
+    window.__lunaBeatPage = page;
+    return Promise.resolve(page);
+  };
 
               const updateSidebarIndicator = (activeNav) => {
     const indicator = document.getElementById('sidebar-indicator');
@@ -1872,7 +2289,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const floatSearch = document.getElementById('float-search');
     const floatToTop = document.getElementById('float-to-top');
     const floatToPlaying = document.getElementById('float-to-playing');
-    const isListTab = tabName === 'local' || tabName === 'recent' || tabName === 'playlists';
+    const isListTab = tabName === 'local' || tabName === 'recent' || tabName === 'playlists' || tabName === 'luna';
     floatingActions?.classList.toggle('visible', isListTab);
     if (floatSearch) floatSearch.style.display = isListTab ? 'flex' : 'none';
     if (floatToTop) floatToTop.style.display = isListTab ? 'flex' : 'none';
@@ -1900,6 +2317,25 @@ document.addEventListener('DOMContentLoaded', () => {
     } else if (tabName === 'settings') {
       contentTitle.innerText = '系统设置';
       renderSettingsTab();
+    } else if (tabName === 'luna') {
+      contentTitle.innerText = '局域网 (LunaBeat)';
+      if (window.__lunaBeatPage) {
+        window.__lunaBeatPage.enter();
+      } else {
+        const listEl = document.getElementById('music-list');
+        if (listEl) {
+          renderLoadingPlaceholder(listEl, {
+            title: '正在初始化局域网页面…',
+            sub: '正在加载 LunaBeat 模块，请稍候',
+          });
+        }
+        // 初始化 LunaBeat 页面
+        ensureLunaBeatPage().then(() => {
+          if (currentTab === 'luna' && window.__lunaBeatPage) {
+            window.__lunaBeatPage.enter();
+          }
+        });
+      }
     }
 
                         // Trigger fluid tab transition with hardware acceleration
@@ -1963,6 +2399,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // Wire up sidebar navigation buttons
   document.getElementById('nav-discover')?.addEventListener('click', () => switchTab('discover'));
   document.getElementById('nav-local')?.addEventListener('click', () => switchTab('local'));
+  document.getElementById('nav-luna')?.addEventListener('click', () => switchTab('luna'));
   document.getElementById('nav-recent')?.addEventListener('click', () => switchTab('recent'));
   document.getElementById('nav-search')?.addEventListener('click', () => switchTab('search'));
   document.getElementById('nav-playlists')?.addEventListener('click', () => switchTab('playlists'));
@@ -2028,28 +2465,64 @@ document.addEventListener('DOMContentLoaded', () => {
     console.error('Failed to init scanned directories:', e);
   }
 
-  // Auto Load Cached Music Library on Startup
-  const cachedLibrary = localStorage.getItem('kimo-music-library');
-  if (cachedLibrary) {
-    try {
-      const parsed = JSON.parse(cachedLibrary);
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        musicLibrary = parsed;
-        // 如果 player.playlist 是空的，恢复为整个音乐库
-        if (player.playlist.length === 0) {
-          player.playlist = [...parsed];
-        }
-        // Spin up background concurrency task to restore missing cover images
-        backgroundLoadCovers(musicLibrary);
+  // ══ SQLite 歌库加载（替代 localStorage）══
+  try {
+    await invoke('init_library_db');
+    const dbSongs = await invoke('get_library_songs', { offset: 0, limit: 50000 });
+    if (Array.isArray(dbSongs) && dbSongs.length > 0) {
+      musicLibrary = dbSongs;
+      if (player.playlist.length === 0) {
+        player.playlist = [...dbSongs];
       }
-    } catch (e) {
-      console.error('Failed to load cached music library on startup', e);
+      backgroundLoadCovers(musicLibrary);
+      // SQLite 已接管歌库，清理 localStorage 中的旧版缓存，避免残留占满配额
+      try {
+        localStorage.removeItem('kimo-music-library');
+      } catch (e) {}
+    } else {
+      // 回退：首次迁移，从 localStorage 旧缓存加载（后续扫描会写入 SQLite）
+      const cachedLibrary = localStorage.getItem('kimo-music-library');
+      if (cachedLibrary) {
+        try {
+          const parsed = JSON.parse(cachedLibrary);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            musicLibrary = parsed;
+            if (player.playlist.length === 0) {
+              player.playlist = [...parsed];
+            }
+            backgroundLoadCovers(musicLibrary);
+          }
+        } catch (e) {
+          console.error('Failed to load cached music library from localStorage', e);
+        }
+      }
+    }
+  } catch (e) {
+    console.error('Failed to load music library from SQLite, falling back to localStorage:', e);
+    const cachedLibrary = localStorage.getItem('kimo-music-library');
+    if (cachedLibrary) {
+      try {
+        const parsed = JSON.parse(cachedLibrary);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          musicLibrary = parsed;
+          if (player.playlist.length === 0) {
+            player.playlist = [...parsed];
+          }
+          backgroundLoadCovers(musicLibrary);
+        }
+      } catch (ex) {}
     }
   }
 
   if (musicLibrary.length === 0 && player.playlist.length > 0) {
     musicLibrary = [...player.playlist];
-    localStorage.setItem('kimo-music-library', JSON.stringify(musicLibrary));
+  }
+
+  // 定期清理超过 12 个月的播放统计数据（此前从未执行，防止配额被历史数据占满）
+  try {
+    cleanupOldStats(12);
+  } catch (e) {
+    console.warn('[PlayStats] cleanup failed:', e);
   }
 
   // Restore last played song only in the main player window.
@@ -2088,10 +2561,10 @@ document.addEventListener('DOMContentLoaded', () => {
           const [r, g, b] = cachedColorStr.split(',').map(Number);
           applyDynamicColor(r, g, b, cachedCoverSrc);
         } else {
-          extractDominantColor(getCoverSrc(song.cover_image), getColorOptions()).then(color => {
+          extractDominantColor(getCoverSrc(song), getColorOptions()).then(color => {
             song.dominant_color = color;
             if (player.currentIndex === index) {
-              applyDynamicColor(color.r, color.g, color.b, getCoverSrc(song.cover_image));
+              applyDynamicColor(color.r, color.g, color.b, getCoverSrc(song));
             }
           });
         }
@@ -2145,8 +2618,16 @@ document.addEventListener('DOMContentLoaded', () => {
       player.playlist.push(newSong);
       renderPlaylist(player.playlist);
       
-      // 异步更新本地缓存
-      localStorage.setItem('kimo-playlist-cache', JSON.stringify(player.playlist));
+      // 异步更新本地缓存（配额满时降级：剥离封面重试）
+      try {
+        localStorage.setItem('kimo-playlist-cache', JSON.stringify(player.playlist));
+      } catch (e) {
+        try {
+          localStorage.setItem('kimo-playlist-cache', JSON.stringify(player.playlist.map((s) => ({ ...s, cover_image: undefined }))));
+        } catch (e2) {
+          console.warn('[PlaylistCache] 存储空间不足，播放列表缓存未保存');
+        }
+      }
       
       // 立即播放最后一首（即新拖入的这首）
       player.play(player.playlist.length - 1);
@@ -2411,7 +2892,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
         player.playlist[songIdx] = updatedSong;
 
-        localStorage.setItem('kimo-playlist-cache', JSON.stringify(player.playlist));
+        try {
+          localStorage.setItem('kimo-playlist-cache', JSON.stringify(player.playlist));
+        } catch (e) {
+          try {
+            localStorage.setItem('kimo-playlist-cache', JSON.stringify(player.playlist.map((s) => ({ ...s, cover_image: undefined }))));
+          } catch (e2) {
+            console.warn('[PlaylistCache] 存储空间不足，播放列表缓存未保存');
+          }
+        }
 
         renderPlaylist(player.playlist);
 
@@ -2423,10 +2912,10 @@ document.addEventListener('DOMContentLoaded', () => {
           }
 
           if (updatedSong.cover_image) {
-            extractDominantColor(getCoverSrc(updatedSong.cover_image), getColorOptions()).then(color => {
+            extractDominantColor(getCoverSrc(updatedSong), getColorOptions()).then(color => {
               updatedSong.dominant_color = color;
               if (player.currentIndex === songIdx) {
-                applyDynamicColor(color.r, color.g, color.b, getCoverSrc(updatedSong.cover_image));
+                applyDynamicColor(color.r, color.g, color.b, getCoverSrc(updatedSong));
               }
             });
           } else {
@@ -2460,6 +2949,211 @@ document.addEventListener('DOMContentLoaded', () => {
 
   initializeLyricsSettingsToolbar();
   applyMiniLyricsTranslationSetting();
+
+  // 应用动画速率设置
+  applyAnimationSpeed();
+
+  // 应用mini歌词字号设置
+  const savedMiniLyricsSize = Math.max(11, Math.min(18, Number(localStorage.getItem('kimo-mini-lyrics-font-size') || 13.5)));
+  document.documentElement.style.setProperty('--mini-lyrics-size', `${savedMiniLyricsSize.toFixed(1)}px`);
+
+  // ── 材质引擎（架构落地 v1，docs/material-layer-architecture.md）──
+  // 默认不激活：设置页「材质引擎预览」开关启用后，引擎接管背景层做玻璃效果
+  function initializeMaterialEngine() {
+    const materialRegistry = new MaterialRegistry();
+    materialRegistry.register('frosted-glass', () => {
+      // 按当前主题对齐评论区玻璃默认：浅色主题用浅色玻璃 + 更强高光
+      const theme = localStorage.getItem('kimo-theme') || 'light';
+      const isLight = theme === 'light' || theme === 'grey';
+      const mat = new FrostedGlassMaterial();
+      if (isLight) {
+        mat.params.patch({ tintColor: 'rgba(245, 245, 247, 0.6)', tintAmount: 0.32, highlight: 0.85 });
+      }
+      return mat;
+    });
+    const materialEngine = new MaterialEngine(materialRegistry);
+    const materialLayer = new MaterialLayer();
+    materialEngine.addLayer('main', materialLayer);
+    const materialThemeBridge = new MaterialThemeBridge();
+    window.__materialEngine = { engine: materialEngine, layer: materialLayer, bridge: materialThemeBridge };
+
+    /** 材质预览自动启用系统底座时记录（关闭时恢复 none） */
+    let previewForcedMaterial = false;
+
+    // 背景内容变化（切歌换封面）联动：叠加层无输入，仅触发重算
+    window.__materialEngine.onBackgroundChanged = () => {
+      materialLayer.invalidate();
+    };
+    window.__materialEngine.previewActive = false;
+
+    function ensureMaterialPreviewCanvas() {
+      let canvas = document.getElementById('material-preview-canvas');
+      if (!canvas) {
+        canvas = document.createElement('canvas');
+        canvas.id = 'material-preview-canvas';
+        // 材质层位于最底（Window → 材质层 → 背景层 → UI）：
+        // 插到 dynamic-bg 之前（同 z-index 0，DOM 在前 → 在背景之下）
+        canvas.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:0;pointer-events:none;';
+        const bg = document.getElementById('dynamic-bg');
+        if (bg && bg.parentElement) {
+          bg.parentElement.insertBefore(canvas, bg);
+        }
+      }
+      return canvas;
+    }
+
+    function setMaterialPreview(enabled) {
+      const bg = document.getElementById('dynamic-bg');
+      const imgs = bg ? bg.querySelectorAll('.bg-blur-img') : [];
+      window.__materialEngine.previewActive = !!enabled;
+      if (enabled && materialLayer.stack.length === 0) {
+        // 系统底座：若未启用窗口材质，自动用亚克力（DWM 模糊窗口后真实内容，无自反馈）
+        if ((localStorage.getItem('kimo-window-material') || 'none') === 'none') {
+          localStorage.setItem('kimo-window-material', 'acrylic');
+          applyWindowMaterial('acrylic');
+          previewForcedMaterial = true;
+        }
+        // 背景容器透明（CSS 规则：html[data-material-preview] .dynamic-bg 透明）——
+        // 露出 DWM 材质（窗口背景）与叠加层
+        document.documentElement.setAttribute('data-material-preview', 'true');
+        // 材质层 = 叠加层：纯合成质感（着色/高光/噪点），半透明叠加在 DWM 材质上
+        materialLayer.resize(Math.round(window.innerWidth * 0.5), Math.round(window.innerHeight * 0.5));
+        materialLayer.setSource(null);
+        materialLayer.stack.push(materialRegistry.create('glass-overlay'));
+        materialEngine.onLayerOutput = (id, output) => {
+          const canvas = ensureMaterialPreviewCanvas();
+          canvas.width = output.width;
+          canvas.height = output.height;
+          canvas.getContext('2d').drawImage(output.canvas, 0, 0);
+        };
+        // 背景层隐藏（DWM 材质是唯一窗口底）
+        for (const img of imgs) img.style.display = 'none';
+        materialEngine.start();
+      } else if (!enabled) {
+        materialLayer.setSource(null);
+        materialLayer.stack.clear();
+        materialEngine.stop();
+        materialEngine.onLayerOutput = null;
+        document.documentElement.removeAttribute('data-material-preview');
+        const canvas = document.getElementById('material-preview-canvas');
+        if (canvas) canvas.remove();
+        for (const img of imgs) img.style.display = '';
+        // 恢复被预览自动启用的系统底座
+        if (previewForcedMaterial) {
+          localStorage.setItem('kimo-window-material', 'none');
+          applyWindowMaterial('none');
+          previewForcedMaterial = false;
+        }
+      }
+    }
+    window.__materialEngine.setPreview = setMaterialPreview;
+
+    // 设置页切换「材质引擎预览」即时生效（storage 事件）
+    window.addEventListener('storage', (e) => {
+      if (e.key === 'kimo-material-engine-preview') {
+        setMaterialPreview(e.newValue === 'true');
+      }
+    });
+    setMaterialPreview(localStorage.getItem('kimo-material-engine-preview') === 'true');
+  }
+
+  // ── 开发者工具桥接：连续点击设置页「关于」卡片中的软件图标 5 次打开独立调试窗口，面板动作经事件桥转发 ──
+  async function setupDebugWindowBridge() {
+  let isOpeningDebugWindow = false; // 并发保护：创建完成前重复触发不再新建
+  async function openDebugWindow() {
+    if (isOpeningDebugWindow) return;
+    isOpeningDebugWindow = true;
+    try {
+      try {
+        const win = await WebviewWindow.getByLabel('debug');
+        if (win) {
+          await win.show();
+          await win.setFocus();
+          showToast('开发者工具已打开');
+          return;
+        }
+      } catch (err) {
+        console.error('[Debug] getByLabel failed:', err);
+      }
+      try {
+        const newWin = new WebviewWindow('debug', { url: 'debug.html', title: '开发者工具', width: 480, height: 640 });
+        newWin.once('tauri://created', () => {
+          showToast('开发者工具已打开');
+        });
+        newWin.once('tauri://error', (e) => {
+          console.error('[Debug] create window failed:', e);
+          showToast('开发者工具打开失败：' + (e.payload || e));
+        });
+      } catch (err) {
+        console.error('[Debug] create window threw:', err);
+        showToast('开发者工具打开失败：' + err);
+      }
+    } finally {
+      isOpeningDebugWindow = false;
+    }
+  }
+
+  // 连续点击设置页「关于」卡片中的软件图标 5 次（2 秒窗口内）开启开发者工具。
+  // 事件委托：设置页为动态渲染，.about-logo 渲染时机不定，委托到 document 最稳
+  let debugIconClicks = 0;
+  let debugIconTimer = null;
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('.about-logo')) return;
+    debugIconClicks += 1;
+    clearTimeout(debugIconTimer);
+    debugIconTimer = setTimeout(() => { debugIconClicks = 0; }, 2000);
+    if (debugIconClicks >= 5) {
+      debugIconClicks = 0;
+      clearTimeout(debugIconTimer);
+      openDebugWindow();
+    }
+  });
+    listen('debug-action', (event) => {
+      const { action, value } = event.payload || {};
+      switch (action) {
+        case 'play-pause': if (player.audio.paused) player.audio.play(); else player.audio.pause(); break;
+        case 'prev': player.previous?.(); break;
+        case 'next': player.next?.(); break;
+        case 'seek': if (player.audio.duration) {
+          const v = Math.max(0, Math.min(1000, Number(value) || 0));
+          player.audio.currentTime = (v / 1000) * player.audio.duration;
+        } break;
+        case 'speed': {
+          const v = Math.max(0.25, Math.min(4, Number(value) || 1));
+          player.audio.playbackRate = v;
+        } break;
+        case 'reload-audio': if (player.audio.src) { const t = player.audio.currentTime; player.audio.load(); player.audio.currentTime = t; } break;
+        case 'immersive': (document.getElementById('immersive-toggle') || document.querySelector('[data-action="immersive"]'))?.click(); break;
+        case 'desktop-lyrics': (document.getElementById('desktop-lyrics-toggle') || document.querySelector('[data-action="desktop-lyrics"]'))?.click(); break;
+        case 'fullscreen': document.fullscreenElement ? document.exitFullscreen?.() : document.documentElement.requestFullscreen?.(); break;
+        case 'open-editor': window.openMetadataEditor?.(); break;
+        case 'reload-main': location.reload(); break;
+        case 'force-render': player.lyrics?.resetAlignmentCache?.(); player.lyrics?.render?.(); break;
+        case 'realign': player.lyrics?.realign?.(); break;
+        case 'view-full': player.lyrics?.viewFullLyrics?.(); break;
+        case 'toggle-class': {
+          // 白名单：仅接受调试面板发送的固定 class
+          const allowlist = ['debug-show-bboxes', 'debug-no-animations', 'debug-show-lift', 'debug-no-blur', 'perf-mode'];
+          const cls = event.payload.value?.cls;
+          if (typeof cls === 'string' && allowlist.includes(cls)) {
+            document.body.classList.toggle(cls, !!event.payload.value?.on);
+          }
+        } break;
+      }
+    });
+
+    // 独立调试窗口修改 localStorage（主题/风格/背景等）后主窗口即时生效
+    window.addEventListener('storage', (e) => {
+      if (e.key === 'kimo-theme') applyTheme(e.newValue || 'dark');
+      else if (e.key === 'kimo-ui-style') applyUiStyle(e.newValue || 'solid');
+      else if (e.key === 'kimo-bg-style') applyBackgroundStyle(e.newValue || 'static');
+      else if (e.key === 'kimo-lyrics-theme') applyLyricsTheme(e.newValue || 'dark');
+      else if (e.key === 'kimo-performance-mode') document.body.classList.toggle('perf-mode', e.newValue === 'true');
+    });
+  }
+
+  // 开发者工具：连续点击设置页「关于」卡片中的软件图标 5 次打开独立调试窗口
+  setupDebugWindowBridge();
 
   showStartupUpdateAnnouncement();
 

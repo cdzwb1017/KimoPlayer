@@ -1,4 +1,5 @@
 export function getLineEnd(line) {
+  if (line.isInterlude && Number.isFinite(line.end)) return line.end;
   return line.endTime || (line.words && line.words.length > 0
     ? line.words[line.words.length - 1].time + 0.5
     : line.time + 3.0);
@@ -31,8 +32,8 @@ export function buildLyricTimeIndex(lines) {
   lines.forEach((line, index) => {
     starts.push(line.time);
     const effectiveEnd = line.isInterlude
-      ? Math.max(line.endTime + 0.4, (lines[index + 1]?.time ?? 0) + 0.5)
-      : line.endTime + 0.4;
+      ? getLineEnd(line)
+      : getLineEnd(line) + 0.4;
     maxEnd = Math.max(maxEnd, effectiveEnd);
     prefixMaxEnds.push(maxEnd);
   });
@@ -60,14 +61,12 @@ export function calculateActiveLineState(lines, currentTime, timeIndex = null) {
   for (let lineIndex = latestPossibleIndex; lineIndex >= 0; lineIndex--) {
     if (index.prefixMaxEnds[lineIndex] < currentTime) break;
     const line = lines[lineIndex];
-    const endBoundary = line.isInterlude
-      ? Math.max(line.endTime + 0.4, (lines[lineIndex + 1]?.time ?? 0) + 0.5)
-      : getActiveLineEnd(line);
+    const endBoundary = getActiveLineEnd(line);
     // Ordinary lyric rows use half-open intervals: [begin, end). When one
     // row ends exactly as the next begins, they are consecutive rather than
     // concurrent. The former ±50 ms tolerance made such shared boundaries
     // briefly activate both rows and incorrectly trigger the duet layout.
-    const startBoundary = line.isInterlude ? line.time - 0.05 : line.time;
+    const startBoundary = line.time;
     if (currentTime >= startBoundary && currentTime < endBoundary) {
       activeIndices.unshift(lineIndex);
     }
@@ -76,7 +75,9 @@ export function calculateActiveLineState(lines, currentTime, timeIndex = null) {
   // Background vocals follow the foreground phrase lifecycle. They should
   // appear while an overlapping main line is singing, but must collapse as
   // soon as the main phrase ends instead of becoming an independent focus.
-  const foregroundActive = activeIndices.filter(index => !lines[index].isBackground);
+  const foregroundActive = activeIndices.filter(index => (
+    !lines[index].isBackground && !lines[index].isInterlude
+  ));
   const hasForegroundLines = lines.some(line => !line.isBackground);
   if (hasForegroundLines) {
     activeIndices = activeIndices.filter(index => {
@@ -136,17 +137,24 @@ export function calculateActiveLineState(lines, currentTime, timeIndex = null) {
   // but moving the scroll anchor before a line actually starts causes a
   // second correction when that line becomes part of an overlapping group.
   let latestStartedIndex = upperBound(index.starts, currentTime) - 1;
-  // An x-bg row is an expandable child of its foreground phrase, never an
-  // independent scroll destination. Selecting it when it finishes would
-  // scroll toward a row whose height is simultaneously collapsing.
+  // An x-bg row is an expandable child of its foreground phrase and never an
+  // independent scroll destination. Interludes are different: they advance
+  // the viewport after the preceding lyric has finished.
   while (latestStartedIndex >= 0 && lines[latestStartedIndex].isBackground) {
     latestStartedIndex -= 1;
   }
-  let scrollIndex = activeIndices.length > 1
+  const scrollActiveIndices = activeIndices.filter(index => (
+    !lines[index].isBackground
+  ));
+  const scrollActiveIndex = scrollActiveIndices.includes(activeIndex)
     ? activeIndex
-    : Math.max(activeIndex, latestStartedIndex);
+    : (scrollActiveIndices.at(-1) ?? -1);
+  let scrollIndex = scrollActiveIndices.length > 1
+    ? scrollActiveIndex
+    : Math.max(scrollActiveIndex, latestStartedIndex);
   if (scrollIndex < 0 && lines.length > 0) {
-    scrollIndex = 0;
+    scrollIndex = lines.findIndex(line => !line.isBackground);
+    if (scrollIndex < 0) scrollIndex = 0;
   }
 
   return {

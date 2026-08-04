@@ -12,7 +12,16 @@ export function getAudioQualityInfo(song) {
   if (!song) return { format: '', quality: '', bitrateText: '', isHiRes: false, isLossless: false };
 
   const path = song.file_path || song.url || song.path || '';
-  const ext = path ? path.split('.').pop().toLowerCase() : '';
+  // 提取扩展名：取路径最后一段的最后一点之后的部分；
+  // 无有效扩展名（如 luna://{id} 或目录名含点）时回退 song.format 字段（LunaBeat 等来源）
+  let ext = '';
+  if (path) {
+    // 兼容正/反斜杠路径（Windows 拖拽等场景 file_path 可能为反斜杠）
+    const lastSeg = String(path).split(/[\\/]/).pop() || '';
+    const dotIdx = lastSeg.lastIndexOf('.');
+    if (dotIdx > 0) ext = lastSeg.slice(dotIdx + 1).toLowerCase();
+  }
+  if (!ext && song.format) ext = String(song.format).toLowerCase();
 
   let rawBitrate = song.bitrate || song.max_br || song.br || 0;
   // 智能矫正比特率：如果大于 5000，通常是 bps (如 320000 -> 320, 1411200 -> 1411)
@@ -98,8 +107,15 @@ export function renderAudioQualityBadgesHtml(song, options = {}) {
  * @param {Object} options - { hideBitrate: boolean }
  * @returns {string} HTML 字符串
  */
+const escapeHtml = (text) => String(text ?? '')
+  .replace(/&/g, '&amp;')
+  .replace(/</g, '&lt;')
+  .replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;')
+  .replace(/'/g, '&#39;');
+
 export function renderArtistWithBadgesHtml(artist, song, options = {}) {
-  const safeArtist = artist || '未知歌手';
+  const safeArtist = escapeHtml(artist || '未知歌手');
   const badgesHtml = renderAudioQualityBadgesHtml(song, options);
   return `<span class="artist-name-text" title="${safeArtist}">${safeArtist}</span>${badgesHtml}`;
 }

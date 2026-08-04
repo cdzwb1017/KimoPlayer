@@ -2,13 +2,24 @@
 .lyrics-body {
   display: flex;
   flex: 1;
+  width: min(100%, 1800px);
+  max-width: 1800px;
+  margin-inline: auto;
+  box-sizing: border-box;
   flex-direction: row;
   overflow: hidden;
 }
 
 /* Left side: Artwork showcase - Clean & Borderless! */
 .lyrics-cover-container {
-  flex: 48;
+  /*
+   * Artwork has a capped visual size, so its pane must not keep growing at
+   * the same rate as the lyrics pane on wide windows. Keep enough room for
+   * the side controls while giving all remaining width to the lyrics.
+   */
+  flex: 0 1 clamp(480px, calc(var(--lyrics-cover-size) + 256px), 720px);
+  width: clamp(480px, calc(var(--lyrics-cover-size) + 256px), 720px);
+  min-width: 0;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -61,13 +72,14 @@
   align-items: center;
   justify-content: center;
   width: 100%;
-  max-width: 440px;
+  max-width: calc(var(--lyrics-cover-size) + 136px);
   gap: 24px;
 }
 
 /* Floating art card with album dynamic-glow shadows */
 .lyrics-cover-wrapper {
   position: relative;
+  flex: 0 0 var(--lyrics-cover-size);
   width: var(--lyrics-cover-size);
   height: var(--lyrics-cover-size);
   aspect-ratio: 1 / 1;
@@ -127,6 +139,11 @@
 .cover-overlay-btn {
   width: 52px;
   height: 52px;
+  min-width: 52px;
+  min-height: 52px;
+  flex: 0 0 52px;
+  flex-shrink: 0;
+  aspect-ratio: 1 / 1;
   pointer-events: auto;
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.02);
@@ -171,7 +188,7 @@
 }
 .lyrics-cover-wrapper:not(.is-playing) .cover-overlay-icon-play {
   display: block;
-  margin-left: 2px; /* Center adjustment for play triangle */
+  margin-left: 2px;
 }
 .lyrics-cover-wrapper:not(.is-playing) .cover-overlay-icon-pause {
   display: none;
@@ -186,6 +203,11 @@
   -webkit-backdrop-filter: blur(20px) saturate(140%);
   width: 44px;
   height: 44px;
+  min-width: 44px;
+  min-height: 44px;
+  flex: 0 0 44px;
+  flex-shrink: 0;
+  aspect-ratio: 1 / 1;
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -208,6 +230,7 @@
 
 /* On hover of container, reveal side buttons and progress bar */
 .lyrics-cover-container:hover .lyrics-side-btn,
+.lyrics-controls-row:hover .lyrics-side-btn,
 .lyrics-cover-container:hover .lyrics-progress-container {
   opacity: 1;
   pointer-events: auto;
@@ -217,18 +240,19 @@
   transform: translateY(0);
 }
 
-.lyrics-cover-container:hover .lyrics-side-btn.prev {
+.lyrics-cover-container:hover .lyrics-side-btn.prev,
+.lyrics-controls-row:hover .lyrics-side-btn.prev {
   transform: translateX(0) scale(1);
 }
 
-.lyrics-cover-container:hover .lyrics-side-btn.next {
+.lyrics-cover-container:hover .lyrics-side-btn.next,
+.lyrics-controls-row:hover .lyrics-side-btn.next {
   transform: translateX(0) scale(1);
 }
 
 .app-container.theme-light .lyrics-side-btn {
   background: rgba(255, 255, 255, 0.15);
   border-color: rgba(0, 0, 0, 0.05);
-  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.45), 0 4px 12px rgba(0, 0, 0, 0.03);
   color: rgba(0, 0, 0, 0.6);
 }
 
@@ -347,7 +371,8 @@
 
 /* Right side: Lyrics area container */
 .lyrics-scroll-container {
-  flex: 52;
+  flex: 1 1 0;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -363,8 +388,8 @@
   scroll-behavior: auto;
   padding: 0 clamp(24px, 5vw, 80px);
   
-  mask-image: linear-gradient(to bottom, transparent 0%, black 15%, black 85%, transparent 100%);
-  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 15%, black 85%, transparent 100%);
+  mask-image: linear-gradient(to bottom, transparent 0%, rgba(0,0,0,0.15) 5%, rgba(0,0,0,0.6) 10%, black 18%, black 82%, rgba(0,0,0,0.6) 90%, rgba(0,0,0,0.15) 95%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, rgba(0,0,0,0.15) 5%, rgba(0,0,0,0.6) 10%, black 18%, black 82%, rgba(0,0,0,0.6) 90%, rgba(0,0,0,0.15) 95%, transparent 100%);
   
   transition: padding-left 0.4s cubic-bezier(0.25, 1, 0.5, 1);
 }
@@ -462,16 +487,41 @@
   }
 
   .lyrics-cover-container {
-    flex: 42 !important;
-    padding: 24px !important;
+    flex: 0 0 42% !important;
+    width: 42%;
+    padding: 20px !important;
   }
-  
+
   .lyrics-scroll-container {
-    flex: 58 !important;
+    flex: 0 0 58% !important;
+    width: 58%;
   }
   
   .lyrics-meta-under-cover {
     margin-top: 20px;
+  }
+
+  .lyrics-controls-row {
+    gap: 12px;
+  }
+
+  .lyrics-side-btn {
+    width: 36px;
+    height: 36px;
+    flex: 0 0 36px;
+  }
+}
+
+/* Windowed lyrics: prioritize reading space before the immersive breakpoint. */
+@media (min-width: 1101px) and (max-width: 1400px) {
+  .lyrics-cover-container {
+    flex: 0 0 42% !important;
+    width: 42%;
+  }
+
+  .lyrics-scroll-container {
+    flex: 0 0 58% !important;
+    width: 58%;
   }
 }
 
@@ -498,6 +548,27 @@
   
   .lyrics-spacer {
     height: 42vh;
+  }
+}
+
+/* Immersive fullscreen is a balanced two-panel stage. Keep this after the
+   window-size rules so mode, rather than viewport width, owns the ratio. */
+@media (min-width: 901px) {
+  .app-container.immersive-mode {
+    /* Immersive mode prioritizes legibility and always uses the same maximum
+       exposed by the lyric font-size control. The saved normal-mode value is
+       only inherited, so leaving immersive mode restores it automatically. */
+    --lyrics-font-size: 48px;
+  }
+
+  .app-container.immersive-mode .lyrics-cover-container {
+    flex: 0 0 50% !important;
+    width: 50% !important;
+  }
+
+  .app-container.immersive-mode .lyrics-scroll-container {
+    flex: 0 0 50% !important;
+    width: 50% !important;
   }
 }
 
@@ -549,8 +620,13 @@
   transition:
     color 0.45s ease,
     filter 0.32s ease,
-    transform 1.15s cubic-bezier(0.2, 0, 0.2, 1) var(--stagger-delay, 0s),
+    transform 1.15s cubic-bezier(0.26, 1.12, 0.42, 1) var(--stagger-delay, 0s),
     opacity 1.05s cubic-bezier(0.2, 0, 0.2, 1);
+  /* 图层按需提升：仅活跃/滚动中的行常驻合成层，避免整屏每行一层 */
+}
+
+.lyrics-line.active,
+.lyrics-line.is-scroll-target {
   will-change: transform, filter, opacity;
 }
 

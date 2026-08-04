@@ -1,120 +1,196 @@
-import { projectPlayheadToRow } from './playhead.js';
+/**
+ * 卡拉OK渐变填充渲染器
+ *
+ * 参考 AMLL 架构：
+ * - bg-aligned 模式（整行共享渐变拼接）：基于逐字独立时间轴计算精确歌唱位置，
+ *   使用预存子像素精度的字位置数据，不再每帧从 DOM 读取整数偏移。
+ *   --line-percent 表示歌唱位置（unfilled 起始点），fill edge = line-percent - 8%。
+ * - 降级模式（逐字独立渐变）：每个字基于自身时间窗独立计算填充百分比，
+ *   --char-fill 表示字内歌唱位置，fill edge = char-fill - 8%。
+ *
+ * 坐标约定（与CSS渐变完全一致）：
+ *   filled  at (p - transition-width)
+ *   unfilled  at p
+ * 其中 p = --line-percent 或 --char-fill，代表歌唱位置（unfilled起始点）。
+ *
+ * 渲染值完全线性，不做任何非线性映射：
+ *   active阶段 p 从0%线性到100%（歌唱位置匀速扫过字宽），
+ *   past阶段 p 从100%基于时间平滑插值到112%（过渡带自然推出），
+ *   不再有"加速冲刺"或瞬间跳变。
+ */
+import {
+  calculateWordFillStates,
+  calculatePlayheadXForRow,
+  playheadXToPercent,
+  getWordRenderPercent,
+  calculateKaraokePlayheadState,
+} from './playhead.js';
 
-const DEFAULT_TRANSITION_RATIO = 0.08;
+// 与 lyrics-rendering.css 的 --transition-width 保持一致（渐变过渡带宽度）
+const DEFAULT_TRANSITION_RATIO = 0.2;
 
 function clearProgressWord(word) {
   word.classList.remove('word-singing', 'word-active');
   word.style.removeProperty('--line-percent');
+  word.style.removeProperty('--line-width');
+  word.style.removeProperty('--char-offset');
   word.style.removeProperty('--char-fill');
   word._lastPercent = null;
+  word._lastFill = null;
 }
 
-function completeProgressWord(word) {
-  // 保持渐变层直到整行切换为过去状态，避免单元唱满时切换到
-  // word-active 的纯色层，从而在相邻单元交界产生闪断。
-  word.classList.add('word-singing');
-  word.classList.remove('word-active');
-  setRowSingingProgress(word, 100);
-}
-
-function setRowSingingProgress(word, rowPercent) {
-  word.classList.add('word-singing');
-  word.classList.remove('word-active');
-
-  const clampedPercent = Math.max(0, Math.min(100, rowPercent));
-  const roundedPercent = clampedPercent.toFixed(1);
-
-  if (word._lastPercent !== roundedPercent) {
-    word._lastPercent = roundedPercent;
-    word.style.setProperty('--line-percent', `${roundedPercent}%`);
+function setWordLinePercent(word, percent) {
+  const clamped = Math.max(-10, Math.min(130, percent));
+  const rounded = clamped.toFixed(1);
+  if (word._lastPercent !== rounded) {
+    word._lastPercent = rounded;
+    word.style.setProperty('--line-percent', `${rounded}%`);
+  }
+  if (clamped > 0.5) {
+    word.classList.add('word-singing');
+    word.classList.remove('word-active');
+  } else {
+    word.classList.remove('word-singing', 'word-active');
   }
 }
 
+function setWordCharFill(word, fillPercent) {
+  const clamped = Math.max(0, Math.min(100, fillPercent));
+  const rounded = clamped.toFixed(1);
+  if (word._lastFill !== rounded) {
+    word._lastFill = rounded;
+    word.style.removeProperty('--line-percent');
+    word.style.removeProperty('--line-width');
+    word.style.removeProperty('--char-offset');
+    word.style.setProperty('--char-fill', `${rounded}%`);
+
+    let subSpans = word._subSpans;
+    if (!subSpans) {
+      subSpans = Array.from(word.querySelectorAll('span'));
+      word._subSpans = subSpans;
+    }
+    for (let i = 0; i < subSpans.length; i++) {
+      subSpans[i].style.removeProperty('--line-percent');
+      subSpans[i].style.removeProperty('--line-width');
+      subSpans[i].style.removeProperty('--char-offset');
+      subSpans[i].style.setProperty('--char-fill', `${rounded}%`);
+    }
+  }
+
+  if (clamped >= 99.5) {
+    word.classList.add('word-active');
+    word.classList.remove('word-singing');
+  } else if (clamped <= 0.5) {
+    word.classList.remove('word-singing', 'word-active');
+  } else {
+    word.classList.add('word-singing');
+    word.classList.remove('word-active');
+  }
+}
+
+/**
+ * 整行渐变拼接模式（bg-aligned）。
+ * 所有字共享统一 --line-percent（歌唱位置百分比），
+ * 通过 background-size/background-position 拼接连续渐变。
+ */
 export function renderRowKaraokeProgress({
   rowsData,
   wordSpans,
-  charC,
-  totalChars,
-  inGap,
-  gapPrevIdx,
-  currentGapT,
-  transitionRatio = DEFAULT_TRANSITION_RATIO,
+  charWords,
+  currentTime,
 }) {
-  rowsData.forEach(row => {
-    const rowWidth = row.width;
-    const transitionWidthPx = rowWidth * transitionRatio;
+  const { states, activeIdx, activeFillPct, lastCompletedIdx } =
+    calculateWordFillStates(charWords, currentTime);
 
-    const playheadX = projectPlayheadToRow({
-      row,
-      wordSpans,
-      charC,
-      totalChars,
-      inGap,
-      gapPrevIdx,
-      currentGapT,
+  rowsData.forEach((row, rowIndex) => {
+    const transitionWidthPx = row.width * DEFAULT_TRANSITION_RATIO;
+
+    const playheadX = calculatePlayheadXForRow({
+      rowsData,
+      rowIndex,
+      wordStates: states,
+      activeIdx,
+      activeFillPct,
+      lastCompletedIdx,
+      charWords,
+      currentTime,
       transitionWidthPx,
     });
 
-    const rowPercent = (playheadX / rowWidth) * 100;
-    // 像素投影会受字体取整或尚未刷新的 DOM 几何影响。最后一个词刚开始时，
-    // playheadX 偶尔已经落到行尾，从而被误判为整行唱完并瞬间染色。
-    // 行完成状态应以单调递增的逻辑字符游标为准。
-    const rowCompletionPlayhead = row.endIdx + 1;
-    const isRowComplete =
-      charC >= rowCompletionPlayhead - 0.001 ||
-      charC >= totalChars;
+    const rowPercent = playheadXToPercent(playheadX, row.width);
 
-    row.words.forEach(word => {
-      if (charC <= 0 || playheadX <= 0) {
-        clearProgressWord(word);
-      } else if (isRowComplete || charC >= totalChars) {
-        completeProgressWord(word);
-      } else {
-        setRowSingingProgress(word, rowPercent);
+    const rowStartIdx = row.startIdx;
+    const rowEndIdx = row.endIdx;
+    const isLeadIn = activeIdx === -1 && lastCompletedIdx === -1;
+    const isRowPast = lastCompletedIdx >= rowEndIdx;
+    const isRowPending = !isLeadIn && lastCompletedIdx < rowStartIdx && activeIdx < rowStartIdx;
+
+    const wordData = row.wordData;
+    wordData.forEach(wd => {
+      const wordEl = wd.word;
+
+      if (isRowPending) {
+        clearProgressWord(wordEl);
+        return;
       }
+
+      setWordLinePercent(wordEl, rowPercent);
     });
   });
 }
 
-export function renderClassicCharProgress({ wordSpans, charWords, currentTime, charC, totalChars }) {
-  const firstCharTime = charWords[0]?.time;
+/**
+ * 桌面歌词 1:1 原装渲染引擎（完全同源 verbatim 代码）：
+ * 直接复用 desktop-lyrics-window.js 中 updateKaraokeSpans 的完全相同代码，
+ * 保证主界面与桌面歌词在任意时刻 100% 表现一致。
+ */
+export function renderClassicCharProgress({ wordSpans, charWords, currentTime }) {
+  if (!wordSpans || wordSpans.length === 0 || !charWords || charWords.length === 0) return;
 
-  wordSpans.forEach((span, index) => {
-    const charWord = charWords[index];
-    if (!charWord) return;
+  const { charC, totalChars } = calculateKaraokePlayheadState(charWords, currentTime);
+
+  for (let index = 0; index < wordSpans.length; index += 1) {
+    const barSpan = wordSpans[index];
+    if (!barSpan) continue;
 
     let fill;
-    if (firstCharTime !== undefined && currentTime < firstCharTime + 0.05) {
+    if (charC < 0) {
       fill = 0;
+    } else if (charC >= totalChars) {
+      fill = 100;
     } else {
-      fill = charC < 0
-        ? 0
-        : charC >= totalChars
-          ? 100
-          : index < Math.floor(charC)
-            ? 100
-            : index > Math.floor(charC)
-              ? 0
-              : (charC - Math.floor(charC)) * 100;
+      const intPart = Math.floor(charC);
+      if (index < intPart) fill = 100;
+      else if (index > intPart) fill = 0;
+      else fill = (charC - intPart) * 100;
     }
 
-    const clampedFill = Math.max(0, Math.min(100, fill));
-    const roundedFill = clampedFill.toFixed(1);
-
-    if (span._lastFill !== roundedFill) {
-      span._lastFill = roundedFill;
-      span.style.setProperty('--char-fill', `${roundedFill}%`);
+    const clamped = Math.max(0, Math.min(100, fill));
+    const charFillVal = `${clamped.toFixed(1)}%`;
+    // ⭐ 值守卫：已填满/未开始的字 fill 恒定，跳过写入（每帧 60-80% 的字可省）
+    if (barSpan._lastCharFill !== charFillVal) {
+      barSpan._lastCharFill = charFillVal;
+      barSpan.style.setProperty('--char-fill', charFillVal);
+      let subSpans = barSpan._barSubSpans;
+      if (!subSpans) {
+        subSpans = Array.from(barSpan.querySelectorAll('span'));
+        barSpan._barSubSpans = subSpans;
+      }
+      for (let subIndex = 0; subIndex < subSpans.length; subIndex += 1) {
+        subSpans[subIndex].style.setProperty('--char-fill', charFillVal);
+      }
     }
 
-    if (fill >= 99.5) {
-      // 同一行内保持在渐变渲染层；整行结束后才由行状态统一转为完成态。
-      span.classList.add('word-singing');
-      span.classList.remove('word-active');
-    } else if (fill <= 0.5) {
-      span.classList.remove('word-active', 'word-singing');
-    } else {
-      span.classList.add('word-singing');
-      span.classList.remove('word-active');
+    if (clamped >= 99) {
+      barSpan.classList.add('word-singing');
+      barSpan.classList.remove('word-active');
+    } else if (clamped <= 1) {
+      if (barSpan.classList.contains('word-active') || barSpan.classList.contains('word-singing')) {
+        barSpan.classList.remove('word-active', 'word-singing');
+      }
+    } else if (!barSpan.classList.contains('word-singing')) {
+      barSpan.classList.add('word-singing');
+      barSpan.classList.remove('word-active');
     }
-  });
+  }
 }

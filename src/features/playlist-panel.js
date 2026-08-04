@@ -23,7 +23,7 @@ export function initializePlaylistPanel({ player, getCoverSrc, showToast }) {
 
       const cover = document.createElement('img');
       cover.className = 'playlist-panel-item-cover';
-      cover.src = getCoverSrc(song.cover_image);
+      cover.src = getCoverSrc(song);
       item.appendChild(cover);
 
       const info = document.createElement('div');

@@ -331,7 +331,7 @@ export function toggleCommentsPanel(player, albumName) {
   songTitleEl.textContent = title || '未知歌曲';
   updateMarqueeState(songTitleEl);
   songArtistEl.innerHTML = renderArtistWithBadgesHtml(artist, song);
-  songCoverEl.src = getCoverSrc(song.cover_image);
+  songCoverEl.src = getCoverSrc(song);
 
   // 重置平台选择为全部
   currentPlatforms = ['wy', 'kw', 'qq', 'kg'];
@@ -379,7 +379,7 @@ export function updateCommentsPanel(player) {
     updateMarqueeState(songTitleEl);
   }
   if (songArtistEl) songArtistEl.innerHTML = renderArtistWithBadgesHtml(artist, song);
-  if (songCoverEl) songCoverEl.src = getCoverSrc(song.cover_image);
+  if (songCoverEl) songCoverEl.src = getCoverSrc(song);
 
   // 面板可见时重新加载评论
   if (isVisible) {
@@ -762,7 +762,7 @@ function createCommentElement(comment) {
     // 回复按钮（始终显示）
   const replyBtn = document.createElement('button');
   replyBtn.className = 'comment-action-btn';
-  replyBtn.textContent = replyCount > 0 ? `回复 ${replyCount}` : '回复';
+  replyBtn.textContent = replyCount > 0 ? `查看回复 ${replyCount}` : '查看回复';
   replyBtn.addEventListener('click', () => {
     // 仅网易云支持查看回复，其他平台暂不支持
     if (comment.platform && comment.platform !== 'wy') {

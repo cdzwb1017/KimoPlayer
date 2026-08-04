@@ -106,6 +106,28 @@ const joinWords = (words) => {
 
     if (plainText.length === 0) continue;
 
+    // ⭐ 规范化逐字数组：补齐最后一个字的 end/duration，避免 duration=0
+    if (words && words.length >= 1) {
+      const lineEnd = lastTS && lastTS > ts ? lastTS : (ts + 2.0);
+      for (let wi = 0; wi < words.length; wi++) {
+        const w = words[wi];
+        if (!Number.isFinite(w.end) || w.end <= w.time) {
+          const nextWord = words[wi + 1];
+          if (nextWord && Number.isFinite(nextWord.time) && nextWord.time > w.time) {
+            w.end = nextWord.time;
+            w.duration = Math.max(0, nextWord.time - w.time);
+          } else {
+            const targetEnd = Math.max(w.time + 0.3, lineEnd);
+            w.end = targetEnd;
+            w.duration = Math.max(0.001, targetEnd - w.time);
+          }
+        }
+        if (!Number.isFinite(w.duration) || w.duration <= 0) {
+          w.duration = Math.max(0.001, w.end - w.time);
+        }
+      }
+    }
+
     entries.push({
       time: ts,
       text: plainText,
@@ -464,22 +486,151 @@ function parseTTMLTime(timeStr) {
 export function parseJSONLyrics(jsonText) {
   try {
     const data = JSON.parse(jsonText);
-    const list = data.lyrics || [];
-    return list.map(item => {
-      const words = (item.words || item.syllables || []).map(w => ({
-        time: parseFloat(w.time),
-        duration: w.duration ? parseFloat(w.duration) : null,
-        text: w.text
-      }));
+    if (!data) return [];
+
+    // ⭐ 兼容 LunaBeat API: { lines: [...], songwriters, source } 与通用格式 { lyrics: [...] }
+    const rawLines = Array.isArray(data.lines) ? data.lines : (Array.isArray(data.lyrics) ? data.lyrics : []);
+    if (rawLines.length === 0) return [];
+
+    // 自动判断时间单位：样本中首行 startTime 若 > 1000 则视为毫秒（LunaBeat 嵌入式格式）
+    const firstLine = rawLines[0];
+    const probe = Number(firstLine.startTime ?? firstLine.time ?? 0);
+    const msToSec = probe > 1000 ? 0.001 : 1;
+    const toSec = (v) => {
+      const n = Number(v);
+      return Number.isFinite(n) ? n * msToSec : null;
+    };
+    const toStr = (v, fb = '') => (v === undefined || v === null ? fb : String(v));
+
+    // LunaBeat/AMLL 的逐字分词（character-level）会把「態度」拆成两个 word，各自带 romanWord=たい/ど，
+    // 导致渲染层振假名被拆成多个独立注音段。这里和适配层保持一致：
+    // 合并「连续纯汉字 + 时间无间隙 + 都有 ruby + isBackground 一致」的相邻 words。
+    const GAP_EPSILON = 0.025;
+    const isPureCJK = (text) => !!(text && /^[\u4e00-\u9faf\u3400-\u4dbf]+$/.test(text));
+    const mergeCompounds = (words) => {
+      if (!words || words.length <= 1) return words;
+      const merged = [];
+      for (let i = 0; i < words.length; i++) {
+        const w = words[i];
+        const prev = merged.length > 0 ? merged[merged.length - 1] : null;
+        const canMerge = prev
+          && isPureCJK(prev.text)
+          && isPureCJK(w.text)
+          && prev.ruby
+          && w.ruby
+          && prev.isBackground === w.isBackground
+          && Math.abs((prev.end || 0) - (w.time || 0)) < GAP_EPSILON;
+        if (canMerge) {
+          prev.text += w.text;
+          prev.ruby += w.ruby;
+          prev.end = Math.max(prev.end || 0, w.end || 0);
+          prev.duration = Math.max(0.001, prev.end - prev.time);
+          prev.spaceAfter = Boolean(w.spaceAfter);
+        } else {
+          merged.push(w);
+        }
+      }
+      return merged;
+    };
+
+    // 规范化一个 word（兼容多种字段名）
+    const normalizeWord = (w, idx, arr) => {
+      const time = toSec(w.startTime ?? w.begin ?? w.time);
+      const end = toSec(w.endTime ?? w.end);
+      const text = toStr(w.word ?? w.text ?? w.syllable ?? '');
+      const durationRaw = Number(w.duration);
+      let duration = Number.isFinite(durationRaw) ? durationRaw * msToSec : null;
+      let endFinal = end;
+      // 互推 end / duration
+      if (time !== null) {
+        if (endFinal === null && duration !== null) {
+          endFinal = time + duration;
+        }
+        if (endFinal !== null && (duration === null || !Number.isFinite(duration))) {
+          duration = Math.max(0, endFinal - time);
+        }
+        if (endFinal === null && duration === null) {
+          // 回退：下一字的 time 或 +0.3s
+          const next = arr[idx + 1];
+          const nextTime = next ? toSec(next.startTime ?? next.begin ?? next.time) : null;
+          endFinal = nextTime !== null ? nextTime : (time + 0.3);
+          duration = Math.max(0, endFinal - time);
+        }
+      }
       return {
-        time: parseFloat(item.time),
-        text: item.text,
-        words: words.length > 0 ? words : null,
-        translation: item.translation || null,
-        end: item.end ? parseFloat(item.end) : null
+        time: time ?? 0,
+        end: endFinal ?? ((time ?? 0) + 0.3),
+        duration: duration ?? 0.3,
+        text,
+        spaceAfter: Boolean(w.spaceAfter),
+        spaceBefore: Boolean(w.spaceBefore),
+        // ⭐ AMLL：romanWord / transliteration 是整段字的振假名（如「態度たいど」），
+        // 需要按字数拆分分配，这里先原样挂到 word.ruby 上，
+        // 真正拆分在 ruby-layout.js#splitKanjiUnits 中按 AMLL w1 算法完成
+        ruby: w.ruby
+          ? toStr(w.ruby)
+          : (w.romanWord || w.transliteration ? toStr(w.romanWord || w.transliteration) : null),
+        isBackground: Boolean(w.isBackground),
       };
-    });
+    };
+
+    const result = [];
+    for (let i = 0; i < rawLines.length; i++) {
+      const item = rawLines[i];
+      const lineTime = toSec(item.startTime ?? item.begin ?? item.time);
+      let lineEnd = toSec(item.endTime ?? item.end);
+      const translation = toStr(item.translatedLyric ?? item.translation ?? item.subLines?.[0]?.text ?? '');
+      const romanLyric = toStr(item.romanLyric ?? '');
+
+      // 规范化 words（支持 words / syllables / 无）
+      const rawWords = Array.isArray(item.words) ? item.words : (Array.isArray(item.syllables) ? item.syllables : null);
+      let words = null;
+      if (rawWords && rawWords.length >= 1) {
+        words = rawWords.map((w, idx) => normalizeWord(w, idx, rawWords));
+        const validWords = words.filter(w => (w.end - w.time) > 0.001);
+        if (validWords.length === 0) {
+          words = null;
+        } else {
+          // ⭐ 合并逐字拆分的 compound 汉字（態+度 → 態度 / たい+ど → たいど）
+          words = mergeCompounds(words);
+        }
+      }
+
+      // 从 words 推导出行级 text / end（若缺失）
+      let text = toStr(item.text ?? '');
+      if (!text && words) text = words.map(w => w.text).join('');
+      if (lineTime === null) {
+        lineTime = words?.[0]?.time ?? 0;
+      }
+      if (lineEnd === null) {
+        if (words && words.length > 0) {
+          lineEnd = words[words.length - 1].end;
+        } else {
+          const next = rawLines[i + 1];
+          const nextTime = next ? toSec(next.startTime ?? next.begin ?? next.time) : null;
+          lineEnd = nextTime !== null ? Math.max(lineTime + 0.5, nextTime) : (lineTime + 3);
+        }
+      }
+
+      const isWordTimed = !!(words && words.length >= 1);
+      result.push({
+        time: lineTime,
+        end: lineEnd,
+        text,
+        words,
+        isWordTimed,
+        timingFormat: isWordTimed ? 'word-lrc' : 'lrc',
+        translation: translation || null,
+        romanLyric: romanLyric || null,
+        isBG: Boolean(item.isBG),
+        isDuet: Boolean(item.isDuet),
+      });
+    }
+
+    result.sort((a, b) => a.time - b.time);
+    return result;
   } catch (e) {
+    console.error('[parseJSONLyrics] failed:', e);
     return [];
   }
 }

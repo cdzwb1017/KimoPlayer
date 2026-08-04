@@ -89,7 +89,7 @@ export function initializeAlbumCoverMenu({
     `;
     itemImg.addEventListener('click', () => {
       menu.remove();
-      viewAlbumImageLarge(getCoverSrc(song.cover_image));
+      viewAlbumImageLarge(getCoverSrc(song));
     });
 
     const itemMeta = document.createElement('div');

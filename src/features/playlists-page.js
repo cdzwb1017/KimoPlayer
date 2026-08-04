@@ -10,6 +10,14 @@ import {
 } from './playlist-service.js';
 import { getPlaylists, savePlaylists } from '../storage/playlist-store.js';
 
+// 转义文案，防止歌单名等外部数据注入 HTML
+const escapeHtml = (text) => String(text ?? '')
+  .replace(/&/g, '&amp;')
+  .replace(/</g, '&lt;')
+  .replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;')
+  .replace(/'/g, '&#39;');
+
 export function createPlaylistsPage({
   player,
   getCoverSrc,
@@ -204,6 +212,128 @@ export function createPlaylistsPage({
     setTimeout(() => document.addEventListener('click', closeMenu), 10);
   };
 
+  // ══ 歌单详情行分批渲染（M3U 导入歌单可达数千首）══
+  const PLAYLIST_DETAIL_BATCH = 100;
+
+  const createPlaylistDetailRow = (song, idx, pl, listEl) => {
+    const row = document.createElement('div');
+    row.className = 'playlist-detail-item song-item';
+    row.setAttribute('data-file-path', song.file_path);
+
+    // 序号
+    const num = document.createElement('span');
+    num.className = 'playlist-detail-num';
+    num.textContent = `${idx + 1}`;
+    row.appendChild(num);
+
+    // 封面小图（懒加载；无封面时异步读 metadata，仅首批行触发）
+    const cov = document.createElement('img');
+    cov.className = 'playlist-detail-cover';
+    cov.loading = 'lazy';
+    cov.src = getCoverSrc(song);
+    if (!song.cover_image) {
+      (async () => {
+        try {
+          const meta = await invoke('read_audio_metadata', { path: song.file_path });
+          if (meta && meta.cover_image) {
+            song.cover_image = meta.cover_image;
+            cov.src = getCoverSrc(song);
+            const all = getPlaylists();
+            const targetPl = all.find(p => p.id === currentPlaylistId);
+            if (targetPl) {
+              const targetSong = targetPl.songs.find(s => s.file_path === song.file_path);
+              if (targetSong) {
+                targetSong.cover_image = meta.cover_image;
+                savePlaylists(all);
+              }
+            }
+          }
+        } catch (err) {
+          console.error('Failed to fetch cover:', song.file_path, err);
+        }
+      })();
+    }
+    row.appendChild(cov);
+
+    // 标题 + 歌手
+    const infoDiv = document.createElement('div');
+    infoDiv.className = 'playlist-detail-info';
+    const t = document.createElement('div');
+    t.className = 'playlist-detail-song-title';
+    t.textContent = song.title || '未知';
+    infoDiv.appendChild(t);
+    const a = document.createElement('div');
+    a.className = 'playlist-detail-song-artist';
+    a.innerHTML = renderArtistWithBadgesHtml(song.artist, song);
+    infoDiv.appendChild(a);
+    row.appendChild(infoDiv);
+
+    // 时长
+    const durEl = document.createElement('span');
+    durEl.className = 'playlist-detail-duration';
+    durEl.textContent = song.duration > 0 ? `${Math.floor(song.duration / 60)}:${String(Math.floor(song.duration % 60)).padStart(2, '0')}` : '';
+    row.appendChild(durEl);
+
+    // 删除按钮
+    const rm = document.createElement('button');
+    rm.className = 'playlist-detail-remove';
+    rm.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
+    rm.title = '从歌单移除';
+    rm.addEventListener('click', (e) => {
+      e.stopPropagation();
+      removeSongFromPlaylist(pl.id, idx);
+      renderPlaylistsTab();
+    });
+    row.appendChild(rm);
+
+    // 单击播放：替换播放列表为歌单歌曲，然后播放该首
+    row.addEventListener('click', () => {
+      player.playlist = [...pl.songs];
+      player.play(idx);
+    });
+
+    // 右键菜单
+    row.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      showPlaylistSongContextMenu(e, song, idx, pl);
+    });
+
+    return row;
+  };
+
+  const appendPlaylistDetailBatch = (listEl, songs, startIndex, pl) => {
+    const endIndex = Math.min(startIndex + PLAYLIST_DETAIL_BATCH, songs.length);
+    const frag = document.createDocumentFragment();
+    for (let i = startIndex; i < endIndex; i++) {
+      frag.appendChild(createPlaylistDetailRow(songs[i], i, pl, listEl));
+    }
+    listEl.appendChild(frag);
+  };
+
+  const setupPlaylistDetailScroll = (listEl, songs, pl) => {
+    if (songs.length <= PLAYLIST_DETAIL_BATCH) return;
+    let nextStart = PLAYLIST_DETAIL_BATCH;
+    const sentinel = document.createElement('div');
+    sentinel.className = 'luna-batch-sentinel';
+    sentinel.setAttribute('aria-hidden', 'true');
+    listEl.appendChild(sentinel);
+    const observer = new IntersectionObserver((entries) => {
+      for (const entry of entries) {
+        if (!entry.isIntersecting) continue;
+        if (nextStart >= songs.length) {
+          observer.disconnect();
+          sentinel.remove();
+          return;
+        }
+        appendPlaylistDetailBatch(listEl, songs, nextStart, pl);
+        nextStart += PLAYLIST_DETAIL_BATCH;
+        if (sentinel.parentNode === listEl) listEl.appendChild(sentinel);
+      }
+    }, { root: null, rootMargin: '300px 0px' });
+    observer.observe(sentinel);
+  };
+
   const renderPlaylistsTab = () => {
     const listEl = document.getElementById('music-list');
     const countEl = document.getElementById('music-count');
@@ -291,7 +421,7 @@ export function createPlaylistsPage({
           first4.forEach((s, i) => {
             const cell = document.createElement('img');
             cell.className = 'playlist-card-cover-cell';
-            cell.src = getCoverSrc(s.cover_image);
+            cell.src = getCoverSrc(s);
             cell.alt = '';
             coverWrap.appendChild(cell);
           });
@@ -349,35 +479,65 @@ export function createPlaylistsPage({
     const pl = getPlaylists().find(p => p.id === currentPlaylistId);
     if (!pl) { switchToPlaylistListView(); return; }
 
-    // 顶部栏
-    const topBar = document.createElement('div');
-    topBar.className = 'playlist-detail-header';
+    // 详情页 Hero 头部：渐变背景 + 封面（第一首歌）+ 统计 + 操作按钮
+    const hero = document.createElement('div');
+    hero.className = 'detail-hero';
+    const coverSong = pl.songs[0];
+    const totalSeconds = pl.songs.reduce((sum, s) => sum + (Number(s.duration) || 0), 0);
+    const fmtDuration = (sec) => {
+      const h = Math.floor(sec / 3600);
+      const m = Math.floor((sec % 3600) / 60);
+      const s = Math.floor(sec % 60);
+      return h > 0
+        ? `${h}小时${String(m).padStart(2, '0')}分`
+        : m > 0 ? `${m}分${String(s).padStart(2, '0')}秒` : `${s}秒`;
+    };
+    hero.innerHTML = `
+      <div class="detail-hero-bg"></div>
+      <div class="detail-hero-inner">
+        <button class="detail-back-btn" title="返回歌单列表" aria-label="返回">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+        </button>
+        <div class="detail-hero-content">
+          <div class="detail-hero-cover${coverSong && coverSong.cover_image ? '' : ' detail-hero-cover--gradient'}">
+            ${coverSong && coverSong.cover_image
+              ? `<img class="detail-hero-img" src="${escapeHtml(getCoverSrc(coverSong))}" alt="" loading="lazy" decoding="async" />`
+              : '<svg width="46" height="46" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>'}
+            <div class="detail-hero-cover-play" title="播放全部">
+              <svg width="34" height="34" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+            </div>
+          </div>
+          <div class="detail-hero-info">
+            <div class="detail-hero-type">歌单</div>
+            <div class="detail-hero-title">${escapeHtml(pl.name)}</div>
+            <div class="detail-hero-stats">${pl.songs.length} 首歌曲 · 总时长 ${fmtDuration(totalSeconds)}</div>
+            <div class="detail-hero-actions">
+              <button class="detail-hero-btn primary" data-action="play">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                播放全部
+              </button>
+              <button class="detail-hero-btn" data-action="shuffle">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/><polyline points="21 16 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/><line x1="4" y1="4" x2="9" y2="9"/></svg>
+                随机播放
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
 
-    const backWrap = document.createElement('div');
-    backWrap.className = 'playlist-detail-back';
-    const backBtn = document.createElement('button');
-    backBtn.className = 'playlist-detail-back-btn';
-    backBtn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>';
-    backBtn.title = '返回歌单列表';
-    backBtn.addEventListener('click', switchToPlaylistListView);
-    backWrap.appendChild(backBtn);
-    const nmEl = document.createElement('span');
-    nmEl.className = 'playlist-detail-title';
-    nmEl.textContent = pl.name;
-    backWrap.appendChild(nmEl);
-    topBar.appendChild(backWrap);
-
-    const playAllBtn = document.createElement('button');
-    playAllBtn.className = 'playlist-detail-play-all';
-    playAllBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg> 播放全部 (${pl.songs.length})`;
-    playAllBtn.addEventListener('click', () => {
-      if (pl.songs.length === 0) return showToast('歌单为空');
-      // ⭐ 直接替换播放列表为歌单歌曲⭐
-      player.playlist = [...pl.songs];
+    const playPlaylist = (songs) => {
+      if (songs.length === 0) return showToast('歌单为空');
+      player.playlist = [...songs];
       player.play(0);
+    };
+    hero.querySelector('.detail-back-btn').addEventListener('click', switchToPlaylistListView);
+    hero.querySelector('.detail-hero-cover-play').addEventListener('click', () => playPlaylist(pl.songs));
+    hero.querySelector('[data-action="play"]').addEventListener('click', () => playPlaylist(pl.songs));
+    hero.querySelector('[data-action="shuffle"]').addEventListener('click', () => {
+      playPlaylist([...pl.songs].sort(() => Math.random() - 0.5));
     });
-    topBar.appendChild(playAllBtn);
-    listEl.appendChild(topBar);
+    listEl.appendChild(hero);
 
     // 歌曲列表
     if (pl.songs.length === 0) {
@@ -388,93 +548,9 @@ export function createPlaylistsPage({
       return;
     }
 
-    pl.songs.forEach((song, idx) => {
-      const row = document.createElement('div');
-      row.className = 'playlist-detail-item song-item';
-      row.setAttribute('data-file-path', song.file_path);
-
-      // 序号
-      const num = document.createElement('span');
-      num.className = 'playlist-detail-num';
-      num.textContent = `${idx + 1}`;
-      row.appendChild(num);
-
-      // 封面小图
-      const cov = document.createElement('img');
-      cov.className = 'playlist-detail-cover';
-      cov.src = getCoverSrc(song.cover_image);
-      if (!song.cover_image) {
-        // ⭐ 没有封面时异步读可metadata ⭐
-        (async () => {
-          try {
-            const meta = await invoke('read_audio_metadata', { path: song.file_path });
-            if (meta && meta.cover_image) {
-              song.cover_image = meta.cover_image;
-              cov.src = getCoverSrc(song.cover_image);
-              // 持久化保存
-              const all = getPlaylists();
-              const targetPl = all.find(p => p.id === currentPlaylistId);
-              if (targetPl) {
-                const targetSong = targetPl.songs.find(s => s.file_path === song.file_path);
-                if (targetSong) {
-                  targetSong.cover_image = meta.cover_image;
-                  savePlaylists(all);
-                }
-              }
-            }
-          } catch (err) {
-            console.error('Failed to fetch cover:', song.file_path, err);
-          }
-        })();
-      }
-      row.appendChild(cov);
-
-      // 标题 + 歌手
-      const infoDiv = document.createElement('div');
-      infoDiv.className = 'playlist-detail-info';
-      const t = document.createElement('div');
-      t.className = 'playlist-detail-song-title';
-      t.textContent = song.title || '未知';
-      infoDiv.appendChild(t);
-      const a = document.createElement('div');
-      a.className = 'playlist-detail-song-artist';
-      a.innerHTML = renderArtistWithBadgesHtml(song.artist, song);
-      infoDiv.appendChild(a);
-      row.appendChild(infoDiv);
-
-      // 时长
-      const durEl = document.createElement('span');
-      durEl.className = 'playlist-detail-duration';
-      durEl.textContent = song.duration > 0 ? `${Math.floor(song.duration / 60)}:${String(Math.floor(song.duration % 60)).padStart(2, '0')}` : '';
-      row.appendChild(durEl);
-
-      // 删除按钮
-      const rm = document.createElement('button');
-      rm.className = 'playlist-detail-remove';
-      rm.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
-      rm.title = '从歌单移闄';
-      rm.addEventListener('click', (e) => {
-        e.stopPropagation();
-        removeSongFromPlaylist(pl.id, idx);
-        renderPlaylistsTab();
-      });
-      row.appendChild(rm);
-
-            // 单击播放：替换播放列表为歌单歌曲，然后播放该首
-      row.addEventListener('click', () => {
-        player.playlist = [...pl.songs];
-        player.play(idx);
-      });
-
-      // 右键菜单
-      row.addEventListener('contextmenu', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        showPlaylistSongContextMenu(e, song, idx, pl);
-      });
-
-      listEl.appendChild(row);
-    });
+    // 分批渲染：首批 PLAYLIST_DETAIL_BATCH 行，滚动触底追加（M3U 大歌单流畅）
+    appendPlaylistDetailBatch(listEl, pl.songs, 0, pl);
+    setupPlaylistDetailScroll(listEl, pl.songs, pl);
   };
 
   // 导出到右键菜单的添加到歌单效果
@@ -516,7 +592,7 @@ export function createPlaylistsPage({
       item.style.cssText = 'display:flex;align-items:center;gap:10px;padding:10px;border-radius:10px;font-size:13px;color:var(--text-primary);cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;transition:background .15s ease;';
 
       // 封面：优先显示歌单第一首歌的封面，否则显示占位符
-      const coverSrc = pl.songs.length > 0 ? getCoverSrc(pl.songs[0].cover_image) : '';
+      const coverSrc = pl.songs.length > 0 ? getCoverSrc(pl.songs[0]) : '';
       const coverHtml = coverSrc
         ? `<img src="${coverSrc}" style="width:30px;height:30px;border-radius:8px;object-fit:cover;" />`
         : `<span style="width:30px;height:30px;display:grid;place-items:center;border-radius:8px;background:rgba(var(--dynamic-color,16,185,129),.14);color:rgb(var(--dynamic-color,16,185,129));font-size:16px;">♫</span>`;

@@ -17,13 +17,48 @@ export function applyDepthBlur({
   const normalizedScrollIdx = scrollIdx ?? normalizedActive[0] ?? 0;
   const foregroundActive = normalizedActive.filter(index => {
     const line = allLines[index];
-    return line && !line.classList.contains('is-background-line');
+    return line
+      && !line.classList.contains('is-background-line')
+      && !line.classList.contains('is-interlude-line');
   });
   // Blur should follow the newest foreground phrase immediately, even while
   // the scroll anchor intentionally remains on an overlapping previous line.
+  const activeLine = activeIndex >= 0 ? allLines[activeIndex] : null;
+  const activeLineIsDecorative = activeLine && (
+    activeLine.classList.contains('is-background-line')
+    || activeLine.classList.contains('is-interlude-line')
+  );
+  let fallbackPrimaryIdx = normalizedScrollIdx;
+  if (allLines[fallbackPrimaryIdx]?.classList.contains('is-interlude-line')) {
+    let previousIdx = fallbackPrimaryIdx - 1;
+    while (
+      previousIdx >= 0
+      && (
+        allLines[previousIdx].classList.contains('is-background-line')
+        || allLines[previousIdx].classList.contains('is-interlude-line')
+      )
+    ) {
+      previousIdx -= 1;
+    }
+    if (previousIdx >= 0) {
+      fallbackPrimaryIdx = previousIdx;
+    } else {
+      let nextIdx = fallbackPrimaryIdx + 1;
+      while (
+        nextIdx < allLines.length
+        && (
+          allLines[nextIdx].classList.contains('is-background-line')
+          || allLines[nextIdx].classList.contains('is-interlude-line')
+        )
+      ) {
+        nextIdx += 1;
+      }
+      if (nextIdx < allLines.length) fallbackPrimaryIdx = nextIdx;
+    }
+  }
   const currentPrimaryIdx = foregroundActive.length > 0
     ? Math.max(...foregroundActive)
-    : (activeIndex >= 0 ? activeIndex : normalizedScrollIdx);
+    : (activeIndex >= 0 && !activeLineIsDecorative ? activeIndex : fallbackPrimaryIdx);
   const isBlurEnabled = shouldEnableDepthBlur();
 
   const container = document.getElementById('lyrics-scroll') || document.querySelector('.lyrics-scroll-container');
@@ -43,6 +78,17 @@ export function applyDepthBlur({
   }
 
   allLines.forEach((el, idx) => {
+    // Interlude dots are decorative separators. Let their own opacity
+    // animation control them instead of making them a depth-blur focus row.
+    if (el.classList.contains('is-interlude-line')) {
+      el.classList.remove('depth-1', 'depth-2', 'depth-3', 'depth-past');
+      el.style.removeProperty('filter');
+      el.style.removeProperty('opacity');
+      el._lastFilter = null;
+      el._lastOpacity = null;
+      return;
+    }
+
     let newOpacity;
 
     if (normalizedActive.includes(idx) || idx === normalizedScrollIdx || idx === currentPrimaryIdx) {

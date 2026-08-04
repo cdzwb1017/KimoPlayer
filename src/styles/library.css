@@ -37,8 +37,8 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  margin-bottom: 22px;
-  padding-bottom: 12px;
+  margin-bottom: 6px;
+  padding-bottom: 4px;
   position: relative;
   background: transparent !important;
   backdrop-filter: none !important;
@@ -358,3 +358,204 @@
   font-size: 12px;
   color: var(--text-secondary);
 }
+
+/* ════════════════════════════════════════════════
+   详情页 Hero 头部（专辑 / 艺人 / 流派 / 歌单共用）
+   ════════════════════════════════════════════════ */
+.detail-hero {
+  position: relative;
+  border-radius: 16px;
+  overflow: hidden;
+  margin-bottom: 22px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.detail-hero-bg {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg,
+    rgba(var(--dynamic-color, 0, 180, 216), 0.18),
+    rgba(var(--dynamic-color, 0, 180, 216), 0.05) 55%,
+    transparent 90%);
+  pointer-events: none;
+}
+
+.detail-hero-inner {
+  position: relative;
+  padding: 20px 22px 24px;
+}
+
+.detail-hero .detail-back-btn {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  z-index: 2;
+  background: rgba(0, 0, 0, 0.25);
+  border-color: rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(6px);
+}
+
+.detail-hero-content {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  padding-top: 30px;
+  min-width: 0;
+}
+
+/* 大封面 */
+.detail-hero-cover {
+  position: relative;
+  width: 136px;
+  height: 136px;
+  border-radius: 14px;
+  overflow: hidden;
+  flex-shrink: 0;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.35);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.detail-hero-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.detail-hero-cover--gradient {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg,
+    rgba(var(--dynamic-color, 0, 180, 216), 0.4),
+    rgba(255, 255, 255, 0.08));
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.detail-hero-cover-play {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.4);
+  opacity: 0;
+  transition: opacity 0.25s ease;
+  cursor: pointer;
+}
+
+.detail-hero-cover:hover .detail-hero-cover-play {
+  opacity: 1;
+}
+
+.detail-hero-cover-play svg {
+  width: 34px;
+  height: 34px;
+  color: #ffffff;
+  filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.45));
+}
+
+/* 信息区 */
+.detail-hero-info {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.detail-hero-type {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: rgb(var(--dynamic-color, 0, 180, 216));
+}
+
+.detail-hero-title {
+  font-size: 25px;
+  font-weight: 800;
+  color: var(--text-primary);
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+.detail-hero-stats {
+  font-size: 12.5px;
+  color: var(--text-secondary);
+}
+
+.detail-hero-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 6px;
+  flex-wrap: wrap;
+}
+
+.detail-hero-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 9px 18px;
+  border-radius: 999px;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--text-primary);
+}
+
+.detail-hero-btn:hover {
+  background: rgba(255, 255, 255, 0.14);
+  transform: translateY(-1px);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.detail-hero-btn.primary {
+  background: rgb(var(--dynamic-color, 0, 180, 216));
+  color: #06121a;
+  border-color: transparent;
+  box-shadow: 0 4px 18px rgba(var(--dynamic-color, 0, 180, 216), 0.35);
+}
+
+.detail-hero-btn.primary:hover {
+  filter: brightness(1.12);
+  background: rgb(var(--dynamic-color, 0, 180, 216));
+}
+
+/* ════════════════════════════════════════════════
+   二级菜单进入动画（专辑/艺术家/流派详情页）
+   与歌单详情页统一：hero 上滑缩放 + 行级交错上移淡入
+   ════════════════════════════════════════════════ */
+.detail-hero {
+  animation: detail-hero-in 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes detail-hero-in {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* 行级交错上移淡入（与歌单详情页 playlist-item-enter 同一节奏，复用同名 keyframes） */
+.detail-list-enter > .song-item {
+  animation: playlist-item-enter 0.3s ease forwards;
+}
+
+.detail-list-enter > .song-item:nth-child(1) { animation-delay: 0.02s; }
+.detail-list-enter > .song-item:nth-child(2) { animation-delay: 0.04s; }
+.detail-list-enter > .song-item:nth-child(3) { animation-delay: 0.06s; }
+.detail-list-enter > .song-item:nth-child(4) { animation-delay: 0.08s; }
+.detail-list-enter > .song-item:nth-child(5) { animation-delay: 0.10s; }
+.detail-list-enter > .song-item:nth-child(6) { animation-delay: 0.12s; }
+.detail-list-enter > .song-item:nth-child(7) { animation-delay: 0.14s; }
+.detail-list-enter > .song-item:nth-child(8) { animation-delay: 0.16s; }
+.detail-list-enter > .song-item:nth-child(9) { animation-delay: 0.18s; }
+.detail-list-enter > .song-item:nth-child(10) { animation-delay: 0.20s; }

@@ -179,21 +179,41 @@ export function saveLyricsCache({ audioPath, lines, invoke }) {
   try {
     const exportLines = lines
       .filter(line => !line.isInterlude)
-      .map(line => ({
-        time: line.time,
-        text: line.text,
-        translation: line.translation || null,
-        end: line.endTime || null,
-        syllables: (line.words || []).map(word => ({
+      .map(line => {
+        const syllables = (line.words || []).map(word => ({
           time: word.time,
-          duration: word.duration || null,
+          duration: Number.isFinite(word.duration) && word.duration > 0 ? word.duration : null,
+          end: Number.isFinite(word.end) && word.end > word.time ? word.end : null,
           text: word.text,
-        })),
-      }));
+          // 振假名：优先保留 ruby（LunaBeat 上 romanWord/transliteration 已经注入这里）
+          // 同时把 romanWord / transliteration 字段也落盘，方便后续做诊断或兼容其他 parser
+          ruby: word.ruby || null,
+          romanWord: word.romanWord || null,
+          transliteration: word.transliteration || null,
+          isBackground: Boolean(word.isBackground) ? true : undefined,
+          spaceAfter: word.spaceAfter ? true : undefined,
+          spaceBefore: word.spaceBefore ? true : undefined,
+        }));
+        return {
+          time: line.time,
+          end: Number.isFinite(line.end) && line.end > line.time ? line.end : (Number.isFinite(line.endTime) && line.endTime > line.time ? line.endTime : null),
+          text: line.text,
+          translation: line.translation || null,
+          romanLyric: line.romanLyric || null,
+          isBG: line.isBG ? true : undefined,
+          isDuet: line.isDuet ? true : undefined,
+          syllables,
+          // 旧格式的 words 字段也保留，方便老版本代码读回
+          words: syllables,
+        };
+      });
 
     const payload = {
       success: true,
       lyrics: exportLines,
+      // 也塞一份 data.lines，让 parseJSONLyrics 的 LunaBeat 分支也能直接读到
+      lines: exportLines,
+      format: 'kimo-player-v2',
     };
 
     invoke('save_lyrics_cache', {

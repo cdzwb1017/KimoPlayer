@@ -287,6 +287,294 @@
   transform: translateY(-50%) scale(1);
 }
 
+/* ====== LunaBeat 降级下载独立进度指示器 ====== */
+/* 覆盖在 progress-track 上方，与播放进度条语义分离，带轻微透明分层 */
+@keyframes luna-shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+.player-bar .progress-track .luna-download-indicator {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 100%;
+  border-radius: 1.5px;
+  overflow: hidden;
+  pointer-events: none;
+  background: rgba(99, 102, 241, 0.12);
+}
+
+.player-bar .progress-track .luna-download-fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(
+    90deg,
+    rgba(99, 102, 241, 0.85),
+    rgba(168, 85, 247, 0.9)
+  );
+  border-radius: 1.5px;
+  transition: width 0.2s ease;
+}
+
+.player-bar .progress-track .luna-download-shimmer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.25) 50%,
+    transparent 100%
+  );
+  animation: luna-shimmer 1.4s ease-in-out infinite;
+}
+
+.player-bar .progress-track .luna-download-text {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  background: rgba(20, 20, 28, 0.72);
+  backdrop-filter: blur(8px);
+  padding: 3px 10px;
+  border-radius: 6px;
+  white-space: nowrap;
+  letter-spacing: 0.2px;
+}
+
+.app-container.theme-light .player-bar .progress-track .luna-download-indicator {
+  background: rgba(99, 102, 241, 0.10);
+}
+
+.app-container.theme-light .player-bar .progress-track .luna-download-text {
+  background: rgba(255, 255, 255, 0.82);
+  color: var(--text-secondary);
+}
+
+/* ====== LunaBeat 局域网曲库列表样式 ====== */
+/* 工具栏：左侧子标签(.local-tabs) + 右侧连接状态/刷新，复用本地视觉语言 */
+.luna-toolbar {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 6px;
+  flex-wrap: wrap;
+}
+
+/* 覆盖 .local-tabs 在 LunaBeat 工具栏内的间距，与右侧状态徽标对齐 */
+.luna-toolbar .luna-local-tabs {
+  margin-bottom: 0;
+  flex: 1;
+  min-width: 0;
+}
+
+.luna-toolbar .luna-toolbar-right {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.luna-toolbar .luna-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 5px 10px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--text-secondary);
+  letter-spacing: 0.2px;
+}
+
+.luna-toolbar .luna-status .luna-status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.luna-toolbar .luna-status.online .luna-status-dot {
+  background: #34d399;
+  box-shadow: 0 0 6px rgba(52, 211, 153, 0.7);
+}
+
+.luna-toolbar .luna-status.connecting .luna-status-dot {
+  background: #fbbf24;
+  animation: luna-status-pulse 1s ease-in-out infinite;
+}
+
+.luna-toolbar .luna-status.offline .luna-status-dot,
+.luna-toolbar .luna-status.unknown .luna-status-dot {
+  background: #9ca3af;
+}
+
+.luna-toolbar .luna-status.online {
+  color: #34d399;
+}
+
+.luna-toolbar .luna-status.offline {
+  color: #f87171;
+}
+
+@keyframes luna-status-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+.luna-toolbar .luna-refresh-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.luna-toolbar .luna-refresh-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--text-primary);
+  transform: rotate(15deg);
+}
+
+.luna-toolbar .luna-refresh-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.luna-toolbar .luna-refresh-btn .is-spinning {
+  animation: luna-refresh-spin 0.9s linear infinite;
+}
+
+/* 歌曲列表尾部加载中 spinner：通用 is-spinning 兜底 + luna-footer-spinner 明确作用域 */
+.luna-page-footer .luna-footer-spinner.is-spinning,
+.luna-page-footer .is-spinning {
+  animation: luna-refresh-spin 0.9s linear infinite;
+  transform-origin: center center;
+  display: inline-flex;
+}
+
+@keyframes luna-refresh-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.app-container.theme-light .luna-toolbar .luna-status,
+.app-container.theme-grey .luna-toolbar .luna-status {
+  background: rgba(255, 255, 255, 0.5);
+  border-color: rgba(0, 0, 0, 0.06);
+}
+
+.app-container.theme-light .luna-toolbar .luna-refresh-btn,
+.app-container.theme-grey .luna-toolbar .luna-refresh-btn {
+  background: rgba(255, 255, 255, 0.5);
+  border-color: rgba(0, 0, 0, 0.06);
+}
+
+/* 虚拟滚动哨兵：min 1×1px 保证 IntersectionObserver 能报告相交
+   （零面积目标永不触发 isIntersecting），视觉上不可见不占空间 */
+.luna-batch-sentinel {
+  min-width: 1px !important;
+  min-height: 1px !important;
+  width: 0 !important;
+  height: 0 !important;
+  flex-shrink: 0;
+  pointer-events: none;
+  overflow: hidden;
+  padding: 0 !important;
+  margin: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+  visibility: hidden !important;
+}
+
+/* ====== LunaBeat 封面淡入过渡动画 ====== */
+/* 初始状态：隐藏 + 轻微模糊，避免从破损图标突兀跳到真实图 */
+.luna-cover-fade {
+  opacity: 0;
+  filter: blur(6px) saturate(0.6);
+  transform: scale(0.96);
+  transition:
+    opacity 0.45s cubic-bezier(0.4, 0, 0.2, 1),
+    filter 0.55s cubic-bezier(0.4, 0, 0.2, 1),
+    transform 0.45s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: opacity, filter, transform;
+}
+
+/* 加载完成：淡入 + 去模糊 + 轻微回弹放大 */
+.luna-cover-fade.is-loaded {
+  opacity: 1;
+  filter: blur(0) saturate(1);
+  transform: scale(1);
+}
+
+.luna-play-all {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 20px;
+  border-radius: 20px;
+  background: linear-gradient(135deg, rgba(var(--dynamic-color, 99, 102, 241), 0.2), rgba(var(--dynamic-color, 168, 85, 247), 0.15));
+  border: 1px solid rgba(var(--dynamic-color, 99, 102, 241), 0.3);
+  color: var(--text-primary);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  margin-bottom: 14px;
+  align-self: flex-start;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.1);
+}
+.luna-play-all:hover {
+  background: linear-gradient(135deg, rgba(var(--dynamic-color, 99, 102, 241), 0.35), rgba(var(--dynamic-color, 168, 85, 247), 0.25));
+  border-color: rgba(var(--dynamic-color, 99, 102, 241), 0.5);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(var(--dynamic-color, 99, 102, 241), 0.25);
+}
+
+/* 工具栏里的播放全部：紧凑尺寸与状态徽标/刷新按钮对齐 */
+.luna-play-all.luna-play-all-toolbar {
+  margin-bottom: 0;
+  align-self: center;
+  padding: 4px 12px;
+  gap: 5px;
+  font-size: 11.5px;
+  font-weight: 500;
+  border-radius: 14px;
+  height: 26px;
+  box-sizing: border-box;
+}
+.luna-play-all.luna-play-all-toolbar svg {
+  width: 11px !important;
+  height: 11px !important;
+}
+.luna-play-all.luna-play-all-toolbar:hover {
+  transform: translateY(-1px);
+}
+.app-container.theme-light .luna-play-all.luna-play-all-toolbar,
+.app-container.theme-grey .luna-play-all.luna-play-all-toolbar {
+  background: linear-gradient(135deg, rgba(var(--dynamic-color, 99, 102, 241), 0.12), rgba(var(--dynamic-color, 168, 85, 247), 0.10));
+  border-color: rgba(var(--dynamic-color, 99, 102, 241), 0.2);
+}
+
 /* Slow Cross-Fade Transitions for switching songs */
 .lyrics-large-cover,
 .player-cover,
@@ -541,4 +829,174 @@ body.theme-light {
   background: linear-gradient(90deg, #1a1a1a, #555);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
+}
+
+/* ════════════════════════════════════════════════
+   LunaBeat 加载占位（连接 / 数据加载 / 页面初始化）
+   ════════════════════════════════════════════════ */
+.luna-loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 72px 24px;
+  text-align: center;
+  animation: luna-loading-fade-in 0.35s ease-out;
+}
+
+.luna-loading-state .luna-loading-visual {
+  position: relative;
+  width: 92px;
+  height: 92px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent-color, #00f0ff);
+}
+
+.luna-loading-state .luna-loading-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  border-top-color: var(--accent-color, #00f0ff);
+  animation: luna-loading-spin 1.1s linear infinite;
+}
+
+.luna-loading-state .luna-loading-ring.ring-2 {
+  inset: 13px;
+  border-top-color: transparent;
+  border-bottom-color: var(--accent-color, #00f0ff);
+  animation-duration: 1.7s;
+  animation-direction: reverse;
+  opacity: 0.6;
+}
+
+.luna-loading-state .luna-loading-icon {
+  animation: luna-loading-pulse 1.6s ease-in-out infinite;
+}
+
+.luna-loading-state .luna-loading-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+  letter-spacing: 0.3px;
+}
+
+.luna-loading-state .luna-loading-sub {
+  font-size: 12.5px;
+  color: var(--text-tertiary);
+  line-height: 1.6;
+  max-width: 340px;
+}
+
+@keyframes luna-loading-spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes luna-loading-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+
+@keyframes luna-loading-fade-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* ════════════════════════════════════════════════
+   LunaBeat 视图容器入场动画（顶部 tab 切换时触发）
+   animateListEnter 会给视图容器添加 .page-enter，
+   此定义补齐基础动画（此前缺失导致切换无动画）。
+   ════════════════════════════════════════════════ */
+.list-songs-container.page-enter,
+.albums-grid.page-enter,
+.artists-grid.page-enter,
+.genres-grid.page-enter {
+  animation: luna-view-float-up 0.42s cubic-bezier(0.25, 0.1, 0.25, 1) both;
+}
+
+@keyframes luna-view-float-up {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 16px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+/* 网格哨兵：占满整行，避免在网格中占一格造成多余空隙 */
+.albums-grid .luna-batch-sentinel,
+.artists-grid .luna-batch-sentinel,
+.genres-grid .luna-batch-sentinel {
+  grid-column: 1 / -1;
+  height: 1px;
+}
+
+/* ══ LunaBeat 工具栏搜索框 ══ */
+.luna-toolbar .luna-search-box {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--text-secondary);
+  flex: 1;
+  min-width: 140px;
+  max-width: 300px;
+  transition: border-color 0.25s ease, background 0.25s ease;
+}
+
+.luna-toolbar .luna-search-box:focus-within {
+  border-color: rgba(var(--dynamic-color, 0, 240, 255), 0.45);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.luna-toolbar .luna-search-box input {
+  flex: 1;
+  min-width: 0;
+  background: none;
+  border: none;
+  outline: none;
+  color: var(--text-primary);
+  font-size: 12.5px;
+  font-family: var(--font-family);
+}
+
+.luna-toolbar .luna-search-box input::placeholder {
+  color: var(--text-tertiary);
+}
+
+.luna-toolbar .luna-search-clear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 2px;
+  border-radius: 50%;
+  transition: all 0.2s ease;
+}
+
+.luna-toolbar .luna-search-clear:hover {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.app-container.theme-light .luna-toolbar .luna-search-box {
+  background: rgba(0, 0, 0, 0.03);
+  border-color: rgba(0, 0, 0, 0.08);
+}
+
+.app-container.theme-light .luna-toolbar .luna-search-box:focus-within {
+  border-color: rgba(var(--dynamic-color, 0, 136, 204), 0.4);
+  background: rgba(0, 0, 0, 0.02);
 }

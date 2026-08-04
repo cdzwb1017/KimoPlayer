@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" type="image/png" href="/favicon-32.png" />
+    <link rel="stylesheet" href="/src/ui/debug-panel.css" />
+  </head>
+  <body oncontextmenu="event.preventDefault()">
+    <!-- 开发者工具独立窗口：面板由 debug-panel.js 挂载到此处；
+         对主窗口播放器的操作通过 debug-action 事件桥转发 -->
+    <script type="module">
+      import { initDebugPanel } from '/src/ui/debug-panel.js';
+      // 标记为独立调试窗口（面板隐藏关闭按钮、不显示常驻触发器）
+      document.body.setAttribute('data-debug-window', 'true');
+      initDebugPanel(null);
+    </script>
+  </body>
+</html>

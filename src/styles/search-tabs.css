@@ -3,8 +3,8 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  margin-bottom: 22px;
-  padding-bottom: 12px;
+  margin-bottom: 6px;
+  padding-bottom: 4px;
   border-bottom: 1px solid var(--glass-border);
   position: sticky;
   top: auto;
@@ -148,19 +148,20 @@
   flex-shrink: 0;
 }
 
-/* Matching highlights */
+/* Matching highlights - 动态取色高亮 */
 .search-highlight {
-  color: rgb(245, 158, 11);
+  color: rgb(var(--dynamic-color, 16, 185, 129));
   font-weight: 600;
+  text-shadow: 0 0 10px rgba(var(--dynamic-color, 16, 185, 129), 0.3);
 }
 
 .lyric-search-highlight {
-  background: rgba(245, 158, 11, 0.3) !important;
-  border-bottom: 2px solid rgb(245, 158, 11) !important;
-  border-radius: 2px;
-  padding: 0 2px;
-  color: #fff !important;
-  text-shadow: 0 0 8px rgba(245, 158, 11, 0.6) !important;
+  background: rgba(var(--dynamic-color, 16, 185, 129), 0.25) !important;
+  border-bottom: 2px solid rgb(var(--dynamic-color, 16, 185, 129)) !important;
+  border-radius: 3px;
+  padding: 0 3px;
+  color: #ffffff !important;
+  text-shadow: 0 0 8px rgba(var(--dynamic-color, 16, 185, 129), 0.6) !important;
 }
 
 /* Light theme adaptations */
@@ -195,9 +196,15 @@
   color: rgba(0, 0, 0, 0.3);
 }
 
+.theme-light .search-highlight {
+  color: rgb(var(--dynamic-color, 0, 136, 204));
+  font-weight: 600;
+}
+
 .theme-light .lyric-search-highlight {
-  background: rgba(245, 158, 11, 0.15) !important;
-  color: #b45309 !important;
+  background: rgba(var(--dynamic-color, 0, 136, 204), 0.18) !important;
+  border-bottom: 2px solid rgb(var(--dynamic-color, 0, 136, 204)) !important;
+  color: rgb(var(--dynamic-color, 0, 100, 170)) !important;
   text-shadow: none !important;
 }
 

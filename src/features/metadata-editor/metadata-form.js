@@ -116,6 +116,6 @@ export function fillMetadataForm({ meta, filePath, getCoverSrc }) {
   setVal('edit-metadata-comment', meta?.comment || '');
 
   if (meta?.cover_image) {
-    setSrc('edit-metadata-cover-preview', getCoverSrc(meta.cover_image));
+    setSrc('edit-metadata-cover-preview', getCoverSrc(meta));
   }
 }

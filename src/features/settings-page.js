@@ -1,12 +1,25 @@
 import {
   applyInterfaceFont,
   getFontFileName,
+  getFontOptions,
+  getUserFonts,
+  addUserFont,
+  removeUserFont,
   getStoredInterfaceFont,
   INTERFACE_FONT_PRESETS,
+  getStoredLyricsFont,
+  applyLyricsFont,
+  getStoredDesktopLyricsFont,
+  resolveDesktopLyricsFontFamily,
+  DOWNLOADABLE_FONTS,
+  downloadFont,
 } from '../ui/interface-font.js';
 import { checkForUpdates, setBetaKey, getBetaStatus, BETA_KEY, APP_VERSION } from '../ui/update-checker.js';
 import { openUrl } from '@tauri-apps/plugin-opener';
+import { listen } from '@tauri-apps/api/event';
 import { updateLyricsPreference } from '../lyrics/preferences.js';
+import { applyWindowMaterial, applyWindowOpacity } from '../ui/theme.js';
+import { pruneLyricsCache } from '../storage/lyrics-cache-db.js';
 
 export const createSettingsPage = ({
   player,
@@ -34,6 +47,14 @@ export const createSettingsPage = ({
     if (!listEl) return;
     listEl.innerHTML = '';
 
+    // 清空工具栏，避免从其他 tab（搜索/局域网）切换过来时残留其工具栏内容；
+    // 同时重置 className（luna 页会设置 luna-toolbar 类，需还原为 content-toolbar）
+    const toolbarEl = document.getElementById('content-toolbar');
+    if (toolbarEl) {
+      toolbarEl.innerHTML = '';
+      toolbarEl.className = 'content-toolbar';
+    }
+
     const staggerMode = localStorage.getItem('kimo-lyrics-stagger-mode') || 'word';
     const fsRaw = localStorage.getItem('kimo-lyrics-font-size');
     const fontSize = (fsRaw !== null && !isNaN(parseFloat(fsRaw))) ? parseFloat(fsRaw) : 22.0;
@@ -45,17 +66,24 @@ export const createSettingsPage = ({
     const lineSpacingRaw = localStorage.getItem('kimo-lyrics-line-spacing');
     const lineSpacing = (lineSpacingRaw !== null && !isNaN(parseFloat(lineSpacingRaw))) ? parseFloat(lineSpacingRaw) : 0.85;
     const rowFollowAnimationVal = localStorage.getItem('kimo-lyrics-row-follow-enabled') !== 'false';
+    const filterLyricInfoVal = localStorage.getItem('kimo-lyrics-filter-info-enabled') === 'true';
     const miniTransVal = localStorage.getItem('kimo-mini-lyrics-show-translation') === 'true';
+    const miniLyricsFontSize = Math.max(11, Math.min(18, Number(localStorage.getItem('kimo-mini-lyrics-font-size') || 13.5)));
     const desktopLyricsEnabled = localStorage.getItem('kimo-desktop-lyrics-enabled') === 'true';
     const desktopLyricsFontSize = Number(localStorage.getItem('kimo-desktop-lyrics-font-size') || 34);
     const desktopLyricsOpacity = Number(localStorage.getItem('kimo-desktop-lyrics-opacity') || 0.96);
     const desktopLyricsShowTranslation = localStorage.getItem('kimo-desktop-lyrics-show-translation') !== 'false';
     const desktopLyricsLocked = localStorage.getItem('kimo-desktop-lyrics-locked') === 'true';
     const desktopLyricsTheme = localStorage.getItem('kimo-desktop-lyrics-theme') || 'aurora';
-    const desktopLyricsAlign = localStorage.getItem('kimo-desktop-lyrics-align') || 'center';
+    const desktopLyricsAlign = localStorage.getItem('kimo-desktop-lyrics-align') || 'left';
     const desktopLyricsWordByWord = localStorage.getItem('kimo-desktop-lyrics-word-by-word') !== 'false';
     const desktopLyricsGlow = localStorage.getItem('kimo-desktop-lyrics-glow') !== 'false';
     const desktopLyricsStroke = localStorage.getItem('kimo-desktop-lyrics-stroke') !== 'false';
+    const desktopLyricsCustomColor = localStorage.getItem('kimo-desktop-lyrics-custom-color') === 'true';
+    const desktopLyricsActiveColor = localStorage.getItem('kimo-desktop-lyrics-color-active') || '';
+    const desktopLyricsInactiveColor = localStorage.getItem('kimo-desktop-lyrics-color-inactive') || '';
+    const desktopLyricsLineMode = localStorage.getItem('kimo-desktop-lyrics-line-mode') || 'single';
+    const desktopLyricsLayout = localStorage.getItem('kimo-desktop-lyrics-layout') || 'stacked';
     const songPlayMode = localStorage.getItem('kimo-song-play-mode') || 'single';
     const aiServerUrl = localStorage.getItem('kimo-ai-server-url') || 'http://127.0.0.1:8000';
         const showQualityBadgeVal = localStorage.getItem('kimo-show-quality-badge') !== 'false';
@@ -69,243 +97,59 @@ export const createSettingsPage = ({
 
     const container = document.createElement('div');
     container.className = 'settings-container';
-    
-    const lyricCard = document.createElement('div');
-    lyricCard.className = 'settings-card';
-    lyricCard.innerHTML = `
-      <div class="settings-card-title">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
-        歌词与视觉动效
-      </div>
-      
-      <div class="setting-row">
-        <div class="setting-info">
-          <div class="setting-label">歌词动画切换模式</div>
-          <div class="setting-desc">控制卡拉OK歌词播放时，是以单个字母为单位依次上移，还是以完整单词为单位整体上移。</div>
-        </div>
-        <div class="setting-radio-group" id="settings-stagger-group" data-active-idx="${staggerMode === 'stagger' ? '0' : '1'}">
-          <div class="setting-radio-active-bg"></div>
-          <button class="setting-radio-btn ${staggerMode === 'stagger' ? 'active' : ''}" data-val="stagger">字母依次</button>
-          <button class="setting-radio-btn ${staggerMode === 'word' ? 'active' : ''}" data-val="word">单词整体</button>
-        </div>
-      </div>
 
-      <div class="setting-row">
-        <div class="setting-info">
-          <div class="setting-label">歌词逐行跟随动画</div>
-          <div class="setting-desc">开启后，当前歌词切换时，下方歌词会按距离依次跟随上移；关闭后所有歌词同步平滑上移。</div>
-        </div>
-        <label class="setting-toggle" title="切换歌词逐行跟随动画">
-          <input type="checkbox" id="settings-lyrics-row-follow" ${rowFollowAnimationVal ? 'checked' : ''} />
-          <span class="setting-toggle-track" aria-hidden="true"></span>
-        </label>
+    // 🔍 永久置顶搜索栏
+    const searchHeader = document.createElement('div');
+    searchHeader.className = 'settings-search-sticky-header';
+    searchHeader.innerHTML = `
+      <div class="settings-search-box">
+        <svg class="settings-search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" id="settings-search-input" class="settings-search-input" placeholder="搜索设置项 (例如：歌词、主题、桌面歌词、取色、缩放)..." autocomplete="off" />
+        <button id="settings-search-clear" class="settings-search-clear" title="清空搜索" style="display: none;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
       </div>
-
-      <div class="setting-row">
-        <div class="setting-info">
-          <div class="setting-label">歌词默认字号</div>
-          <div class="setting-desc">调节全屏歌词面板中的歌词渲染大小。支持无级缩放。</div>
-        </div>
-        <div class="setting-slider-wrapper">
-          <input type="range" class="setting-slider" id="settings-slider-font-size" min="16" max="48" step="0.5" value="${fontSize}">
-          <div class="setting-value-display" id="settings-font-size-val">${fontSize.toFixed(1)}px</div>
-        </div>
-      </div>
-
-      <div class="setting-row">
-        <div class="setting-info">
-          <div class="setting-label">歌词上抬动画幅度</div>
-          <div class="setting-desc">调节当前发音的歌词向上漂移抬升的物理高度（以像素为单位）。</div>
-        </div>
-        <div class="setting-slider-wrapper">
-          <input type="range" class="setting-slider" id="settings-slider-lift" min="0" max="5" step="1" value="${liftAmp}">
-          <div class="setting-value-display" id="settings-lift-val">${liftAmp}px</div>
-        </div>
-      </div>
-
-      <div class="setting-row">
-        <div class="setting-info">
-          <div class="setting-label">歌词行间距</div>
-          <div class="setting-desc">调节两句歌词之间的上下间距（相对字号倍数，=紧贴）。</div>
-        </div>
-        <div class="setting-slider-wrapper">
-          <input type="range" class="setting-slider" id="settings-slider-line-spacing" min="0" max="2.0" step="0.05" value="${lineSpacing}">
-          <div class="setting-value-display" id="settings-line-spacing-val">${lineSpacing.toFixed(2)}</div>
-        </div>
-      </div>
-
-      <div class="setting-row">
-        <div class="setting-info">
-          <div class="setting-label">迷你歌词显示翻译</div>
-          <div class="setting-desc">开启后，主播放页中央的迷你歌词下方会显示当前行的翻译内容。</div>
-        </div>
-        <label class="setting-toggle" title="切换迷你歌词翻译">
-          <input type="checkbox" id="settings-mini-translation" ${miniTransVal ? 'checked' : ''} />
-          <span class="setting-toggle-track" aria-hidden="true"></span>
-        </label>
-      </div>
+      <div id="settings-search-result-count" class="settings-search-count" style="display: none;"></div>
     `;
-    container.appendChild(lyricCard);
+    // 参考搜索页/本地音乐页：搜索头放到固定工具栏（content-toolbar），
+    // 列表在其下方的独立滚动区域，结构上不会从搜索头下穿过
+    const settingsToolbar = document.getElementById('content-toolbar');
+    (settingsToolbar || container).appendChild(searchHeader);
 
-    // ========== 桌面歌词独立设置卡片 ==========
-    const desktopLyricCard = document.createElement('div');
-    desktopLyricCard.className = 'settings-card';
-    desktopLyricCard.innerHTML = `
-      <div class="settings-card-title">
-        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
-        桌面歌词设置
-      </div>
-
-      <div class="setting-row">
-        <div class="setting-info">
-          <div class="setting-label">开启桌面歌词</div>
-          <div class="setting-desc">在桌面上显示浮动置顶歌词；悬停可进行切歌、调字号与锁定。</div>
-        </div>
-        <label class="setting-toggle">
-          <input type="checkbox" id="settings-desktop-lyrics" ${desktopLyricsEnabled ? 'checked' : ''} />
-          <span class="setting-toggle-track" aria-hidden="true"></span>
-        </label>
-      </div>
-
-      <div class="setting-row">
-        <div class="setting-info">
-          <div class="setting-label">锁定桌面歌词 (鼠标穿透)</div>
-          <div class="setting-desc">锁定后歌词窗口支持鼠标完全穿透，防止误触拖动；可在此解除锁定。</div>
-        </div>
-        <label class="setting-toggle">
-          <input type="checkbox" id="settings-desktop-lyrics-locked" ${desktopLyricsLocked ? 'checked' : ''} />
-          <span class="setting-toggle-track" aria-hidden="true"></span>
-        </label>
-      </div>
-
-      <div class="setting-row">
-        <div class="setting-info">
-          <div class="setting-label">桌面歌词字号</div>
-          <div class="setting-desc">调整桌面歌词文字显示字号大小。</div>
-        </div>
-        <div class="setting-slider-wrapper">
-          <input type="range" class="setting-slider" id="settings-desktop-lyrics-size" min="12" max="56" step="1" value="${desktopLyricsFontSize}">
-          <div class="setting-value-display" id="desktop-lyrics-size-val">${desktopLyricsFontSize}px</div>
-        </div>
-      </div>
-
-      <div class="setting-row">
-        <div class="setting-info">
-          <div class="setting-label">桌面歌词透明度</div>
-          <div class="setting-desc">调整桌面歌词窗口的不透明度。</div>
-        </div>
-        <div class="setting-slider-wrapper">
-          <input type="range" class="setting-slider" id="settings-desktop-lyrics-opacity" min="0.25" max="1" step="0.05" value="${desktopLyricsOpacity}">
-          <div class="setting-value-display" id="desktop-lyrics-opacity-val">${Math.round(desktopLyricsOpacity * 100)}%</div>
-        </div>
-      </div>
-
-      <div class="setting-row">
-        <div class="setting-info">
-          <div class="setting-label">桌面歌词逐字动画</div>
-          <div class="setting-desc">开启后若歌词包含逐字时间戳，桌面歌词将展示平滑的逐字高亮/卡拉OK效果。</div>
-        </div>
-        <label class="setting-toggle">
-          <input type="checkbox" id="settings-desktop-lyrics-word-by-word" ${desktopLyricsWordByWord ? 'checked' : ''} />
-          <span class="setting-toggle-track" aria-hidden="true"></span>
-        </label>
-      </div>
-
-      <div class="setting-row">
-        <div class="setting-info">
-          <div class="setting-label">显示歌词翻译</div>
-          <div class="setting-desc">在桌面歌词下方显示对应的翻译字幕。</div>
-        </div>
-        <label class="setting-toggle">
-          <input type="checkbox" id="settings-desktop-lyrics-translation" ${desktopLyricsShowTranslation ? 'checked' : ''} />
-          <span class="setting-toggle-track" aria-hidden="true"></span>
-        </label>
-      </div>
-
-      <div class="setting-row">
-        <div class="setting-info">
-          <div class="setting-label">字体阴影</div>
-          <div class="setting-desc">为桌面歌词文字提供霓虹发光与背景阴影以增强质感（关闭后文字变纯净）。</div>
-        </div>
-        <label class="setting-toggle">
-          <input type="checkbox" id="settings-desktop-lyrics-glow" ${desktopLyricsGlow ? 'checked' : ''} />
-          <span class="setting-toggle-track" aria-hidden="true"></span>
-        </label>
-      </div>
-
-      <div class="setting-row">
-        <div class="setting-info">
-          <div class="setting-label">字体描边</div>
-          <div class="setting-desc">在发光关闭时提供微弱黑投影以在白壁纸下防瞎（关闭后展现极致纯净裸字）。</div>
-        </div>
-        <label class="setting-toggle">
-          <input type="checkbox" id="settings-desktop-lyrics-stroke" ${desktopLyricsStroke ? 'checked' : ''} />
-          <span class="setting-toggle-track" aria-hidden="true"></span>
-        </label>
-      </div>
-
-      <div class="setting-row">
-        <div class="setting-info">
-          <div class="setting-label">配色Preset与对齐</div>
-          <div class="setting-desc">选择流光发光主题Preset与文字对齐方式。</div>
-        </div>
-        <div style="display:flex;gap:8px;align-items:center;">
-          <select id="settings-desktop-lyrics-theme" class="setting-select">
-            <option value="follow-app" ${desktopLyricsTheme === 'follow-app' ? 'selected' : ''}>跟随软件主题 (Auto)</option>
-            <option value="aurora" ${desktopLyricsTheme === 'aurora' ? 'selected' : ''}>极光青绿 (Aurora)</option>
-            <option value="cyber" ${desktopLyricsTheme === 'cyber' ? 'selected' : ''}>赛博粉紫 (Cyber)</option>
-            <option value="sunset" ${desktopLyricsTheme === 'sunset' ? 'selected' : ''}>夕阳金橙 (Sunset)</option>
-            <option value="ocean" ${desktopLyricsTheme === 'ocean' ? 'selected' : ''}>蔚蓝深海 (Ocean)</option>
-            <option value="white" ${desktopLyricsTheme === 'white' ? 'selected' : ''}>经典亮白 (White)</option>
-          </select>
-          <select id="settings-desktop-lyrics-align" class="setting-select">
-            <option value="center" ${desktopLyricsAlign === 'center' ? 'selected' : ''}>居中对齐</option>
-            <option value="left" ${desktopLyricsAlign === 'left' ? 'selected' : ''}>靠左对齐</option>
-            <option value="right" ${desktopLyricsAlign === 'right' ? 'selected' : ''}>靠右对齐</option>
-          </select>
-        </div>
-      </div>
-
-      <div class="setting-row">
-        <div class="setting-info">
-          <div class="setting-label">沉浸模式隐藏标题栏</div>
-          <div class="setting-desc">进入沉浸全屏模式时，是否隐藏窗口标题栏按钮（最小化、最大化、关闭）。</div>
-        </div>
-        <label class="setting-toggle" title="切换沉浸模式隐藏标题栏">
-          <input type="checkbox" id="settings-immersive-hide-titlebar" ${localStorage.getItem('kimo-immersive-hide-titlebar') === 'false' ? '' : 'checked'} />
-          <span class="setting-toggle-track" aria-hidden="true"></span>
-        </label>
-      </div>
+    const noResultsEl = document.createElement('div');
+    noResultsEl.id = 'settings-no-results';
+    noResultsEl.className = 'settings-no-results';
+    noResultsEl.style.display = 'none';
+    noResultsEl.innerHTML = `
+      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+      <span>未找到与“<strong id="settings-no-results-keyword"></strong>”匹配的设置项目</span>
     `;
-    container.appendChild(desktopLyricCard);
 
-    const perfCard = document.createElement('div');
-    perfCard.className = 'settings-card';
-    const isPerfMode = localStorage.getItem('kimo-performance-mode') === 'true';
-    perfCard.innerHTML = `
-      <div class="settings-card-title">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-        硬件性能与省电模式
-      </div>
-      
-      <div class="setting-row">
-        <div class="setting-info">
-          <div class="setting-label">开启低功耗性能模式</div>
-          <div class="setting-desc">适合在集成显卡、低功耗设备或播放不够流畅时尝试开启。开启后会减少景深模糊和毛玻璃效果，可能降低 CPU 与 GPU 占用并改善歌词动画流畅度，实际效果因设备而异。</div>
-        </div>
-        <label class="setting-toggle" title="切换低功耗性能模式">
-          <input type="checkbox" id="settings-perf-mode" ${isPerfMode ? 'checked' : ''} />
-          <span class="setting-toggle-track" aria-hidden="true"></span>
-        </label>
-      </div>
-    `;
-    container.appendChild(perfCard);
-
+    // ════════════════════════════════════════════════
+    // 1. 🎨 外观与界面 (Appearance & Layout)
+    // ════════════════════════════════════════════════
     const themeCard = document.createElement('div');
     themeCard.className = 'settings-card';
     const themeVal = localStorage.getItem('kimo-theme') || 'light';
     const uiStyleVal = localStorage.getItem('kimo-ui-style') || 'solid';
     const bgStyleVal = localStorage.getItem('kimo-bg-style') || 'static';
+    const bgCustomPath = localStorage.getItem('kimo-custom-bg-path') || '';
+    const bgCustomName = bgCustomPath ? bgCustomPath.split(/[\\/]/).pop() : '';
+    const windowMaterialVal = localStorage.getItem('kimo-window-material') || 'none';
+    const materialEnginePreview = localStorage.getItem('kimo-material-engine-preview') === 'true';
+    // 迁移旧设置：此前「背景透明度」存于 kimo-bg-custom-opacity（0-1 格式），
+    // 迁移为整窗口透明度（0-100 格式，需 ×100；<0.1 视为测试残留，重置为 100 防卡死）
+    if (localStorage.getItem('kimo-window-opacity') === null && localStorage.getItem('kimo-bg-custom-opacity') !== null) {
+      const oldVal = parseFloat(localStorage.getItem('kimo-bg-custom-opacity'));
+      const migrated = Number.isFinite(oldVal) && oldVal >= 0.1 ? Math.round(oldVal * 100) : 100;
+      localStorage.setItem('kimo-window-opacity', String(migrated));
+      localStorage.removeItem('kimo-bg-custom-opacity');
+    }
+    const rawWindowOpacity = localStorage.getItem('kimo-window-opacity');
+    const bgCustomOpacityPct = rawWindowOpacity !== null && Number.isFinite(parseFloat(rawWindowOpacity))
+      ? Math.max(5, Math.round(parseFloat(rawWindowOpacity)))
+      : 100;
+    const bgMaskEnabled = localStorage.getItem('kimo-bg-mask-enabled') === 'true';
     const bgRotatePct = parseFloat(localStorage.getItem('kimo-bg-rotate-speed')) || 50;
     const isCustom = localStorage.getItem('kimo-overlay-opacity-custom') === 'true';
     const savedOpVal = isCustom ? localStorage.getItem('kimo-overlay-opacity') : null;
@@ -315,14 +159,21 @@ export const createSettingsPage = ({
     const currentZoom = (zoomRaw !== null && !isNaN(parseFloat(zoomRaw))) ? parseFloat(zoomRaw) : 1.0;
     const zoomPercent = Math.round(currentZoom * 100);
 
-    const radiusRaw = localStorage.getItem('kimo-window-radius');
-    const currentRadius = (radiusRaw !== null && !isNaN(parseFloat(radiusRaw))) ? parseInt(radiusRaw, 10) : 5;
     const interfaceFont = getStoredInterfaceFont();
-    const interfaceFontOptions = INTERFACE_FONT_PRESETS.map(preset =>
-      `<option value="${preset.value}" ${interfaceFont.mode === preset.value ? 'selected' : ''}>${preset.label}</option>`
+    const interfaceFontOptions = getFontOptions().map(opt =>
+      `<option value="${opt.value}" ${interfaceFont.mode === opt.value ? 'selected' : ''}>${opt.label}</option>`
     ).join('');
 
-    // 取色设置
+    const storedLyricsFont = getStoredLyricsFont();
+    const lyricsFontOptions = getFontOptions(true).map(opt =>
+      `<option value="${opt.value}" ${storedLyricsFont.mode === opt.value ? 'selected' : ''}>${opt.label}</option>`
+    ).join('');
+
+    const storedDesktopLyricsFont = getStoredDesktopLyricsFont();
+    const desktopLyricsFontOptions = getFontOptions(true).map(opt =>
+      `<option value="${opt.value}" ${storedDesktopLyricsFont.mode === opt.value ? 'selected' : ''}>${opt.label}</option>`
+    ).join('');
+
     const colorEnabled = localStorage.getItem('kimo-color-extraction') !== 'off';
     const colorMode = localStorage.getItem('kimo-color-mode') || 'smart';
     const colorIntensity = parseInt(localStorage.getItem('kimo-color-intensity'), 10) || 0;
@@ -330,13 +181,13 @@ export const createSettingsPage = ({
     themeCard.innerHTML = `
       <div class="settings-card-title">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2a7 7 0 1 0 10 10"/></svg>
-        外观主题与遮罩设置
+        外观与界面
       </div>
-      
-            <div class="setting-row">
+
+      <div class="setting-row">
         <div class="setting-info">
-          <div class="setting-label">默认外观主题</div>
-          <div class="setting-desc">设置播放器的外观主题（支持浅色遮罩、雅致灰色与深色遮罩主题）。</div>
+          <div class="setting-label">默认主题</div>
+          <div class="setting-desc">设置播放器的默认界面配色主题。</div>
         </div>
         <div class="setting-radio-group" id="settings-theme-group" data-active-idx="${themeVal === 'light' ? '0' : (themeVal === 'grey' ? '1' : '2')}">
           <div class="setting-radio-active-bg"></div>
@@ -348,8 +199,8 @@ export const createSettingsPage = ({
 
       <div class="setting-row">
         <div class="setting-info">
-          <div class="setting-label">UI 风格</div>
-          <div class="setting-desc">选择界面玻璃材质效果，从默认纯色到液态玻璃逐级增强视觉质感。默认效果性能最佳。</div>
+          <div class="setting-label">UI 材质与风格</div>
+          <div class="setting-desc">选择界面玻璃模糊质感（高斯模糊与液态玻璃效果较消耗显卡性能）。</div>
         </div>
         <div class="setting-radio-group" id="settings-ui-style-group" data-active-idx="${uiStyleVal === 'solid' ? '0' : (uiStyleVal === 'acrylic' ? '1' : (uiStyleVal === 'gaussian' ? '2' : '3'))}">
           <div class="setting-radio-active-bg"></div>
@@ -363,20 +214,79 @@ export const createSettingsPage = ({
       <div class="setting-row">
         <div class="setting-info">
           <div class="setting-label">背景样式</div>
-          <div class="setting-desc">选择播放器背景的展示方式。动态背景会将专辑封面扭曲后围绕窗口中心旋转，营造沉浸式视觉体验。</div>
+          <div class="setting-desc">设置播放器主背景效果（动态背景将平滑旋转高斯模糊封面）。</div>
         </div>
-        <div class="setting-radio-group" id="settings-bg-style-group" data-active-idx="${bgStyleVal === 'none' ? '0' : (bgStyleVal === 'static' ? '1' : '2')}">
+        <div class="setting-radio-group" id="settings-bg-style-group" data-active-idx="${bgStyleVal === 'none' ? '0' : (bgStyleVal === 'static' ? '1' : (bgStyleVal === 'dynamic' ? '2' : '3'))}">
           <div class="setting-radio-active-bg"></div>
-          <button class="setting-radio-btn ${bgStyleVal === 'none' ? 'active' : ''}" data-val="none">去除背景</button>
+          <button class="setting-radio-btn ${bgStyleVal === 'none' ? 'active' : ''}" data-val="none">关闭背景</button>
           <button class="setting-radio-btn ${bgStyleVal === 'static' ? 'active' : ''}" data-val="static">静态背景</button>
           <button class="setting-radio-btn ${bgStyleVal === 'dynamic' ? 'active' : ''}" data-val="dynamic">动态背景</button>
+          <button class="setting-radio-btn ${bgStyleVal === 'custom' ? 'active' : ''}" data-val="custom">自定义背景</button>
+        </div>
+      </div>
+
+      <!-- 自定义背景设置区（仅自定义模式显示） -->
+      <div class="setting-row" id="settings-bg-custom-mask-row" style="display: ${bgStyleVal === 'custom' ? 'flex' : 'none'};">
+        <div class="setting-info">
+          <div class="setting-label">背景遮罩</div>
+          <div class="setting-desc">开启后由模糊/透明度滑块控制背景效果；关闭后图片原样直出（不受模糊、透明度与 UI 风格影响）。</div>
+        </div>
+        <label class="setting-toggle">
+          <input type="checkbox" id="settings-bg-mask-enabled" ${bgMaskEnabled ? 'checked' : ''} />
+          <span class="setting-toggle-track" aria-hidden="true"></span>
+        </label>
+      </div>
+      <div class="setting-row" id="settings-bg-custom-pick-row" style="display: ${bgStyleVal === 'custom' ? 'flex' : 'none'};">
+        <div class="setting-info">
+          <div class="setting-label">自定义背景图片</div>
+          <div class="setting-desc">选择本地图片作为播放器背景。透明度滑到 0% 实现全透明（透出桌面）；注意播放条/侧边栏等表面仍保留自身材质，全透明效果以实际窗口为准。</div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+          <button class="setting-btn" id="settings-bg-custom-pick">选择图片</button>
+          <span id="settings-bg-custom-name" style="font-size:12px;color:var(--text-tertiary);max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${bgCustomName || '未选择'}</span>
+        </div>
+      </div>
+      <div class="setting-row">
+        <div class="setting-info">
+          <div class="setting-label">窗口材质</div>
+          <div class="setting-desc">Windows 系统级材质：DWM 实时模糊窗口背后的真实内容（桌面）。亚克力/模糊支持 Win10+，云母仅 Win11 22H2+。材质层引擎可在此之上叠加自定义质感。</div>
+        </div>
+        <div class="setting-radio-group" id="settings-window-material-group" data-active-idx="${windowMaterialVal === 'none' ? '0' : (windowMaterialVal === 'acrylic' ? '1' : (windowMaterialVal === 'mica' ? '2' : '3'))}">
+          <div class="setting-radio-active-bg" aria-hidden="true"></div>
+          <button class="setting-radio-btn ${windowMaterialVal === 'none' ? 'active' : ''}" data-val="none">无</button>
+          <button class="setting-radio-btn ${windowMaterialVal === 'acrylic' ? 'active' : ''}" data-val="acrylic">亚克力</button>
+          <button class="setting-radio-btn ${windowMaterialVal === 'mica' ? 'active' : ''}" data-val="mica">云母</button>
+          <button class="setting-radio-btn ${windowMaterialVal === 'blur' ? 'active' : ''}" data-val="blur">模糊</button>
+        </div>
+      </div>
+      <div class="setting-row" id="settings-window-opacity-row" style="display: flex;">
+        <div class="setting-info">
+          <div class="setting-label">窗口透明度</div>
+          <div class="setting-desc">作用于整个窗口（壁纸与全部界面一起透明）：0% = 全透明透出桌面，100% = 完全不透明。与背景设置无关。</div>
+        </div>
+        <div class="setting-slider-wrapper">
+          <input type="range" class="setting-slider" id="settings-slider-window-opacity" min="5" max="100" step="1" value="${bgCustomOpacityPct}">
+          <div class="setting-value-display" id="settings-window-opacity-val">${bgCustomOpacityPct}%</div>
+        </div>
+      </div>
+
+      <div class="setting-row">
+        <div class="setting-info">
+          <div class="setting-label">界面动画速率</div>
+          <div class="setting-desc">调整页面与列表入场浮起、按钮 hover 等过渡动画的响应速率。</div>
+        </div>
+        <div class="setting-radio-group" id="settings-anim-speed-group" data-active-idx="${(localStorage.getItem('kimo-anim-speed') || 'slow') === 'slow' ? '0' : ((localStorage.getItem('kimo-anim-speed') || 'slow') === 'fast' ? '1' : '2')}">
+          <div class="setting-radio-active-bg"></div>
+          <button class="setting-radio-btn ${(localStorage.getItem('kimo-anim-speed') || 'slow') === 'slow' ? 'active' : ''}" data-val="slow">舒缓平滑</button>
+          <button class="setting-radio-btn ${(localStorage.getItem('kimo-anim-speed') || 'slow') === 'fast' ? 'active' : ''}" data-val="fast">极速敏捷</button>
+          <button class="setting-radio-btn ${(localStorage.getItem('kimo-anim-speed') || 'slow') === 'none' ? 'active' : ''}" data-val="none">关闭动画</button>
         </div>
       </div>
 
       <div class="setting-row" id="settings-bg-rotate-speed-row" style="display: ${bgStyleVal === 'dynamic' ? 'flex' : 'none'};">
         <div class="setting-info">
           <div class="setting-label">动态背景旋转速率</div>
-          <div class="setting-desc">调整专辑封面背景的旋转速度，百分比越高旋转越快。拖动时暂停旋转，释放后生效。</div>
+          <div class="setting-desc">调整背景封面的旋转速度。拖动滑块时暂停旋转，释放后应用。</div>
         </div>
         <div class="setting-slider-wrapper">
           <input type="range" class="setting-slider" id="settings-slider-bg-rotate-speed" min="10" max="100" step="5" value="${bgRotatePct}">
@@ -384,38 +294,10 @@ export const createSettingsPage = ({
         </div>
       </div>
 
-      <div class="setting-row">
+      <div class="setting-row" id="settings-overlay-opacity-row" style="display: ${bgStyleVal === 'static' || bgStyleVal === 'dynamic' ? 'flex' : 'none'};">
         <div class="setting-info">
-          <div class="setting-label">歌词页面主题</div>
-          <div class="setting-desc">单独设置歌词页面的外观主题，可选择自动跟随或独立设置深色/浅色。</div>
-        </div>
-        <div class="setting-radio-group" id="settings-lyrics-theme-group" data-active-idx="${lyricsThemeVal === 'follow' ? '0' : (lyricsThemeVal === 'light' ? '1' : '2')}">
-          <div class="setting-radio-active-bg"></div>
-          <button class="setting-radio-btn ${lyricsThemeVal === 'follow' ? 'active' : ''}" data-val="follow">自动</button>
-          <button class="setting-radio-btn ${lyricsThemeVal === 'light' ? 'active' : ''}" data-val="light">浅色</button>
-          <button class="setting-radio-btn ${lyricsThemeVal === 'dark' ? 'active' : ''}" data-val="dark">深色</button>
-        </div>
-      </div>
-
-      <div class="setting-row">
-        <div class="setting-info">
-          <div class="setting-label">界面字体</div>
-          <div class="setting-desc">切换播放器界面使用的字体，或选择本地 TTF、OTF、WOFF 字体文件。歌词字号与字重设置不受影响。</div>
-        </div>
-        <div class="setting-font-controls">
-          <select class="setting-select" id="settings-interface-font">
-            ${interfaceFontOptions}
-            <option value="custom" ${interfaceFont.mode === 'custom' ? 'selected' : ''}>自定义字体</option>
-          </select>
-          <button class="setting-btn" id="settings-custom-font-btn">选择字体文件</button>
-          <div class="setting-font-file" id="settings-custom-font-file" title="${interfaceFont.customPath}">${getFontFileName(interfaceFont.customPath)}</div>
-        </div>
-      </div>
-
-      <div class="setting-row">
-        <div class="setting-info">
-          <div class="setting-label">背景遮罩透明度</div>
-          <div class="setting-desc">无级微调背景高斯模糊遮罩层的不透明度。</div>
+          <div class="setting-label">背景遮罩不透明度</div>
+          <div class="setting-desc">微调背景高斯模糊遮罩层的不透明度（仅静态/动态背景有效；关闭背景与自定义背景不适用）。</div>
         </div>
         <div class="setting-slider-wrapper">
           <input type="range" class="setting-slider" id="settings-slider-opacity" min="0" max="100" step="1" value="${opacityNum}">
@@ -425,8 +307,45 @@ export const createSettingsPage = ({
 
       <div class="setting-row">
         <div class="setting-info">
+          <div class="setting-label">材质引擎预览（实验）</div>
+          <div class="setting-desc">启用新材质引擎（Canvas2D 管线，docs/material-layer-architecture.md）接管背景层，渲染玻璃材质效果。默认关闭。</div>
+        </div>
+        <label class="setting-toggle">
+          <input type="checkbox" id="settings-material-engine-preview" ${materialEnginePreview ? 'checked' : ''} />
+          <span class="setting-toggle-track" aria-hidden="true"></span>
+        </label>
+      </div>
+
+      <div class="setting-row">
+        <div class="setting-info">
+          <div class="setting-label">界面字体</div>
+          <div class="setting-desc">内置字体不可删除；也可添加本地 TTF、OTF、WOFF 字体文件。</div>
+        </div>
+        <div class="setting-font-controls">
+          <select class="setting-select" id="settings-interface-font">
+            ${interfaceFontOptions}
+            <option value="custom" ${interfaceFont.mode === 'custom' ? 'selected' : ''}>自定义字体</option>
+          </select>
+          <button class="setting-btn" id="settings-font-manage-btn">管理字体</button>
+          <div class="setting-font-file" id="settings-custom-font-file" title="${interfaceFont.customPath}">${getFontFileName(interfaceFont.customPath)}</div>
+        </div>
+      </div>
+
+      <div class="setting-row">
+        <div class="setting-info">
+          <div class="setting-label">软件界面缩放</div>
+          <div class="setting-desc">调整播放器界面整体缩放，以适配高分屏或小屏设备。</div>
+        </div>
+        <div class="setting-slider-wrapper">
+          <input type="range" class="setting-slider" id="settings-slider-zoom" min="80" max="120" step="1" value="${zoomPercent}">
+          <div class="setting-value-display" id="settings-zoom-val">${zoomPercent}%</div>
+        </div>
+      </div>
+
+      <div class="setting-row">
+        <div class="setting-info">
           <div class="setting-label">专辑封面取色</div>
-          <div class="setting-desc">从专辑封面提取主题色并应用到播放器界面。关闭后使用默认蓝色主题。</div>
+          <div class="setting-desc">提取当前播放歌曲的封面颜色作为界面主题强调色。</div>
         </div>
         <label class="setting-toggle" title="切换专辑封面取色">
           <input type="checkbox" id="settings-color-extraction-toggle" ${colorEnabled ? 'checked' : ''} />
@@ -437,7 +356,7 @@ export const createSettingsPage = ({
       <div class="setting-row" id="settings-color-mode-row" style="display: ${colorEnabled ? 'flex' : 'none'};">
         <div class="setting-info">
           <div class="setting-label">取色模式</div>
-          <div class="setting-desc">智能模式根据当前主题自动适配最佳亮度，保证可读性。手动模式可自由调节取色深浅。</div>
+          <div class="setting-desc">智能模式自动适配最佳亮度，手动模式可自由调节取色深浅。</div>
         </div>
         <div class="setting-radio-group" id="settings-color-mode-group" data-active-idx="${colorMode === 'smart' ? '0' : '1'}">
           <div class="setting-radio-active-bg"></div>
@@ -459,19 +378,8 @@ export const createSettingsPage = ({
 
       <div class="setting-row">
         <div class="setting-info">
-          <div class="setting-label">软件界面缩放比例</div>
-          <div class="setting-desc">无级微调整个播放器软件组件的缩放大小，以完美适配不同的高分屏或低分辨率屏幕。</div>
-        </div>
-        <div class="setting-slider-wrapper">
-          <input type="range" class="setting-slider" id="settings-slider-zoom" min="80" max="120" step="1" value="${zoomPercent}">
-          <div class="setting-value-display" id="settings-zoom-val">${zoomPercent}%</div>
-        </div>
-      </div>
-
-      <div class="setting-row">
-        <div class="setting-info">
-          <div class="setting-label">显示音质标签 (SQ / Hi-Res / HQ)</div>
-          <div class="setting-desc">控制歌曲列表中是否展示音质等级徽章（如玫瑰红 SQ、黑金 Hi-Res、紫罗兰 HQ 等）。</div>
+          <div class="setting-label">显示音质标签</div>
+          <div class="setting-desc">在歌曲列表中展示音质等级徽章（如 SQ、Hi-Res、HQ）。</div>
         </div>
         <label class="setting-toggle" title="切换音质标签展示">
           <input type="checkbox" id="settings-show-quality-badge" ${showQualityBadgeVal ? 'checked' : ''} />
@@ -481,8 +389,8 @@ export const createSettingsPage = ({
 
       <div class="setting-row">
         <div class="setting-info">
-          <div class="setting-label">显示码率标签 (1291k / 320k)</div>
-          <div class="setting-desc">控制歌曲列表中是否展示具体的音频传输码率数字标签。</div>
+          <div class="setting-label">显示码率标签</div>
+          <div class="setting-desc">在歌曲列表中展示具体传输码率数字。</div>
         </div>
         <label class="setting-toggle" title="切换码率标签展示">
           <input type="checkbox" id="settings-show-bitrate-badge" ${showBitrateBadgeVal ? 'checked' : ''} />
@@ -492,79 +400,367 @@ export const createSettingsPage = ({
     `;
     container.appendChild(themeCard);
 
-    const aiCard = document.createElement('div');
-    aiCard.className = 'settings-card';
-    aiCard.innerHTML = `
+    // ════════════════════════════════════════════════
+    // 2. 🎵 歌词与面板 (Lyrics & Panel Settings)
+    // ════════════════════════════════════════════════
+    const lyricCard = document.createElement('div');
+    lyricCard.className = 'settings-card';
+    lyricCard.innerHTML = `
       <div class="settings-card-title">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
-        AI 语音识别服务 (ASR)
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+        歌词与面板
       </div>
+
       <div class="setting-row">
         <div class="setting-info">
-          <div class="setting-label">推理服务器地址 (Server URL)</div>
-          <div class="setting-desc">用于提取未配对歌词音频的 Whisper 时间戳对齐服务后台接口。</div>
+          <div class="setting-label">歌词页面主题</div>
+          <div class="setting-desc">单独设置全屏歌词页面的主题风格。</div>
         </div>
-        <div style="display: flex; gap: 8px;">
-          <input type="text" class="setting-input" id="settings-asr-url" value="${aiServerUrl}">
-          <button class="setting-btn accent" id="settings-save-asr-btn">保存</button>
+        <div class="setting-radio-group" id="settings-lyrics-theme-group" data-active-idx="${lyricsThemeVal === 'follow' ? '0' : (lyricsThemeVal === 'light' ? '1' : '2')}">
+          <div class="setting-radio-active-bg"></div>
+          <button class="setting-radio-btn ${lyricsThemeVal === 'follow' ? 'active' : ''}" data-val="follow">自动</button>
+          <button class="setting-radio-btn ${lyricsThemeVal === 'light' ? 'active' : ''}" data-val="light">浅色</button>
+          <button class="setting-radio-btn ${lyricsThemeVal === 'dark' ? 'active' : ''}" data-val="dark">深色</button>
+        </div>
+      </div>
+
+      <div class="setting-row">
+        <div class="setting-info">
+          <div class="setting-label">歌词页面字体</div>
+          <div class="setting-desc">单独为全屏歌词页面与歌词面板设置显示字体。</div>
+        </div>
+        <div class="setting-font-controls">
+          <select id="settings-lyrics-font" class="setting-select">
+            ${lyricsFontOptions}
+          </select>
+          <button class="setting-btn" id="settings-custom-lyrics-font-btn">选择字体文件</button>
+          <div class="setting-font-file" id="settings-custom-lyrics-font-file" title="${storedLyricsFont.customPath}">
+            ${getFontFileName(storedLyricsFont.customPath)}
+          </div>
+        </div>
+      </div>
+
+      <div class="setting-row">
+        <div class="setting-info">
+          <div class="setting-label">歌词动画切换模式</div>
+          <div class="setting-desc">设置卡拉OK歌词按字母依次上移或按单词整体滚动。</div>
+        </div>
+        <div class="setting-radio-group" id="settings-stagger-group" data-active-idx="${staggerMode === 'stagger' ? '0' : '1'}">
+          <div class="setting-radio-active-bg"></div>
+          <button class="setting-radio-btn ${staggerMode === 'stagger' ? 'active' : ''}" data-val="stagger">字母依次</button>
+          <button class="setting-radio-btn ${staggerMode === 'word' ? 'active' : ''}" data-val="word">单词整体</button>
+        </div>
+      </div>
+
+      <div class="setting-row">
+        <div class="setting-info">
+          <div class="setting-label">歌词逐行跟随动画</div>
+          <div class="setting-desc">切换歌词时，下方多行歌词呈现层次跟随滚动动画。</div>
+        </div>
+        <label class="setting-toggle" title="切换歌词逐行跟随动画">
+          <input type="checkbox" id="settings-lyrics-row-follow" ${rowFollowAnimationVal ? 'checked' : ''} />
+          <span class="setting-toggle-track" aria-hidden="true"></span>
+        </label>
+      </div>
+
+      <div class="setting-row">
+        <div class="setting-info">
+          <div class="setting-label">歌词默认字号</div>
+          <div class="setting-desc">调整全屏歌词面板中的文字字号大小。</div>
+        </div>
+        <div class="setting-slider-wrapper">
+          <input type="range" class="setting-slider" id="settings-slider-font-size" min="16" max="48" step="0.5" value="${fontSize}">
+          <div class="setting-value-display" id="settings-font-size-val">${fontSize.toFixed(1)}px</div>
+        </div>
+      </div>
+
+      <div class="setting-row">
+        <div class="setting-info">
+          <div class="setting-label">歌词行间距</div>
+          <div class="setting-desc">调整全屏歌词上下行之间的间距。</div>
+        </div>
+        <div class="setting-slider-wrapper">
+          <input type="range" class="setting-slider" id="settings-slider-line-spacing" min="0" max="2.0" step="0.05" value="${lineSpacing}">
+          <div class="setting-value-display" id="settings-line-spacing-val">${lineSpacing.toFixed(2)}</div>
+        </div>
+      </div>
+
+      <div class="setting-row">
+        <div class="setting-info">
+          <div class="setting-label">歌词上抬动画幅度</div>
+          <div class="setting-desc">正在发音的歌词向上抬升的动画高度。</div>
+        </div>
+        <div class="setting-slider-wrapper">
+          <input type="range" class="setting-slider" id="settings-slider-lift" min="0" max="5" step="1" value="${liftAmp}">
+          <div class="setting-value-display" id="settings-lift-val">${liftAmp}px</div>
+        </div>
+      </div>
+
+      <div class="setting-row">
+        <div class="setting-info">
+          <div class="setting-label">过滤歌曲信息</div>
+          <div class="setting-desc">自动隐藏歌词开头的作词、作曲及制作人员署名行。</div>
+        </div>
+        <label class="setting-toggle" title="过滤歌词中的歌曲信息与制作人员署名">
+          <input type="checkbox" id="settings-lyrics-filter-info" ${filterLyricInfoVal ? 'checked' : ''} />
+          <span class="setting-toggle-track" aria-hidden="true"></span>
+        </label>
+      </div>
+
+      <div class="setting-row">
+        <div class="setting-info">
+          <div class="setting-label">迷你歌词显示翻译</div>
+          <div class="setting-desc">在底部播放栏中央的迷你歌词下方显示翻译。</div>
+        </div>
+        <label class="setting-toggle" title="切换迷你歌词翻译">
+          <input type="checkbox" id="settings-mini-translation" ${miniTransVal ? 'checked' : ''} />
+          <span class="setting-toggle-track" aria-hidden="true"></span>
+        </label>
+      </div>
+
+      <div class="setting-row">
+        <div class="setting-info">
+          <div class="setting-label">迷你歌词字号</div>
+          <div class="setting-desc">调整底部播放栏中央迷你歌词的字号大小。</div>
+        </div>
+        <div class="setting-slider-wrapper">
+          <input type="range" class="setting-slider" id="settings-mini-lyrics-size" min="11" max="18" step="0.5" value="${miniLyricsFontSize}">
+          <div class="setting-value-display" id="mini-lyrics-size-val">${miniLyricsFontSize.toFixed(1)}px</div>
+        </div>
+      </div>
+
+      <div class="setting-row">
+        <div class="setting-info">
+          <div class="setting-label">沉浸模式隐藏标题栏</div>
+          <div class="setting-desc">进入全屏沉浸歌词模式时隐藏窗口顶栏按钮。</div>
+        </div>
+        <label class="setting-toggle" title="切换沉浸模式隐藏标题栏">
+          <input type="checkbox" id="settings-immersive-hide-titlebar" ${localStorage.getItem('kimo-immersive-hide-titlebar') === 'false' ? '' : 'checked'} />
+          <span class="setting-toggle-track" aria-hidden="true"></span>
+        </label>
+      </div>
+    `;
+    container.appendChild(lyricCard);
+
+    // ════════════════════════════════════════════════
+    // 3. 🖥️ 桌面歌词 (Desktop Lyrics)
+    // ════════════════════════════════════════════════
+    const desktopLyricCard = document.createElement('div');
+    desktopLyricCard.className = 'settings-card';
+    desktopLyricCard.innerHTML = `
+      <div class="settings-card-title">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+        桌面歌词
+      </div>
+
+      <!-- 🖥️ 桌面歌词实时效果预览组件 -->
+      <div class="desktop-lyrics-preview-wrapper">
+        <div class="desktop-lyrics-preview-header">
+          <span>桌面歌词效果预览</span>
+          <span class="desktop-lyrics-preview-badge">实时渲染</span>
+        </div>
+        <div class="desktop-lyrics-preview-box" id="desktop-lyrics-preview-box">
+          <div class="desktop-lyrics-preview-toolbar-mock">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="12" r="1"/><circle cx="15" cy="12" r="1"/></svg>
+            <span>桌面歌词</span>
+          </div>
+          <div class="desktop-lyrics-preview-viewport" id="desktop-lyrics-preview-viewport">
+            <div class="desktop-lyrics-preview-main" id="desktop-lyrics-preview-main">
+              ♪ 这一刻 画面定格在眼前 ♪
+            </div>
+            <div class="desktop-lyrics-preview-sub" id="desktop-lyrics-preview-sub">
+              This moment is frozen in time
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="setting-row">
+        <div class="setting-info">
+          <div class="setting-label">开启桌面歌词</div>
+          <div class="setting-desc">在桌面上显示浮动置顶歌词。</div>
+        </div>
+        <label class="setting-toggle">
+          <input type="checkbox" id="settings-desktop-lyrics" ${desktopLyricsEnabled ? 'checked' : ''} />
+          <span class="setting-toggle-track" aria-hidden="true"></span>
+        </label>
+      </div>
+
+      <div class="setting-row">
+        <div class="setting-info">
+          <div class="setting-label">桌面歌词字体</div>
+          <div class="setting-desc">单独为桌面悬浮歌词设置显示字体。</div>
+        </div>
+        <div class="setting-font-controls">
+          <select id="settings-desktop-lyrics-font" class="setting-select">
+            ${desktopLyricsFontOptions}
+          </select>
+          <button class="setting-btn" id="settings-custom-desktop-font-btn">选择字体文件</button>
+          <div class="setting-font-file" id="settings-custom-desktop-font-file" title="${storedDesktopLyricsFont.customPath}">
+            ${getFontFileName(storedDesktopLyricsFont.customPath)}
+          </div>
+        </div>
+      </div>
+
+      <div class="setting-row">
+        <div class="setting-info">
+          <div class="setting-label">锁定桌面歌词 (鼠标穿透)</div>
+          <div class="setting-desc">锁定后支持鼠标完全穿透，防止误触拖动。</div>
+        </div>
+        <label class="setting-toggle">
+          <input type="checkbox" id="settings-desktop-lyrics-locked" ${desktopLyricsLocked ? 'checked' : ''} />
+          <span class="setting-toggle-track" aria-hidden="true"></span>
+        </label>
+      </div>
+
+      <div class="setting-row">
+        <div class="setting-info">
+          <div class="setting-label">桌面歌词字号</div>
+          <div class="setting-desc">调整桌面歌词文字显示字号。</div>
+        </div>
+        <div class="setting-slider-wrapper">
+          <input type="range" class="setting-slider" id="settings-desktop-lyrics-size" min="12" max="56" step="1" value="${desktopLyricsFontSize}">
+          <div class="setting-value-display" id="desktop-lyrics-size-val">${desktopLyricsFontSize}px</div>
+        </div>
+      </div>
+
+      <div class="setting-row">
+        <div class="setting-info">
+          <div class="setting-label">桌面歌词透明度</div>
+          <div class="setting-desc">调整桌面歌词窗口的不透明度。</div>
+        </div>
+        <div class="setting-slider-wrapper">
+          <input type="range" class="setting-slider" id="settings-desktop-lyrics-opacity" min="0.25" max="1" step="0.05" value="${desktopLyricsOpacity}">
+          <div class="setting-value-display" id="desktop-lyrics-opacity-val">${Math.round(desktopLyricsOpacity * 100)}%</div>
+        </div>
+      </div>
+
+      <div class="setting-row">
+        <div class="setting-info">
+          <div class="setting-label">桌面歌词逐字动画</div>
+          <div class="setting-desc">展示平滑的逐字高亮/卡拉OK流光效果。</div>
+        </div>
+        <label class="setting-toggle">
+          <input type="checkbox" id="settings-desktop-lyrics-word-by-word" ${desktopLyricsWordByWord ? 'checked' : ''} />
+          <span class="setting-toggle-track" aria-hidden="true"></span>
+        </label>
+      </div>
+
+      <div class="setting-row">
+        <div class="setting-info">
+          <div class="setting-label">显示歌词翻译</div>
+          <div class="setting-desc">在桌面歌词下方显示对应的翻译字幕。</div>
+        </div>
+        <label class="setting-toggle">
+          <input type="checkbox" id="settings-desktop-lyrics-translation" ${desktopLyricsShowTranslation ? 'checked' : ''} />
+          <span class="setting-toggle-track" aria-hidden="true"></span>
+        </label>
+      </div>
+
+      <div class="setting-row">
+        <div class="setting-info">
+          <div class="setting-label">桌面歌词显示模式</div>
+          <div class="setting-desc">设置桌面歌词显示单行（仅当前句）或双行（当前句与下一句预读）。</div>
+        </div>
+        <div class="setting-radio-group" id="settings-desktop-lyrics-line-mode-group" data-active-idx="${desktopLyricsLineMode === 'double' ? '1' : '0'}">
+          <div class="setting-radio-active-bg"></div>
+          <button class="setting-radio-btn ${desktopLyricsLineMode !== 'double' ? 'active' : ''}" data-val="single">单行模式</button>
+          <button class="setting-radio-btn ${desktopLyricsLineMode === 'double' ? 'active' : ''}" data-val="double">双行模式</button>
+        </div>
+      </div>
+
+      <div class="setting-row" id="settings-desktop-lyrics-layout-row" style="display: ${desktopLyricsLineMode === 'double' ? 'flex' : 'none'};">
+        <div class="setting-info">
+          <div class="setting-label">双行排列</div>
+          <div class="setting-desc">上下排列或左右分栏（左右分栏会自动调整窗口大小）。</div>
+        </div>
+        <div class="setting-radio-group" id="settings-desktop-lyrics-layout-group" data-active-idx="${desktopLyricsLayout === 'split' ? '1' : '0'}">
+          <div class="setting-radio-active-bg"></div>
+          <button class="setting-radio-btn ${desktopLyricsLayout !== 'split' ? 'active' : ''}" data-val="stacked">上下排列</button>
+          <button class="setting-radio-btn ${desktopLyricsLayout === 'split' ? 'active' : ''}" data-val="split">左右分栏</button>
+        </div>
+      </div>
+
+      <div class="setting-row">
+        <div class="setting-info">
+          <div class="setting-label">字体阴影</div>
+          <div class="setting-desc">提供霓虹发光与背景阴影效果。</div>
+        </div>
+        <label class="setting-toggle">
+          <input type="checkbox" id="settings-desktop-lyrics-glow" ${desktopLyricsGlow ? 'checked' : ''} />
+          <span class="setting-toggle-track" aria-hidden="true"></span>
+        </label>
+      </div>
+
+      <div class="setting-row">
+        <div class="setting-info">
+          <div class="setting-label">字体描边</div>
+          <div class="setting-desc">提供文字描边以防止浅色壁纸背景下模糊。</div>
+        </div>
+        <label class="setting-toggle">
+          <input type="checkbox" id="settings-desktop-lyrics-stroke" ${desktopLyricsStroke ? 'checked' : ''} />
+          <span class="setting-toggle-track" aria-hidden="true"></span>
+        </label>
+      </div>
+
+      <div class="setting-row">
+        <div class="setting-info">
+          <div class="setting-label">自定义歌词颜色</div>
+          <div class="setting-desc">自由设置已播放与未播放歌词颜色，关闭后跟随配色预设。</div>
+        </div>
+        <label class="setting-toggle" title="开启自定义歌词颜色">
+          <input type="checkbox" id="settings-desktop-lyrics-custom-color" ${desktopLyricsCustomColor ? 'checked' : ''} />
+          <span class="setting-toggle-track" aria-hidden="true"></span>
+        </label>
+      </div>
+      <div class="setting-row" id="settings-desktop-lyrics-color-row" style="display: ${desktopLyricsCustomColor ? 'flex' : 'none'};">
+        <div class="setting-info">
+          <div class="setting-label">已播放 / 未播放颜色</div>
+          <div class="setting-desc">左侧为已播放歌词颜色，右侧为未播放歌词颜色（含第二行）。</div>
+        </div>
+        <div class="setting-color-pickers">
+          <label class="setting-color-picker">
+            <span>已播放</span>
+            <input type="color" id="settings-desktop-lyrics-color-active" value="${desktopLyricsActiveColor || '#00f2fe'}" />
+          </label>
+          <label class="setting-color-picker">
+            <span>未播放</span>
+            <input type="color" id="settings-desktop-lyrics-color-inactive" value="${desktopLyricsInactiveColor || '#ffffff'}" />
+          </label>
+        </div>
+      </div>
+
+      <div class="setting-row">
+        <div class="setting-info">
+          <div class="setting-label">配色预设与对齐</div>
+          <div class="setting-desc">选择桌面歌词主题配色与文字对齐方式。</div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <select id="settings-desktop-lyrics-theme" class="setting-select">
+            <option value="follow-app" ${desktopLyricsTheme === 'follow-app' ? 'selected' : ''}>跟随软件主题 (Auto)</option>
+            <option value="aurora" ${desktopLyricsTheme === 'aurora' ? 'selected' : ''}>极光青绿 (Aurora)</option>
+            <option value="cyber" ${desktopLyricsTheme === 'cyber' ? 'selected' : ''}>赛博粉紫 (Cyber)</option>
+            <option value="sunset" ${desktopLyricsTheme === 'sunset' ? 'selected' : ''}>夕阳金橙 (Sunset)</option>
+            <option value="ocean" ${desktopLyricsTheme === 'ocean' ? 'selected' : ''}>蔚蓝深海 (Ocean)</option>
+            <option value="white" ${desktopLyricsTheme === 'white' ? 'selected' : ''}>经典亮白 (White)</option>
+          </select>
+          <select id="settings-desktop-lyrics-align" class="setting-select">
+            <option value="center" ${desktopLyricsAlign === 'center' ? 'selected' : ''}>居中对齐</option>
+            <option value="left" ${desktopLyricsAlign === 'left' ? 'selected' : ''}>靠左对齐</option>
+            <option value="right" ${desktopLyricsAlign === 'right' ? 'selected' : ''}>靠右对齐</option>
+          </select>
         </div>
       </div>
     `;
-    container.appendChild(aiCard);
+    container.appendChild(desktopLyricCard);
 
+    // ════════════════════════════════════════════════
+    // 4. ▶️ 播放与曲库 (Playback & Library)
+    // ════════════════════════════════════════════════
     const playbackCard = document.createElement('div');
     playbackCard.className = 'settings-card';
     const autoPlayVal = localStorage.getItem('kimo-auto-play-on-start') === 'true';
-    playbackCard.innerHTML = `
-      <div class="settings-card-title">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-        播放与启动设置
-      </div>
-      
-      <div class="setting-row">
-        <div class="setting-info">
-          <div class="setting-label">启动自动播放</div>
-          <div class="setting-desc">打开软件时，自动播放上次关闭前播放的歌曲。</div>
-        </div>
-        <div style="display: flex; align-items: center;">
-          <input type="checkbox" id="settings-autoplay-on-start" ${autoPlayVal ? 'checked' : ''} style="width: 18px; height: 18px; cursor: pointer; accent-color: rgb(var(--dynamic-color, 16, 185, 129));" />
-        </div>
-      </div>
 
-      <div class="setting-row">
-        <div class="setting-info">
-          <div class="setting-label">列表播放方式</div>
-          <div class="setting-desc">选择歌曲列表中触发播放所需的点击次数。</div>
-        </div>
-        <div class="setting-radio-group" id="settings-song-play-mode" data-active-idx="${songPlayMode === 'double' ? '1' : '0'}">
-          <div class="setting-radio-active-bg"></div>
-          <button class="setting-radio-btn ${songPlayMode === 'single' ? 'active' : ''}" data-val="single">单击播放</button>
-          <button class="setting-radio-btn ${songPlayMode === 'double' ? 'active' : ''}" data-val="double">双击播放</button>
-        </div>
-      </div>
-    `;
-    container.appendChild(playbackCard);
-
-    playbackCard.querySelector('#settings-autoplay-on-start').addEventListener('change', (e) => {
-      localStorage.setItem('kimo-auto-play-on-start', e.target.checked);
-      showToast(`已${e.target.checked ? '开启' : '关闭'}启动自动播放`);
-    });
-
-    playbackCard.querySelectorAll('#settings-song-play-mode .setting-radio-btn').forEach((button, index) => {
-      button.addEventListener('click', () => {
-        playbackCard.querySelectorAll('#settings-song-play-mode .setting-radio-btn').forEach(item => item.classList.remove('active'));
-        button.classList.add('active');
-        playbackCard.querySelector('#settings-song-play-mode').setAttribute('data-active-idx', String(index));
-        const mode = button.dataset.val;
-        localStorage.setItem('kimo-song-play-mode', mode);
-        showToast(`已切换为${mode === 'double' ? '双击播放' : '单击播放'}`);
-      });
-    });
-
-    const scanCard = document.createElement('div');
-    scanCard.className = 'settings-card';
-    scanCard.id = 'settings-scan-card';
-    
     let pathsHtml = '';
     if (scannedDirs.length === 0) {
       pathsHtml = `<div class="scanned-paths-empty">暂无已添加的扫描文件夹目录，请点击下方按钮添加。</div>`;
@@ -583,12 +779,40 @@ export const createSettingsPage = ({
       pathsHtml += `</div>`;
     }
 
-    scanCard.innerHTML = `
+    playbackCard.id = 'settings-scan-card';
+    playbackCard.innerHTML = `
       <div class="settings-card-title">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
-        音乐文件夹扫描管理
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+        播放与曲库管理
       </div>
+
+      <div class="setting-row">
+        <div class="setting-info">
+          <div class="setting-label">启动自动播放</div>
+          <div class="setting-desc">打开软件时，自动继续播放上次关闭前播放的歌曲。</div>
+        </div>
+        <label class="setting-toggle" title="切换启动自动播放">
+          <input type="checkbox" id="settings-autoplay-on-start" ${autoPlayVal ? 'checked' : ''} />
+          <span class="setting-toggle-track" aria-hidden="true"></span>
+        </label>
+      </div>
+
+      <div class="setting-row">
+        <div class="setting-info">
+          <div class="setting-label">列表播放触发方式</div>
+          <div class="setting-desc">选择在歌曲列表中触发播放所需的点击操作。</div>
+        </div>
+        <div class="setting-radio-group" id="settings-song-play-mode" data-active-idx="${songPlayMode === 'double' ? '1' : '0'}">
+          <div class="setting-radio-active-bg"></div>
+          <button class="setting-radio-btn ${songPlayMode === 'single' ? 'active' : ''}" data-val="single">单击播放</button>
+          <button class="setting-radio-btn ${songPlayMode === 'double' ? 'active' : ''}" data-val="double">双击播放</button>
+        </div>
+      </div>
+
+      <div style="width: 100%; height: 1px; background: var(--glass-border); margin: 10px 0;"></div>
+
       <div style="display: flex; flex-direction: column; gap: 12px;">
+        <div style="font-size: 13px; font-weight: 600; color: var(--text-primary);">本地音乐文件夹扫描管理</div>
         ${pathsHtml}
         <div class="settings-actions">
           <button class="setting-btn" id="settings-clear-dirs">清空歌曲缓存</button>
@@ -597,7 +821,125 @@ export const createSettingsPage = ({
         </div>
       </div>
     `;
-    container.appendChild(scanCard);
+    container.appendChild(playbackCard);
+
+    // ════════════════════════════════════════════════
+    // 5. 🌐 扩展服务 (Extensions & Network Services)
+    // ════════════════════════════════════════════════
+    const extCard = document.createElement('div');
+    extCard.className = 'settings-card';
+    const savedLunaUrl = JSON.parse(localStorage.getItem('kimo-lunabeat-config') || '{}').baseUrl || '';
+    const savedLunaPin = JSON.parse(localStorage.getItem('kimo-lunabeat-config') || '{}').pinCode || '';
+    const savedLunaEnabled = JSON.parse(localStorage.getItem('kimo-lunabeat-config') || '{}').enabled || false;
+    // 默认参与统计（保持既有行为）
+    const lunaStatsEnabled = localStorage.getItem('kimo-luna-stats-enabled') !== 'false';
+    extCard.innerHTML = `
+      <div class="settings-card-title">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+        扩展服务
+      </div>
+
+      <div style="font-size: 13px; font-weight: 600; color: var(--text-primary); margin-bottom: 6px;">LunaBeat 局域网音源</div>
+      <div style="font-size: 12px; color: var(--text-tertiary); margin-bottom: 10px; line-height: 1.5;">
+        连接手机端 LunaBeat App，直接播放局域网音乐。
+      </div>
+      <div class="setting-row">
+        <div class="setting-info">
+          <div class="setting-label">启用局域网音源</div>
+          <div class="setting-desc">开启后在侧边栏显示「局域网(LB)」入口。</div>
+        </div>
+        <label class="setting-toggle">
+          <input type="checkbox" id="settings-luna-enabled" ${savedLunaEnabled ? 'checked' : ''} />
+          <span class="setting-toggle-track" aria-hidden="true"></span>
+        </label>
+      </div>
+      <div class="setting-row">
+        <div class="setting-info">
+          <div class="setting-label">局域网歌曲参与月度统计</div>
+          <div class="setting-desc">开启后，局域网歌曲的播放次数计入「月度听歌报告」，并缓存上榜歌曲封面供离线显示。</div>
+        </div>
+        <label class="setting-toggle">
+          <input type="checkbox" id="settings-luna-stats" ${lunaStatsEnabled ? 'checked' : ''} />
+          <span class="setting-toggle-track" aria-hidden="true"></span>
+        </label>
+      </div>
+      <div class="setting-row">
+        <div class="setting-info">
+          <div class="setting-label">服务器地址</div>
+          <div class="setting-desc">LunaBeat Web 服务的 IP 与端口（如 http://192.168.x.x:8787）。</div>
+        </div>
+        <input type="text" class="setting-input" id="settings-luna-url" value="${savedLunaUrl}" placeholder="http://192.168.x.x:8787" style="min-width: 200px;">
+      </div>
+      <div class="setting-row">
+        <div class="setting-info">
+          <div class="setting-label">配对码 (PIN)</div>
+          <div class="setting-desc">LunaBeat App 设置 → 局域网 Web 音乐服务中显示的配对码。</div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <input type="password" class="setting-input" id="settings-luna-pin" value="${savedLunaPin}" placeholder="请输入配对码" style="min-width:140px;">
+          <button class="setting-btn accent" id="settings-luna-save-btn">保存&amp;测试</button>
+        </div>
+      </div>
+      <div id="settings-luna-status" style="font-size:12px;margin-top:8px;padding:6px 10px;border-radius:6px;background:rgba(255,255,255,0.05);color:var(--text-tertiary);"></div>
+
+      <div style="width: 100%; height: 1px; background: var(--glass-border); margin: 16px 0 12px;"></div>
+
+      <div style="font-size: 13px; font-weight: 600; color: var(--text-primary); margin-bottom: 6px;">AI 语音识别服务 (ASR)</div>
+      <div class="setting-row">
+        <div class="setting-info">
+          <div class="setting-label">推理服务器地址 (Server URL)</div>
+          <div class="setting-desc">Whisper 音频时间戳对齐与歌词识别后台服务接口。</div>
+        </div>
+        <div style="display: flex; gap: 8px;">
+          <input type="text" class="setting-input" id="settings-asr-url" value="${aiServerUrl}">
+          <button class="setting-btn accent" id="settings-save-asr-btn">保存</button>
+        </div>
+      </div>
+    `;
+    container.appendChild(extCard);
+
+    // ════════════════════════════════════════════════
+    // 6. ⚡ 硬件性能 (Performance Settings)
+    // ════════════════════════════════════════════════
+    const perfCard = document.createElement('div');
+    perfCard.className = 'settings-card';
+    const isPerfMode = localStorage.getItem('kimo-performance-mode') === 'true';
+    perfCard.innerHTML = `
+      <div class="settings-card-title">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+        硬件性能
+      </div>
+
+      <div class="setting-row">
+        <div class="setting-info">
+          <div class="setting-label">开启低功耗性能模式</div>
+          <div class="setting-desc">减少高斯模糊与景深渲染，降低 CPU 与 GPU 资源占用，提升低配设备流畅度。</div>
+        </div>
+        <label class="setting-toggle" title="切换低功耗性能模式">
+          <input type="checkbox" id="settings-perf-mode" ${isPerfMode ? 'checked' : ''} />
+          <span class="setting-toggle-track" aria-hidden="true"></span>
+        </label>
+      </div>
+    `;
+    container.appendChild(perfCard);
+
+    playbackCard.querySelector('#settings-autoplay-on-start')?.addEventListener('change', (e) => {
+      localStorage.setItem('kimo-auto-play-on-start', e.target.checked);
+      showToast(`已${e.target.checked ? '开启' : '关闭'}启动自动播放`);
+    });
+
+    playbackCard.querySelectorAll('#settings-song-play-mode .setting-radio-btn').forEach((button, index) => {
+      button.addEventListener('click', () => {
+        playbackCard.querySelectorAll('#settings-song-play-mode .setting-radio-btn').forEach(item => item.classList.remove('active'));
+        button.classList.add('active');
+        playbackCard.querySelector('#settings-song-play-mode').setAttribute('data-active-idx', String(index));
+        const mode = button.dataset.val;
+        localStorage.setItem('kimo-song-play-mode', mode);
+        showToast(`已切换为${mode === 'double' ? '双击播放' : '单击播放'}`);
+      });
+    });
+
+    const scanCard = playbackCard;
 
     // 关于软件 Card
     const aboutCard = document.createElement('div');
@@ -688,9 +1030,213 @@ export const createSettingsPage = ({
       </div>
     `;
     container.appendChild(aboutCard);
+    container.appendChild(noResultsEl);
+
+    // 🔍 实时搜索过滤逻辑
+    const searchInput = searchHeader.querySelector('#settings-search-input');
+    const searchClearBtn = searchHeader.querySelector('#settings-search-clear');
+    const searchCountEl = searchHeader.querySelector('#settings-search-result-count');
+
+    const filterSettings = (query) => {
+      const trimmed = (query || '').trim().toLowerCase();
+      if (!trimmed) {
+        searchClearBtn.style.display = 'none';
+        searchCountEl.style.display = 'none';
+        noResultsEl.style.display = 'none';
+        container.querySelectorAll('.settings-card').forEach(card => {
+          card.style.display = '';
+          card.querySelectorAll('.setting-row').forEach(row => row.style.display = '');
+        });
+        return;
+      }
+
+      searchClearBtn.style.display = 'flex';
+      const keywords = trimmed.split(/\s+/).filter(Boolean);
+      let totalMatches = 0;
+
+      const cards = container.querySelectorAll('.settings-card');
+      cards.forEach(card => {
+        const cardTitle = card.querySelector('.settings-card-title')?.textContent?.toLowerCase() || '';
+        const rows = card.querySelectorAll('.setting-row');
+        let cardVisibleCount = 0;
+
+        rows.forEach(row => {
+          const label = row.querySelector('.setting-label')?.textContent?.toLowerCase() || '';
+          const desc = row.querySelector('.setting-desc')?.textContent?.toLowerCase() || '';
+          const fullText = `${cardTitle} ${label} ${desc}`;
+
+          const isMatch = keywords.every(kw => fullText.includes(kw));
+          if (isMatch) {
+            row.style.display = '';
+            cardVisibleCount++;
+          } else {
+            row.style.display = 'none';
+          }
+        });
+
+        // 检查卡片内是否有非 row 区域标题匹配 (例如 LunaBeat / ASR 区域标题)
+        const subTitles = card.querySelectorAll('div[style*="font-weight: 600"]');
+        let subMatch = false;
+        subTitles.forEach(st => {
+          if (keywords.every(kw => st.textContent.toLowerCase().includes(kw))) {
+            subMatch = true;
+          }
+        });
+
+        if (cardVisibleCount > 0 || subMatch) {
+          card.style.display = '';
+          totalMatches += cardVisibleCount || 1;
+        } else {
+          card.style.display = 'none';
+        }
+      });
+
+      if (totalMatches === 0) {
+        noResultsEl.style.display = 'flex';
+        const kwEl = noResultsEl.querySelector('#settings-no-results-keyword');
+        if (kwEl) kwEl.textContent = query.trim();
+        searchCountEl.style.display = 'none';
+      } else {
+        noResultsEl.style.display = 'none';
+        searchCountEl.style.display = 'block';
+        searchCountEl.textContent = `包含 ${totalMatches} 项匹配`;
+      }
+    };
+
+    searchInput?.addEventListener('input', (e) => filterSettings(e.target.value));
+    searchClearBtn?.addEventListener('click', () => {
+      if (searchInput) {
+        searchInput.value = '';
+        filterSettings('');
+        searchInput.focus();
+      }
+    });
 
         // 历史更新公告数据
-        const changelogData = [
+    const changelogData = [
+            {
+        version: '1.8.1',
+        date: '2026.08.05',
+        type: '体验打磨',
+        sections: [
+          { title: '🎤 桌面歌词优化', items: [
+            '修复双行模式下，第二句歌词在等待开唱时的左右抖动问题',
+            '修复间奏倒计时小圆点因超出窗口边界被系统裁剪不可见的 Bug',
+            '修正间奏倒计时时间戳算法，精确对齐下一句开唱时间',
+            '移除超长歌词的自动左右滚动效果，改为静止居中对齐'
+          ] },
+          { title: '🎨 界面与系统', items: [
+            '全局实装全新设计的 Windows 音频文件关联图标（支持 12 种主流格式）'
+          ] }
+        ],
+      },
+      {
+        version: '1.8.0',
+        date: '2026.08.03',
+        type: '更新日志',
+        sections: [
+          { title: '🌐 局域网', items: [
+            '优化界面，新增加载动画、状态显示与刷新按钮',
+            '新增歌曲搜索功能',
+            '优化专辑界面滚动卡顿',
+            '重构二级页面样式，优化进入动画',
+          ] },
+          { title: '🎨 界面', items: [
+            '新增设置搜索，可快速查找设置项',
+            '修复底栏音质标签渲染失效',
+            '设置页标题层次优化',
+          ] },
+          { title: '🖼️ 壁纸与背景', items: [
+            '新增自定义壁纸功能',
+            '新增背景遮罩开关',
+            '新增窗口透明度调整',
+            '新增窗口材质（实验性）',
+          ] },
+          { title: '🎤 歌词', items: [
+            '优化抬起动画帧率与卡拉OK渐变过渡',
+            '新增桌面歌词双行模式',
+            '新增桌面歌词样式实时预览',
+            '修复桌面歌词滚动抖动与行末露不全',
+            '修复桌面歌词开关偶尔打开多个窗口',
+          ] },
+          { title: '⚡ 性能', items: [
+            '优化本地全部歌曲列表与详情页滚动卡顿',
+          ] },
+          { title: '🛠️ 其他', items: [
+            '新增思源黑体作为默认字体',
+            '开发者工具改为隐藏式入口，点击设置页软件图标 5 次开启',
+            '修复发现页/最近播放页点击歌曲后页面错乱',
+            '修复部分滑块在不同设置选项下显示错位',
+          ] },
+        ],
+      },
+      {
+        version: '1.7.2',
+        date: '2026.08.02',
+        type: '歌词卡拉OK同源对齐与设置交互修复',
+        sections: [
+          { title: '🎤 歌词卡拉OK与动效体验', items: [
+            '主界面歌词引擎与桌面歌词 1:1 同源对齐，走字与亮灯效果保持完全一致',
+            'CSS 渐变涂色公式与游标匹配深度统一，解决文字不走字与填充错位问题',
+            '恢复 AMLL 逐字抬起弹跳动画（Word Lift Bounce），带来更具动感的歌词视觉体感',
+            '优化日语假名注音（Ruby）的高光剪裁与多图层物理隔离，解决注音重影',
+          ] },
+          { title: '🛠️ 设置界面与系统优化', items: [
+            '修复设置界面中“歌词页面主题”（自动/浅色/深色）点击无响应的问题，支持实时切换与保存',
+            '修复设置界面 DOM 挂载逻辑，保证面板秒开与顺畅加载',
+            '修正 LunaBeat 局域网连字符 UUID 封面正则与 LRU Blob URL 缓存释放，清除控制台 404 报错',
+          ] },
+        ],
+      },
+      {
+        version: '1.7.1',
+        date: '2026.08.01',
+        type: '局域网播放全面增强与滚动体验优化',
+        sections: [
+          { title: '🌐 局域网播放（LunaBeat）全面增强', items: [
+            '全新接入 LunaBeat 局域网曲库，可直接浏览并播放手机 App 中的音乐',
+            '封面加载增加淡入过渡动画，快速滚动时不再出现突兀跳转',
+            '列表风格与本地界面保持视觉统一：按钮、标签、高亮、播放状态无缝一致',
+            '播放全部按钮移至工具栏左侧，与连接状态、刷新按钮形成清晰的操作区',
+            '定制局域网专属右键菜单，操作逻辑与本地音乐场景对齐',
+            '点击播放歌曲时列表不再跳动、所有封面不再集体闪烁，播放状态改为局部 DOM 刷新',
+            '修复局域网歌曲播放时列表播放状态一闪而过的问题，支持跨模块 _lunaId 与 file_path 双 ID 匹配',
+            '列表渲染采用虚拟滚动 + 哨兵触底分批追加，千首级大曲库首次进入同样秒开',
+            '封面图片接入 IntersectionObserver 懒加载与 LRU Blob URL 缓存，滚动时零卡顿、无内存暴涨',
+            '进入局域网列表、切换子视图时增加交错入场动画，首次进入不再丢帧',
+          ] },
+          { title: '✨ 滚动体验深度优化', items: [
+            '移除内容区手动滚动干预逻辑，完全交由浏览器原生平滑滚动驱动，彻底消除滚轮顿挫感',
+            '优化 .content-area、.song-item 等关键容器的渲染属性，减少滚动时多余的图层合成',
+            '发现页滚动监听统一设为被动（passive），避免浏览器等待事件处理导致滚动滞后',
+          ] },
+          { title: '🛠️ 稳定性与布局修复', items: [
+            '修复从局域网页面切回搜索界面后工具栏样式错乱、布局错位的问题',
+            '工具栏在每次渲染时重置 className，避免上一个页面残留的样式类污染',
+            '加大歌词沉浸页左侧封面区域宽度，返回按钮位置保持不变，留白更舒展',
+          ] },
+        ],
+      },
+      {
+        version: '1.7.0',
+        date: '2026.07.31',
+        type: '局域网播放秒开与界面体验优化',
+        sections: [
+          { title: '⚡ 局域网播放秒开', items: ['播放手机 LunaBeat 歌曲秒点秒播，无需漫长等待，拖动进度条丝滑不卡顿'] },
+          { title: '🎨 背景与界面优化', items: ['局域网歌曲完美支持沉浸毛玻璃背景，修复部分界面背景纯黑的问题', '修复歌曲列表时长显示超长小数尾巴的 Bug', '修复歌词沉浸页切歌按钮挤压变形的问题'] },
+          { title: '✏️ 体验与细节修复', items: ['将应用顶栏及全局各处的软件名称统一更正为 KimoPlayer', '优化最近播放记录的封面展示'] },
+        ],
+      },
+      {
+        version: '1.6.1',
+        date: '2026.07.30',
+        type: '歌词滚动与布局修复',
+        sections: [
+          { title: '歌词滚动与时间状态', items: ['修复间奏展开、收起引起的歌词错位，间奏位置继承下一句声道布局', '支持一句同时与上一句、下一句重叠演唱，越过结束点后立即切换下一组', '修复点击歌词跳转时上一句错误保持高亮，以及逐字单元首字提前染色'] },
+          { title: '布局与沉浸模式', items: ['小窗口提高歌词区域占比，沉浸模式恢复左右 1:1 布局', '沉浸模式歌词字号直接提升至设置上限，退出后恢复原字号', '封面保持正方形并随窗口缓慢放大，歌词舞台在宽屏下整体居中'] },
+          { title: '设置与交互', items: ['新增歌词歌曲信息过滤，可隐藏标题、歌手及作词、作曲、编曲等署名行', '更新提示页强化版本号展示，评论入口改为“查看回复”', '修复部分内容区域滚轮操作不稳定'] },
+        ],
+      },
       {
         version: '1.6.0',
         date: '2026.07.30',
@@ -719,7 +1265,7 @@ export const createSettingsPage = ({
         type: '功能与体验优化',
         sections: [
           { title: '系统文件关联', items: ['安装后可在操作系统中双击音频文件直接使用播放器打开播放，支持 mp3、flac、wav、ogg、m4a、aac、wma、opus、ape、aiff 共 10 种格式', '应用已运行时双击文件自动追加到播放列表并播放，应用未运行时启动后自动加载'] },
-          { title: '背景样式设置', items: ['新增三种背景模式：去除背景、静态背景、动态背景', '动态背景模式下专辑封面以模糊旋转效果展示，可在设置中调节旋转速率（10%~100%）', '拖动滑块时暂停旋转，释放后立即生效'] },
+          { title: '背景样式设置', items: ['新增三种背景模式：关闭背景、静态背景、动态背景', '动态背景模式下专辑封面以模糊旋转效果展示，可在设置中调节旋转速率（10%~100%）', '拖动滑块时暂停旋转，释放后立即生效'] },
           { title: 'UI 风格体系完善', items: ['新增四种 UI 风格：默认效果、亚克力、高斯模糊、液态玻璃，按视觉复杂度递增排列', '亚克力模式主内容区 60% 透明度 + 设置卡片 70% 透明度，呈现微妙层次感', '液态玻璃模式使用评论区同款材质参数，保留侧边栏与播放栏液态边框', '评论区窗口、右键菜单、Toast 提示全面适配四种 UI 风格', '深色主题下亚克力模式使用半透明黑色，浅色/灰色主题使用半透明白色'] },
           { title: '歌词弹出框重新设计', items: ['歌词控制栏滑块弹出框改为现代玻璃胶囊风格，增大模糊半径与饱和度', '滑块轨道新增进度填充效果，已调节部分以动态主题色高亮显示', '弹出框跟随歌词页面主题设置（深色/浅色/跟随软件），与右键菜单机制统一', '增大滑块圆点尺寸，优化悬停与拖动时的缩放反馈'] },
           { title: '滑块交互优化', items: ['所有设置页滑块与歌词弹出框滑块统一支持鼠标滚轮调整', '修复弹出框字号上限（36→48px）与抬起幅度上限（15→40px）未跟随设置页同步的问题', '动态背景旋转速率滑块滚轮调整后立即生效并恢复旋转'] },
@@ -731,7 +1277,7 @@ export const createSettingsPage = ({
         date: '2026.07.28',
         type: '开源版本',
         sections: [
-          { title: '开源发布', items: ['KiomPlayer 正式开源，源代码托管于 GitHub', '基于 Tauri + Rust + Vite 技术栈构建'] },
+          { title: '开源发布', items: ['KimoPlayer 正式开源，源代码托管于 GitHub', '基于 Tauri + Rust + Vite 技术栈构建'] },
         ],
       },
       {
@@ -1025,7 +1571,22 @@ export const createSettingsPage = ({
       showBetaKeyModal(aboutCard);
     });
 
+    // 挂载设置面板容器至 DOM
     listEl.appendChild(container);
+
+    lyricCard.querySelectorAll('#settings-lyrics-theme-group .setting-radio-btn').forEach((btn, idx) => {
+      btn.addEventListener('click', () => {
+        lyricCard.querySelectorAll('#settings-lyrics-theme-group .setting-radio-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        lyricCard.querySelector('#settings-lyrics-theme-group').setAttribute('data-active-idx', idx.toString());
+        const val = btn.getAttribute('data-val');
+        localStorage.setItem('kimo-lyrics-theme', val);
+        if (typeof applyLyricsTheme === 'function') {
+          applyLyricsTheme(val);
+        }
+        showToast(`歌词页面主题已切换为: ${val === 'follow' ? '自动' : (val === 'light' ? '浅色' : '深色')}`);
+      });
+    });
 
     lyricCard.querySelectorAll('#settings-stagger-group .setting-radio-btn').forEach((btn, idx) => {
       btn.addEventListener('click', () => {
@@ -1056,8 +1617,47 @@ export const createSettingsPage = ({
       showToast(`已${e.target.checked ? '开启' : '关闭'}迷你歌词翻译`);
     });
 
-    desktopLyricCard.querySelector('#settings-desktop-lyrics')?.addEventListener('change', event => {
-      desktopLyrics?.setVisible(event.target.checked);
+    // 迷你歌词字号滑块
+    const miniLyricsSizeSlider = lyricCard.querySelector('#settings-mini-lyrics-size');
+    const miniLyricsSizeVal = lyricCard.querySelector('#mini-lyrics-size-val');
+    const applyMiniLyricsSize = (size) => {
+      const clamped = Math.max(11, Math.min(18, size));
+      document.documentElement.style.setProperty('--mini-lyrics-size', `${clamped.toFixed(1)}px`);
+      if (miniLyricsSizeSlider) miniLyricsSizeSlider.value = clamped;
+      if (miniLyricsSizeVal) miniLyricsSizeVal.textContent = `${clamped.toFixed(1)}px`;
+    };
+    if (miniLyricsSizeSlider) {
+      miniLyricsSizeSlider.addEventListener('input', (e) => {
+        applyMiniLyricsSize(parseFloat(e.target.value));
+      });
+      miniLyricsSizeSlider.addEventListener('change', (e) => {
+        const val = Math.max(11, Math.min(18, parseFloat(e.target.value)));
+        localStorage.setItem('kimo-mini-lyrics-font-size', val);
+      });
+      // 滚轮支持
+      miniLyricsSizeSlider.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        const delta = e.deltaY < 0 ? 0.5 : -0.5;
+        const current = parseFloat(miniLyricsSizeSlider.value);
+        const next = Math.max(11, Math.min(18, current + delta));
+        miniLyricsSizeSlider.value = next;
+        applyMiniLyricsSize(next);
+        localStorage.setItem('kimo-mini-lyrics-font-size', next);
+      }, { passive: false });
+    }
+
+    lyricCard.querySelector('#settings-lyrics-filter-info')?.addEventListener('change', async (e) => {
+      const enabled = e.target.checked;
+      updateLyricsPreference('filterInfoEnabled', enabled);
+
+      if (player?.lyrics?.audioPath) {
+        await player.lyrics.load(player.lyrics.audioPath);
+        if (player.audio) {
+          player.lyrics.syncToTime(player.audio.currentTime);
+        }
+      }
+
+      showToast(enabled ? '已过滤歌词中的歌曲信息' : '已显示完整歌词信息');
     });
 
     const syncDesktopLyricsStyle = () => {
@@ -1085,10 +1685,43 @@ export const createSettingsPage = ({
       if (themeVal) localStorage.setItem('kimo-desktop-lyrics-theme', themeVal);
       if (alignVal) localStorage.setItem('kimo-desktop-lyrics-align', alignVal);
       desktopLyrics?.updateStyle();
+      // 同步刷新设置页实时预览（此前缺失，导致部分设置项修改后预览不更新）
+      updateDesktopLyricsPreview();
     };
 
     desktopLyricCard.querySelector('#settings-desktop-lyrics-size')?.addEventListener('input', syncDesktopLyricsStyle);
     desktopLyricCard.querySelector('#settings-desktop-lyrics-opacity')?.addEventListener('input', syncDesktopLyricsStyle);
+
+    desktopLyricCard.querySelector('#settings-desktop-lyrics-line-mode-group')?.addEventListener('click', (e) => {
+      const btn = e.target.closest('.setting-radio-btn');
+      if (!btn) return;
+      const val = btn.dataset.val;
+      const group = desktopLyricCard.querySelector('#settings-desktop-lyrics-line-mode-group');
+      if (group) {
+        group.setAttribute('data-active-idx', val === 'double' ? '1' : '0');
+        group.querySelectorAll('.setting-radio-btn').forEach(b => b.classList.toggle('active', b === btn));
+      }
+      localStorage.setItem('kimo-desktop-lyrics-line-mode', val);
+      // 双行排列选项仅在双行模式显示
+      const layoutRow = desktopLyricCard.querySelector('#settings-desktop-lyrics-layout-row');
+      if (layoutRow) layoutRow.style.display = val === 'double' ? 'flex' : 'none';
+      desktopLyrics?.updateStyle();
+    });
+
+    // 双行排列：上下 / 左右
+    desktopLyricCard.querySelector('#settings-desktop-lyrics-layout-group')?.addEventListener('click', (e) => {
+      const btn = e.target.closest('.setting-radio-btn');
+      if (!btn) return;
+      const val = btn.dataset.val;
+      const group = desktopLyricCard.querySelector('#settings-desktop-lyrics-layout-group');
+      if (group) {
+        group.setAttribute('data-active-idx', val === 'split' ? '1' : '0');
+        group.querySelectorAll('.setting-radio-btn').forEach(b => b.classList.toggle('active', b === btn));
+      }
+      localStorage.setItem('kimo-desktop-lyrics-layout', val);
+      desktopLyrics?.updateStyle();
+      showToast(`双行排列: ${val === 'split' ? '左右分栏' : '上下排列'}`);
+    });
 
     // 桌面歌词字号滑块滚轮支持
     desktopLyricCard.querySelector('#settings-desktop-lyrics-size')?.addEventListener('wheel', (e) => {
@@ -1199,6 +1832,20 @@ export const createSettingsPage = ({
       });
     });
 
+    // 界面动画速率分段钮组事件监听
+    themeCard.querySelectorAll('#settings-anim-speed-group .setting-radio-btn')?.forEach((btn, idx) => {
+      btn.addEventListener('click', () => {
+        themeCard.querySelectorAll('#settings-anim-speed-group .setting-radio-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        themeCard.querySelector('#settings-anim-speed-group').setAttribute('data-active-idx', idx.toString());
+        const val = btn.getAttribute('data-val');
+        localStorage.setItem('kimo-anim-speed', val);
+        document.documentElement.setAttribute('data-anim-speed', val);
+        const speedNames = { slow: '舒缓平滑', fast: '极速敏捷', none: '关闭动画' };
+        showToast(`界面动画速率已切换至: ${speedNames[val] || val}`);
+      });
+    });
+
     // 背景样式分段钮组事件监听
     themeCard.querySelectorAll('#settings-bg-style-group .setting-radio-btn').forEach((btn, idx) => {
       btn.addEventListener('click', () => {
@@ -1208,12 +1855,95 @@ export const createSettingsPage = ({
         const val = btn.getAttribute('data-val');
         localStorage.setItem('kimo-bg-style', val);
         applyBackgroundStyle(val);
-        // 显示/隐藏旋转速率滑块
+        // 显示/隐藏旋转速率滑块、自定义背景设置区与背景遮罩滑块（按背景样式适配）
         const speedRow = themeCard.querySelector('#settings-bg-rotate-speed-row');
         if (speedRow) speedRow.style.display = val === 'dynamic' ? 'flex' : 'none';
-        const bgNames = { none: '去除背景', static: '静态背景', dynamic: '动态背景' };
+        const overlayRow = themeCard.querySelector('#settings-overlay-opacity-row');
+        if (overlayRow) overlayRow.style.display = (val === 'static' || val === 'dynamic') ? 'flex' : 'none';
+        const isCustom = val === 'custom';
+        ['#settings-bg-custom-mask-row', '#settings-bg-custom-pick-row'].forEach(sel => {
+          const row = themeCard.querySelector(sel);
+          if (row) row.style.display = isCustom ? 'flex' : 'none';
+        });
+        const bgNames = { none: '关闭背景', static: '静态背景', dynamic: '动态背景', custom: '自定义背景' };
         showToast(`背景样式已切换至: ${bgNames[val] || val}`);
       });
+    });
+
+    // 自定义背景：遮罩开关（关闭后图片原样直出）
+    themeCard.querySelector('#settings-bg-mask-enabled')?.addEventListener('change', (e) => {
+      localStorage.setItem('kimo-bg-mask-enabled', e.target.checked ? 'true' : 'false');
+      applyBackgroundStyle('custom');
+      showToast(e.target.checked ? '背景遮罩已开启' : '背景遮罩已关闭，图片原样直出');
+    });
+
+    // 自定义背景：选择图片
+    themeCard.querySelector('#settings-bg-custom-pick')?.addEventListener('click', async () => {
+      try {
+        const selected = await open({
+          title: '选择背景图片',
+          filters: [{ name: '图片', extensions: ['png', 'jpg', 'jpeg', 'webp', 'bmp', 'gif'] }],
+        });
+        if (!selected) return;
+        const filePath = typeof selected === 'string' ? selected : selected.path;
+        localStorage.setItem('kimo-custom-bg-path', filePath);
+        const nameEl = themeCard.querySelector('#settings-bg-custom-name');
+        if (nameEl) nameEl.textContent = filePath.split(/[\\/]/).pop();
+        applyBackgroundStyle('custom');
+        showToast('自定义背景已应用');
+      } catch (e) {
+        console.error('[CustomBg] Failed to pick image:', e);
+        showToast('选择图片失败');
+      }
+    });
+
+    // 窗口透明度（0% = 整窗口全透明透出桌面；作用于整个窗口，与背景设置无关）
+    themeCard.querySelector('#settings-slider-window-opacity')?.addEventListener('input', (e) => {
+      const v = e.target.value;
+      const valEl = themeCard.querySelector('#settings-window-opacity-val');
+      if (valEl) valEl.textContent = `${v}%`;
+      localStorage.setItem('kimo-window-opacity', String(v));
+      // 材质层与窗口透明互斥：调到透明时自动关闭材质引擎预览，再应用用户新值
+      if (parseFloat(v) < 100 && window.__materialEngine?.previewActive) {
+        localStorage.setItem('kimo-material-engine-preview', 'false');
+        window.__materialEngine.setPreview(false);
+        const toggle = themeCard.querySelector('#settings-material-engine-preview');
+        if (toggle) toggle.checked = false;
+        showToast('窗口透明与材质层互斥，已自动关闭材质引擎');
+        // setPreview(false) 会恢复被强制的不透明度——这里重新写回用户新值，保证存储与显示一致
+        localStorage.setItem('kimo-window-opacity', String(v));
+      }
+      applyWindowOpacity(parseFloat(v));
+    });
+
+    // 窗口材质：Windows 系统级底座（DWM 模糊窗口后真实内容）
+    themeCard.querySelectorAll('#settings-window-material-group .setting-radio-btn').forEach((btn, idx) => {
+      btn.addEventListener('click', () => {
+        themeCard.querySelectorAll('#settings-window-material-group .setting-radio-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        themeCard.querySelector('#settings-window-material-group').setAttribute('data-active-idx', idx.toString());
+        const val = btn.getAttribute('data-val');
+        localStorage.setItem('kimo-window-material', val);
+        // 互斥：材质预览开着时选「无」→ 自动关闭预览（避免叠加层悬空）
+        if (val === 'none' && window.__materialEngine?.previewActive) {
+          localStorage.setItem('kimo-material-engine-preview', 'false');
+          window.__materialEngine.setPreview(false);
+          const toggle = themeCard.querySelector('#settings-material-engine-preview');
+          if (toggle) toggle.checked = false;
+          showToast('窗口材质已切换为: 无（材质引擎预览已关闭）');
+          return;
+        }
+        applyWindowMaterial(val);
+        const materialNames = { none: '无', acrylic: '亚克力', mica: '云母', blur: '模糊' };
+        showToast(`窗口材质已切换为: ${materialNames[val] || val}`);
+      });
+    });
+
+    // 材质引擎预览（实验）：开启后引擎接管背景层渲染玻璃效果
+    themeCard.querySelector('#settings-material-engine-preview')?.addEventListener('change', (e) => {
+      localStorage.setItem('kimo-material-engine-preview', e.target.checked ? 'true' : 'false');
+      window.__materialEngine?.setPreview?.(e.target.checked);
+      showToast(e.target.checked ? '材质引擎已启用（实验）' : '材质引擎已关闭');
     });
 
     // 动态背景旋转速率滑块
@@ -1255,7 +1985,6 @@ export const createSettingsPage = ({
     }
 
     const interfaceFontSelect = themeCard.querySelector('#settings-interface-font');
-    const customFontButton = themeCard.querySelector('#settings-custom-font-btn');
     const customFontFile = themeCard.querySelector('#settings-custom-font-file');
     let currentFontMode = getStoredInterfaceFont().mode;
 
@@ -1270,17 +1999,171 @@ export const createSettingsPage = ({
         });
         if (!selected) return false;
 
-        await applyInterfaceFont('custom', selected);
-        currentFontMode = 'custom';
-        interfaceFontSelect.value = 'custom';
+        const entry = await addUserFont(selected);
+        await applyInterfaceFont(`user:${selected}`);
+        currentFontMode = `user:${selected}`;
+        interfaceFontSelect.value = `user:${selected}`;
         customFontFile.textContent = getFontFileName(selected);
         customFontFile.title = selected;
-        showToast('已应用自定义界面字体');
+        showToast(`已添加并应用字体「${entry.name}」`);
+        renderUserFontList();
+        refreshFontSelects();
         return true;
       } catch (error) {
         console.error('[InterfaceFont] Failed to apply custom font:', error);
         showToast('字体文件无法加载，请尝试其他字体');
         return false;
+      }
+    };
+
+    // ─── 字体管理弹窗：我的字体（可删）+ 推荐字体（下载）───
+    const renderUserFontList = () => {
+      const userFontList = document.getElementById('settings-user-font-list');
+      if (!userFontList) return;
+      const fonts = getUserFonts();
+      if (!fonts.length) {
+        userFontList.innerHTML = '<div class="setting-font-empty">暂无，可点击「添加字体」或从下方「推荐字体」下载</div>';
+        return;
+      }
+      userFontList.innerHTML = fonts.map(font => `
+        <div class="setting-user-font-item">
+          <span class="setting-user-font-name" title="${font.path}">${font.name}</span>
+          <button class="setting-font-remove-btn" data-font-path="${font.path.replace(/"/g, '&quot;')}">删除</button>
+        </div>
+      `).join('');
+    };
+
+    // ─── 推荐字体列表渲染（应用内下载 + 进度；已安装的不再显示）───
+    const renderDownloadableFontList = () => {
+      const downloadableFontList = document.getElementById('settings-downloadable-font-list');
+      if (!downloadableFontList) return;
+      const installed = new Set(getUserFonts().map(f => f.path.split(/[\\/]/).pop()));
+      // auto 条目（默认字体）由首次启动自动下载，不出现在推荐列表
+      const list = DOWNLOADABLE_FONTS.filter(font => !font.auto && !installed.has(font.filename));
+      if (!list.length) {
+        downloadableFontList.innerHTML = '<div class="setting-font-empty">推荐字体已全部安装</div>';
+        return;
+      }
+      downloadableFontList.innerHTML = list.map(font => `
+        <div class="setting-downloadable-font-item" data-font-name="${font.name}" data-font-filename="${font.filename}">
+          <div class="setting-downloadable-font-info">
+            <div class="setting-downloadable-font-name">${font.name}</div>
+            <div class="setting-downloadable-font-desc">${font.description}</div>
+          </div>
+          <div class="setting-font-progress hidden">
+            <div class="setting-font-progress-bar"></div>
+          </div>
+          <div class="setting-downloadable-font-action">
+            <button class="setting-btn setting-font-download-btn">下载</button>
+          </div>
+        </div>
+      `).join('');
+    };
+
+    // 重建三个字体下拉（添加/删除用户字体后同步 options）
+    const refreshFontSelects = () => {
+      const rebuild = (select, options, currentValue) => {
+        if (!select) return;
+        select.innerHTML = options.map(opt =>
+          `<option value="${opt.value}" ${currentValue === opt.value ? 'selected' : ''}>${opt.label}</option>`
+        ).join('') + '<option value="custom">自定义字体</option>';
+      };
+      rebuild(interfaceFontSelect, getFontOptions(), currentFontMode);
+      rebuild(lyricsFontSelect, getFontOptions(true), currentLyricsFontMode);
+      rebuild(desktopLyricsFontSelect, getFontOptions(true), currentDesktopFontMode);
+    };
+
+    const openFontManager = () => {
+      const existing = document.getElementById('kimo-font-manager-modal');
+      if (existing) existing.remove();
+
+      const overlay = document.createElement('div');
+      overlay.id = 'kimo-font-manager-modal';
+      overlay.className = 'kimo-modal-overlay';
+      overlay.innerHTML = `
+        <div class="kimo-modal-card" style="max-width:520px;width:92%;max-height:78vh;padding:0;text-align:left;overflow:hidden;display:flex;flex-direction:column;">
+          <div class="kimo-modal-header">
+            <div class="kimo-modal-title">字体管理</div>
+            <button class="kimo-modal-close" data-font-manager-close title="关闭">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+          </div>
+          <div class="kimo-modal-body">
+            <div class="font-manager-section">
+              <div class="font-manager-section-title">我的字体 <span class="font-manager-section-hint">内置字体不可删除</span></div>
+              <div class="font-manager-add-row">
+                <button class="setting-btn" id="settings-font-add-btn">+ 添加字体</button>
+              </div>
+              <div class="setting-user-fonts" id="settings-user-font-list"></div>
+            </div>
+            <div class="font-manager-section">
+              <div class="font-manager-section-title">推荐字体 <span class="font-manager-section-hint">开源免费，应用内下载</span></div>
+              <div class="setting-downloadable-fonts" id="settings-downloadable-font-list"></div>
+            </div>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(overlay);
+      renderUserFontList();
+      renderDownloadableFontList();
+
+      overlay.querySelector('[data-font-manager-close]')?.addEventListener('click', () => overlay.remove());
+      overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+      overlay.querySelector('#settings-font-add-btn')?.addEventListener('click', chooseCustomFont);
+      overlay.querySelector('#settings-user-font-list')?.addEventListener('click', onRemoveFont);
+      overlay.querySelector('#settings-downloadable-font-list')?.addEventListener('click', onDownloadFont);
+    };
+
+    // 用户字体删除（事件委托：内置字体不在列表，天然不可删）
+    const onRemoveFont = async (event) => {
+      const btn = event.target.closest('.setting-font-remove-btn');
+      if (!btn) return;
+      const path = btn.dataset.fontPath;
+      const removed = await removeUserFont(path);
+      if (removed) {
+        showToast('已删除字体');
+        currentFontMode = getStoredInterfaceFont().mode;
+        interfaceFontSelect.value = currentFontMode;
+        renderUserFontList();
+        renderDownloadableFontList();
+        refreshFontSelects();
+        applyStoredLyricsFont();
+        desktopLyrics?.updateStyle();
+        updateDesktopLyricsPreview();
+      }
+    };
+
+    // 推荐字体下载（进度展示）
+    const onDownloadFont = async (event) => {
+      const btn = event.target.closest('.setting-font-download-btn');
+      if (!btn) return;
+      const item = btn.closest('.setting-downloadable-font-item');
+      const fontInfo = DOWNLOADABLE_FONTS.find(f => f.name === item.dataset.fontName);
+      if (!fontInfo || btn.disabled) return;
+
+      btn.disabled = true;
+      btn.textContent = '下载中…';
+      const progressBox = item.querySelector('.setting-font-progress');
+      const progressBar = item.querySelector('.setting-font-progress-bar');
+      progressBox?.classList.remove('hidden');
+
+      try {
+        const targetPath = await downloadFont(fontInfo, (progress) => {
+          const percent = Math.min(100, Math.round(progress.percent || 0));
+          if (progressBar) progressBar.style.width = `${percent}%`;
+        });
+        progressBar?.style && (progressBar.style.width = '100%');
+        const entry = getUserFonts().find(f => f.path === targetPath) || { name: fontInfo.name };
+        showToast(`字体「${entry.name}」下载完成，已加入「我的字体」`);
+        renderUserFontList();
+        renderDownloadableFontList();
+        refreshFontSelects();
+      } catch (error) {
+        console.error('[InterfaceFont] 字体下载失败：', error);
+        showToast(`字体下载失败：${error?.message || '网络异常，请重试'}`);
+        progressBox?.classList.add('hidden');
+        btn.disabled = false;
+        btn.textContent = '重试';
       }
     };
 
@@ -1307,10 +2190,315 @@ export const createSettingsPage = ({
       await applyInterfaceFont(nextMode);
       currentFontMode = nextMode;
       const preset = INTERFACE_FONT_PRESETS.find(item => item.value === nextMode);
-      showToast(`已切换至${preset?.label || '默认字体'}`);
+      const userFont = nextMode.startsWith('user:') ? getUserFonts().find(f => f.path === nextMode.slice(5)) : null;
+      showToast(`已切换至${userFont?.name || preset?.label || '默认字体'}`);
+      applyStoredLyricsFont();
+      desktopLyrics?.updateStyle();
+      updateDesktopLyricsPreview();
     });
 
-    customFontButton?.addEventListener('click', chooseCustomFont);
+    themeCard.querySelector('#settings-font-manage-btn')?.addEventListener('click', openFontManager);
+
+    // ════ 歌词页面字体控制事件 ════
+    const lyricsFontSelect = lyricCard.querySelector('#settings-lyrics-font');
+    const customLyricsFontBtn = lyricCard.querySelector('#settings-custom-lyrics-font-btn');
+    const customLyricsFontFile = lyricCard.querySelector('#settings-custom-lyrics-font-file');
+    let currentLyricsFontMode = getStoredLyricsFont().mode;
+
+    const chooseCustomLyricsFont = async () => {
+      try {
+        const selected = await open({
+          multiple: false,
+          filters: [{
+            name: '字体文件',
+            extensions: ['ttf', 'otf', 'woff', 'woff2', 'ttc'],
+          }],
+        });
+        if (!selected) return false;
+
+        const entry = await addUserFont(selected);
+        await applyLyricsFont(`user:${selected}`);
+        currentLyricsFontMode = `user:${selected}`;
+        if (lyricsFontSelect) lyricsFontSelect.value = `user:${selected}`;
+        if (customLyricsFontFile) {
+          customLyricsFontFile.textContent = getFontFileName(selected);
+          customLyricsFontFile.title = selected;
+        }
+        showToast(`已添加并应用歌词字体「${entry.name}」`);
+        renderUserFontList();
+        refreshFontSelects();
+        return true;      } catch (error) {
+        console.error('[LyricsFont] Failed to apply custom lyrics font:', error);
+        showToast('字体文件无法加载，请尝试其他字体');
+        return false;
+      }
+    };
+
+    lyricsFontSelect?.addEventListener('change', async (event) => {
+      const nextMode = event.target.value;
+      if (nextMode === 'custom') {
+        const storedFont = getStoredLyricsFont();
+        if (storedFont.customPath) {
+          try {
+            await applyLyricsFont('custom', storedFont.customPath);
+            currentLyricsFontMode = 'custom';
+            showToast('已切换至自定义歌词页面字体');
+            return;
+          } catch (error) {
+            console.warn('[LyricsFont] Saved custom font is unavailable:', error);
+          }
+        }
+
+        const applied = await chooseCustomLyricsFont();
+        if (!applied) event.target.value = currentLyricsFontMode;
+        return;
+      }
+
+      await applyLyricsFont(nextMode);
+      currentLyricsFontMode = nextMode;
+      const preset = getFontOptions(true).find(item => item.value === nextMode);
+      const userFont = nextMode.startsWith('user:') ? getUserFonts().find(f => f.path === nextMode.slice(5)) : null;
+      showToast(`已切换至${userFont?.name || preset?.label || '默认歌词字体'}`);
+    });
+
+    customLyricsFontBtn?.addEventListener('click', chooseCustomLyricsFont);
+
+    // ════ 🖥️ 桌面歌词预览与控件联动事件 ════
+    const desktopLyricsFontSelect = desktopLyricCard.querySelector('#settings-desktop-lyrics-font');
+    const customDesktopFontBtn = desktopLyricCard.querySelector('#settings-custom-desktop-font-btn');
+    const customDesktopFontFile = desktopLyricCard.querySelector('#settings-custom-desktop-font-file');
+    let currentDesktopFontMode = getStoredDesktopLyricsFont().mode;
+    const previewLoadedFontMap = new Map();
+
+    const updateDesktopLyricsPreview = async () => {
+      const previewBox = desktopLyricCard.querySelector('#desktop-lyrics-preview-box');
+      const previewViewport = desktopLyricCard.querySelector('#desktop-lyrics-preview-viewport');
+      const previewMain = desktopLyricCard.querySelector('#desktop-lyrics-preview-main');
+      const previewSub = desktopLyricCard.querySelector('#desktop-lyrics-preview-sub');
+      if (!previewBox || !previewViewport || !previewMain || !previewSub) return;
+
+      const size = Number(desktopLyricCard.querySelector('#settings-desktop-lyrics-size')?.value || 34);
+      const opacity = Number(desktopLyricCard.querySelector('#settings-desktop-lyrics-opacity')?.value || 0.96);
+      const theme = desktopLyricCard.querySelector('#settings-desktop-lyrics-theme')?.value || 'aurora';
+      const align = desktopLyricCard.querySelector('#settings-desktop-lyrics-align')?.value || 'center';
+      const showTranslation = desktopLyricCard.querySelector('#settings-desktop-lyrics-translation')?.checked !== false;
+      const wordByWord = desktopLyricCard.querySelector('#settings-desktop-lyrics-word-by-word')?.checked !== false;
+      const glow = desktopLyricCard.querySelector('#settings-desktop-lyrics-glow')?.checked !== false;
+      const stroke = desktopLyricCard.querySelector('#settings-desktop-lyrics-stroke')?.checked !== false;
+
+      const fontSelectVal = desktopLyricsFontSelect?.value || 'follow';
+      const storedFont = getStoredDesktopLyricsFont();
+      const fontFamily = resolveDesktopLyricsFontFamily(fontSelectVal, storedFont.customPath);
+
+      previewBox.style.setProperty('--preview-size', `${size}px`);
+      previewBox.style.opacity = opacity;
+      previewBox.setAttribute('data-theme', theme);
+      previewBox.setAttribute('data-glow', glow ? 'true' : 'false');
+      previewBox.setAttribute('data-stroke', stroke ? 'true' : 'false');
+      previewViewport.setAttribute('data-align', align);
+
+      // 自定义歌词颜色（已播放 / 未播放）同步到预览
+      const customColorEnabled = desktopLyricCard.querySelector('#settings-desktop-lyrics-custom-color')?.checked === true;
+      const activeColorVal = desktopLyricCard.querySelector('#settings-desktop-lyrics-color-active')?.value || '';
+      const inactiveColorVal = desktopLyricCard.querySelector('#settings-desktop-lyrics-color-inactive')?.value || '';
+      previewBox.setAttribute('data-custom-color', customColorEnabled ? 'true' : 'false');
+      if (activeColorVal) previewBox.style.setProperty('--desktop-lyrics-active-color', activeColorVal);
+      if (inactiveColorVal) previewBox.style.setProperty('--desktop-lyrics-inactive-color', inactiveColorVal);
+
+      const targetFont = (fontSelectVal === 'custom' && storedFont.customPath)
+        ? `'KimoDesktopLyricsPreviewCustom', system-ui, "Microsoft YaHei UI", sans-serif`
+        : fontFamily;
+
+      if (fontSelectVal === 'custom' && storedFont.customPath) {
+        if (!previewLoadedFontMap.has(storedFont.customPath)) {
+          try {
+            const sourceUrl = convertFileSrc(storedFont.customPath);
+            const nextFontFace = new FontFace('KimoDesktopLyricsPreviewCustom', `url(${JSON.stringify(sourceUrl)})`);
+            await nextFontFace.load();
+            document.fonts.add(nextFontFace);
+            previewLoadedFontMap.set(storedFont.customPath, nextFontFace);
+          } catch (e) {
+            console.warn('[DesktopLyricsPreview] Failed custom font load:', e);
+          }
+        }
+      }
+
+      previewViewport.style.fontFamily = targetFont;
+      previewMain.style.fontFamily = targetFont;
+      previewSub.style.fontFamily = targetFont;
+
+      previewSub.style.display = showTranslation ? 'block' : 'none';
+
+      if (wordByWord) {
+        previewMain.innerHTML = `
+          <span class="lyrics-word word-active">这</span>
+          <span class="lyrics-word word-active">一</span>
+          <span class="lyrics-word word-active">刻</span>
+          <span style="margin:0 3px;"></span>
+          <span class="lyrics-word word-singing" style="--char-fill:70%;background-image:linear-gradient(to right, var(--theme-accent, #00f2fe) 70%, var(--unfilled-color, rgba(255,255,255,0.45)) 70%);-webkit-background-clip:text;color:transparent;">画</span>
+          <span class="lyrics-word" style="color:var(--unfilled-color, rgba(255,255,255,0.45));">面</span>
+          <span class="lyrics-word" style="color:var(--unfilled-color, rgba(255,255,255,0.45));">定</span>
+          <span class="lyrics-word" style="color:var(--unfilled-color, rgba(255,255,255,0.45));">格</span>
+        `;
+      } else {
+        previewMain.textContent = '♪ 这一刻 画面定格在眼前 ♪';
+      }
+    };
+
+    // 初始渲染一次桌面歌词预览效果
+    setTimeout(() => {
+      updateDesktopLyricsPreview();
+    }, 50);
+
+    const chooseCustomDesktopFont = async () => {
+      try {
+        const selected = await open({
+          multiple: false,
+          filters: [{
+            name: '字体文件',
+            extensions: ['ttf', 'otf', 'woff', 'woff2', 'ttc'],
+          }],
+        });
+        if (!selected) return false;
+
+        const entry = await addUserFont(selected);
+        localStorage.setItem('kimo-desktop-lyrics-font-mode', `user:${selected}`);
+        localStorage.removeItem('kimo-desktop-lyrics-font-path');
+        currentDesktopFontMode = `user:${selected}`;
+        if (desktopLyricsFontSelect) desktopLyricsFontSelect.value = `user:${selected}`;
+        if (customDesktopFontFile) {
+          customDesktopFontFile.textContent = getFontFileName(selected);
+          customDesktopFontFile.title = selected;
+        }
+        showToast(`已添加并应用桌面歌词字体「${entry.name}」`);
+        renderUserFontList();
+        refreshFontSelects();
+        desktopLyrics?.updateStyle();
+        updateDesktopLyricsPreview();
+        return true;
+      } catch (error) {
+        console.error('[DesktopLyricsFont] Failed to apply custom desktop font:', error);
+        showToast('字体文件无法加载，请尝试其他字体');
+        return false;
+      }
+    };
+
+    desktopLyricsFontSelect?.addEventListener('change', async (event) => {
+      const nextMode = event.target.value;
+      if (nextMode === 'custom') {
+        const storedFont = getStoredDesktopLyricsFont();
+        if (storedFont.customPath) {
+          localStorage.setItem('kimo-desktop-lyrics-font-mode', 'custom');
+          currentDesktopFontMode = 'custom';
+          showToast('已切换至自定义桌面歌词字体');
+          desktopLyrics?.updateStyle();
+          updateDesktopLyricsPreview();
+          return;
+        }
+
+        const applied = await chooseCustomDesktopFont();
+        if (!applied) event.target.value = currentDesktopFontMode;
+        return;
+      }
+
+      localStorage.setItem('kimo-desktop-lyrics-font-mode', nextMode);
+      currentDesktopFontMode = nextMode;
+      const preset = getFontOptions(true).find(item => item.value === nextMode);
+      const userFont = nextMode.startsWith('user:') ? getUserFonts().find(f => f.path === nextMode.slice(5)) : null;
+      showToast(`已切换桌面歌词字体为: ${userFont?.name || preset?.label || '默认字体'}`);
+      desktopLyrics?.updateStyle();
+      updateDesktopLyricsPreview();
+    });
+
+    customDesktopFontBtn?.addEventListener('click', chooseCustomDesktopFont);
+
+    // 绑定桌面歌词设置项与预览更新联动
+    desktopLyricCard.querySelector('#settings-desktop-lyrics')?.addEventListener('change', (e) => {
+      desktopLyrics?.setVisible(e.target.checked);
+      updateDesktopLyricsPreview();
+    });
+
+    desktopLyricCard.querySelector('#settings-desktop-lyrics-locked')?.addEventListener('change', (e) => {
+      localStorage.setItem('kimo-desktop-lyrics-locked', e.target.checked ? 'true' : 'false');
+      desktopLyrics?.updateStyle();
+      updateDesktopLyricsPreview();
+    });
+
+    const dSizeSlider = desktopLyricCard.querySelector('#settings-desktop-lyrics-size');
+    const dSizeVal = desktopLyricCard.querySelector('#desktop-lyrics-size-val');
+    dSizeSlider?.addEventListener('input', (e) => {
+      const size = e.target.value;
+      if (dSizeVal) dSizeVal.textContent = `${size}px`;
+      localStorage.setItem('kimo-desktop-lyrics-font-size', String(size));
+      desktopLyrics?.updateStyle();
+      updateDesktopLyricsPreview();
+    });
+
+    const dOpSlider = desktopLyricCard.querySelector('#settings-desktop-lyrics-opacity');
+    const dOpVal = desktopLyricCard.querySelector('#desktop-lyrics-opacity-val');
+    dOpSlider?.addEventListener('input', (e) => {
+      const opacity = e.target.value;
+      if (dOpVal) dOpVal.textContent = `${Math.round(opacity * 100)}%`;
+      localStorage.setItem('kimo-desktop-lyrics-opacity', String(opacity));
+      desktopLyrics?.updateStyle();
+      updateDesktopLyricsPreview();
+    });
+
+    desktopLyricCard.querySelector('#settings-desktop-lyrics-word-by-word')?.addEventListener('change', (e) => {
+      localStorage.setItem('kimo-desktop-lyrics-word-by-word', e.target.checked ? 'true' : 'false');
+      desktopLyrics?.updateStyle();
+      updateDesktopLyricsPreview();
+    });
+
+    desktopLyricCard.querySelector('#settings-desktop-lyrics-translation')?.addEventListener('change', (e) => {
+      localStorage.setItem('kimo-desktop-lyrics-show-translation', e.target.checked ? 'true' : 'false');
+      desktopLyrics?.updateStyle();
+      updateDesktopLyricsPreview();
+    });
+
+    desktopLyricCard.querySelector('#settings-desktop-lyrics-glow')?.addEventListener('change', (e) => {
+      localStorage.setItem('kimo-desktop-lyrics-glow', e.target.checked ? 'true' : 'false');
+      desktopLyrics?.updateStyle();
+      updateDesktopLyricsPreview();
+    });
+
+    desktopLyricCard.querySelector('#settings-desktop-lyrics-stroke')?.addEventListener('change', (e) => {
+      localStorage.setItem('kimo-desktop-lyrics-stroke', e.target.checked ? 'true' : 'false');
+      desktopLyrics?.updateStyle();
+      updateDesktopLyricsPreview();
+    });
+
+    // 自定义歌词颜色（已播放 / 未播放）
+    desktopLyricCard.querySelector('#settings-desktop-lyrics-custom-color')?.addEventListener('change', (e) => {
+      localStorage.setItem('kimo-desktop-lyrics-custom-color', e.target.checked ? 'true' : 'false');
+      const colorRow = desktopLyricCard.querySelector('#settings-desktop-lyrics-color-row');
+      if (colorRow) colorRow.style.display = e.target.checked ? 'flex' : 'none';
+      desktopLyrics?.updateStyle();
+      updateDesktopLyricsPreview();
+      showToast(`自定义歌词颜色: ${e.target.checked ? '开启' : '关闭'}`);
+    });
+    desktopLyricCard.querySelector('#settings-desktop-lyrics-color-active')?.addEventListener('input', (e) => {
+      localStorage.setItem('kimo-desktop-lyrics-color-active', e.target.value);
+      desktopLyrics?.updateStyle();
+      updateDesktopLyricsPreview();
+    });
+    desktopLyricCard.querySelector('#settings-desktop-lyrics-color-inactive')?.addEventListener('input', (e) => {
+      localStorage.setItem('kimo-desktop-lyrics-color-inactive', e.target.value);
+      desktopLyrics?.updateStyle();
+      updateDesktopLyricsPreview();
+    });
+
+    desktopLyricCard.querySelector('#settings-desktop-lyrics-theme')?.addEventListener('change', (e) => {
+      localStorage.setItem('kimo-desktop-lyrics-theme', e.target.value);
+      desktopLyrics?.updateStyle();
+      updateDesktopLyricsPreview();
+    });
+
+    desktopLyricCard.querySelector('#settings-desktop-lyrics-align')?.addEventListener('change', (e) => {
+      localStorage.setItem('kimo-desktop-lyrics-align', e.target.value);
+      desktopLyrics?.updateStyle();
+      updateDesktopLyricsPreview();
+    });
 
     const opInput = themeCard.querySelector('#settings-slider-opacity');
     const opDisplay = themeCard.querySelector('#settings-opacity-val');
@@ -1502,12 +2690,94 @@ export const createSettingsPage = ({
       localStorage.setItem('kimo-lyrics-line-spacing', nextVal);
     }, { passive: false });
 
-    const asrUrlInput = aiCard.querySelector('#settings-asr-url');
-    aiCard.querySelector('#settings-save-asr-btn').addEventListener('click', () => {
+    const asrUrlInput = extCard.querySelector('#settings-asr-url');
+    extCard.querySelector('#settings-save-asr-btn').addEventListener('click', () => {
       const url = asrUrlInput.value.trim();
       localStorage.setItem('kimo-ai-server-url', url);
       showToast('AI ASR 服务器地址保存成功');
     });
+
+    // LunaBeat 事件处理
+    const lunaUrlInput = extCard.querySelector('#settings-luna-url');
+    const lunaPinInput = extCard.querySelector('#settings-luna-pin');
+    const lunaEnabledInput = extCard.querySelector('#settings-luna-enabled');
+    const lunaStatsInput = extCard.querySelector('#settings-luna-stats');
+    const lunaStatus = extCard.querySelector('#settings-luna-status');
+    const lunaSaveBtn = extCard.querySelector('#settings-luna-save-btn');
+
+    lunaStatsInput?.addEventListener('change', () => {
+      localStorage.setItem('kimo-luna-stats-enabled', String(lunaStatsInput.checked));
+      showToast(lunaStatsInput.checked ? '局域网歌曲已计入月度统计' : '局域网歌曲不再计入月度统计');
+    });
+
+    const writeLunaConfig = () => {
+      const cfg = {
+        baseUrl: lunaUrlInput.value.trim(),
+        pinCode: lunaPinInput.value.trim(),
+        enabled: lunaEnabledInput.checked,
+      };
+      localStorage.setItem('kimo-lunabeat-config', JSON.stringify(cfg));
+      return cfg;
+    };
+
+    lunaEnabledInput.addEventListener('change', () => {
+      const cfg = writeLunaConfig();
+      showToast(cfg.enabled ? '已开启 LunaBeat 局域网音源' : '已关闭 LunaBeat 局域网音源');
+      // 重置适配器使新配置生效
+      if (window.__lunaBeatAdapter) {
+        window.__lunaBeatAdapter.dispose();
+        window.__lunaBeatAdapter = null;
+      }
+    });
+
+    lunaSaveBtn.addEventListener('click', async () => {
+      const url = lunaUrlInput.value.trim();
+      const pin = lunaPinInput.value.trim();
+      if (!url) {
+        if (lunaStatus) lunaStatus.textContent = '⚠️ 请先填写服务器地址';
+        return;
+      }
+      if (!pin) {
+        if (lunaStatus) lunaStatus.textContent = '⚠️ 请先填写配对码';
+        return;
+      }
+      try {
+        lunaSaveBtn.disabled = true;
+        lunaSaveBtn.textContent = '连接中...';
+        if (lunaStatus) lunaStatus.textContent = '正在连接...';
+        // 临时实例测试
+        const { LunaBeatAdapter } = await import('./luna-beat/luna-beat-adapter.js');
+        const adapter = new LunaBeatAdapter(url);
+        await adapter.authenticate(pin);
+        if (adapter.authenticated) {
+          // 同时写入配置
+          writeLunaConfig();
+          // 设为全局适配器
+          if (window.__lunaBeatAdapter) window.__lunaBeatAdapter.dispose();
+          window.__lunaBeatAdapter = adapter;
+          if (lunaStatus) {
+            lunaStatus.style.color = 'rgb(16,185,129)';
+            lunaStatus.textContent = `✅ 连接成功！认证通过 (${url})`;
+          }
+          showToast('LunaBeat 连接成功');
+        }
+      } catch (e) {
+        console.error('[LunaBeat] Connect failed:', e);
+        if (lunaStatus) {
+          lunaStatus.style.color = '#f87171';
+          lunaStatus.textContent = `❌ 连接失败: ${e.message}`;
+        }
+        showToast('LunaBeat 连接失败');
+      } finally {
+        lunaSaveBtn.disabled = false;
+        lunaSaveBtn.textContent = '保存&测试';
+      }
+    });
+
+    // 如果有已保存的配置，显示状态
+    if (savedLunaUrl && savedLunaPin) {
+      if (lunaStatus) lunaStatus.textContent = `${savedLunaEnabled ? '🟢' : '⚪'} 已配置: ${savedLunaUrl}`;
+    }
 
     scanCard.querySelectorAll('.scanned-path-remove').forEach(btn => {
       btn.addEventListener('click', () => {
@@ -1564,93 +2834,56 @@ export const createSettingsPage = ({
       const scanBtn = scanCard.querySelector('#settings-scan-btn');
       scanBtn.disabled = true;
       scanBtn.innerText = '正在扫描目录...';
-      
+
+      let unlisten = null;
       try {
-        const allFiles = [];
-        for (const dir of scannedDirs) {
-          try {
-            const files = await invoke('scan_directory', { dir });
-            if (Array.isArray(files)) {
-              allFiles.push(...files);
-            }
-          } catch(err) {
-             console.error('Scan failed for dir:', dir, err);
-          }
-        }
+        // 1. 监听 Rust 侧流式进度事件
+        unlisten = await listen('scan-progress', (event) => {
+          const { current, total, title, skipped } = event.payload;
+          scanBtn.innerText = skipped
+            ? `正在建立索引(${current}/${total}) 跳过`
+            : `正在建立索引(${current}/${total}) ${title || ''}`;
+        });
 
-        const uniqueFiles = Array.from(new Set(allFiles));
-        
-        if (uniqueFiles.length === 0) {
-          showToast('未在指定文件夹中检索到音频文件');
-          scanBtn.disabled = false;
-          scanBtn.innerText = '立即重新扫描';
-          return;
-        }
+        // 2. 一次性调用：Rust 侧完成 扫描 + 元数据解析 + 写入 SQLite
+        const indexed = await invoke('scan_and_index_library', { dirs: scannedDirs });
 
-        scanBtn.innerText = `正在读取元数据(0/${uniqueFiles.length})...`;
-        
-        const tempPlaylist = [];
-        for (let i = 0; i < uniqueFiles.length; i++) {
-          try {
-            scanBtn.innerText = `正在读取元数据(${i + 1}/${uniqueFiles.length})...`;
-            const meta = await invoke('read_audio_metadata', { path: uniqueFiles[i] });
-            if (meta) {
-              tempPlaylist.push(meta);
-            }
-          } catch (e) {
-            console.error('Failed to read metadata for', uniqueFiles[i], e);
-          }
-        }
+        // 3. 从 SQLite 加载完整歌库
+        const songs = await invoke('get_library_songs', { offset: 0, limit: 50000 });
 
-        if (tempPlaylist.length > 0) {
-          setMusicLibrary(tempPlaylist);
-          player.playlist = [...tempPlaylist]; // 初次扫描时把全部歌曲同时设为播放列表
+        if (Array.isArray(songs) && songs.length > 0) {
+          setMusicLibrary(songs);
+          player.playlist = [...songs];
           resetDiscoverRecommendations();
 
-          // ⭐ localStorage 不存大字段（cover_image data URI 可能超5MB 配额），先精简再存 ⭐
-                    const slimPlaylist = tempPlaylist.map(s => ({
-            file_path: s.file_path,
-            title: s.title,
-            artist: s.artist,
-            album: s.album,
-            duration: s.duration,
-            year: s.year,
-            track_number: s.track_number,
-            genre: s.genre,
-            bitrate: s.bitrate,
-            // ⭐ 封面仅保留路径引用，data URI 留空（启动时 backgroundLoadCovers 会按需补全）。
-            cover_image: typeof s.cover_image === 'string' && s.cover_image.startsWith('data:') ? null : s.cover_image,
-          }));
-
-          try {
-            localStorage.setItem('kimo-music-library', JSON.stringify(slimPlaylist));
-            localStorage.setItem('kimo-playlist-cache', JSON.stringify(slimPlaylist));
-          } catch (e) {
-            console.warn('localStorage 写入失败（配额满？），已跳过持久化：', e);
-          }
-
-          // ⭐ 异步加载封面（不阻塞扫描完成提示）。
+          // 异步加载封面（不阻塞扫描完成提示）
           backgroundLoadCovers(player.playlist);
 
-          showToast(`扫描完成！共导入 ${tempPlaylist.length} 首歌曲`);
-          // ⭐ 隔离 switchTab 错误，避免渲染错误覆盖成功提示⭐
+          // 清理歌库中已不存在的歌词缓存（不阻塞主流程）
+          pruneLyricsCache(songs.map((s) => s.file_path));
+
+          showToast(`扫描完成！共索引 ${indexed} 首新歌曲，歌库共 ${songs.length} 首`);
           try {
             switchTab('local');
           } catch (tabErr) {
             console.error('switchTab error after scan:', tabErr);
           }
-          scanBtn.disabled = false;
-          scanBtn.innerText = '立即重新扫描';
         } else {
-          showToast('扫描完成，未读取到有效的音频文件元数据');
-          scanBtn.disabled = false;
-          scanBtn.innerText = '立即重新扫描';
+          showToast('扫描完成，未检索到有效的音频文件');
         }
-      } catch(err) {
+
+        scanBtn.disabled = false;
+        scanBtn.innerText = '立即重新扫描';
+      } catch (err) {
         console.error('Global scan error:', err);
         showToast('扫描失败，请重试');
         scanBtn.disabled = false;
         scanBtn.innerText = '立即重新扫描';
+      } finally {
+        // 无论成功失败都释放事件监听，避免失败重扫时监听器累积泄漏
+        if (unlisten) {
+          try { unlisten(); } catch (e) {}
+        }
       }
     });
   };

@@ -1,3 +1,19 @@
+/* ═══ 思源黑体（默认字体，OFL 开源许可）═══ */
+@font-face {
+  font-family: 'Source Han Sans CN';
+  src: url('/fonts/SourceHanSansCN-Regular.otf') format('opentype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Source Han Sans CN';
+  src: url('/fonts/SourceHanSansCN-Bold.otf') format('opentype');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
 /* 🌟 Houdini GPU-Accelerated Property Registrations for Butter-Smooth Lyrics Flow 🌟 */
 @property --line-percent {
   syntax: '<percentage>';
@@ -33,13 +49,20 @@
   --sticky-header-bg: rgba(13, 13, 16, 0.25);
   
   /* Typography - 🌟 High-Fidelity Font Chain with multi-weight variable-grade local support */
-  --font-family: 'MiSans', 'Outfit', 'Inter', -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei UI", "Microsoft YaHei", "Segoe UI", system-ui, sans-serif;
+  --font-family: 'Source Han Sans CN', 'MiSans', 'Outfit', 'Inter', -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei UI", "Microsoft YaHei", "Segoe UI", system-ui, sans-serif;
+  --lyrics-font-family: var(--font-family);
+  --desktop-lyrics-font-family: var(--font-family);
   
   /* Layout */
   --sidebar-width: 230px;
   --player-bar-height: 90px;
   --titlebar-height: 40px;
-  --lyrics-cover-size: clamp(180px, 22vw, 320px);
+  /* Grow gently with the viewport while remaining safe on short windows. */
+  --lyrics-cover-size: clamp(240px, min(22vw, 42vh), 420px);
+
+  /* Effects */
+  --glass-blur: blur(20px);
+  --ui-blur: 20px;
 
   /* Effects */
   --glass-blur: blur(20px);
@@ -55,4 +78,30 @@
   --card-hover: rgba(255, 255, 255, 0.05);
   --card-border: rgba(255, 255, 255, 0.03);
   --card-border-hover: rgba(255, 255, 255, 0.08);
+}
+
+/* ⚡ 界面动画速率控制 (Animation Speed Rate) ⚡ */
+html[data-anim-speed="fast"] {
+  --transition-smooth: transform 0.12s ease, opacity 0.12s ease, background 0.12s ease, border-color 0.12s ease, box-shadow 0.12s ease, filter 0.12s ease;
+  --transition-spring: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.2), opacity 0.2s ease, filter 0.2s ease;
+}
+
+html[data-anim-speed="fast"] .page-enter,
+html[data-anim-speed="fast"] #music-list.page-enter,
+html[data-anim-speed="fast"] .list-songs-container.page-enter,
+html[data-anim-speed="fast"] .albums-grid.page-enter,
+html[data-anim-speed="fast"] .artists-grid.page-enter,
+html[data-anim-speed="fast"] .genres-grid.page-enter,
+html[data-anim-speed="fast"] #search-results-list.page-enter,
+html[data-anim-speed="fast"] .luna-content-area.page-enter,
+html[data-anim-speed="fast"] .settings-container.page-enter {
+  animation-duration: 0.22s !important;
+}
+
+html[data-anim-speed="none"] *,
+html[data-anim-speed="none"] *::before,
+html[data-anim-speed="none"] *::after {
+  animation-duration: 0.001s !important;
+  animation-delay: 0s !important; /* 清掉交错延迟（如歌单/详情行 stagger），关闭动画即即时显示 */
+  transition-duration: 0.001s !important;
 }

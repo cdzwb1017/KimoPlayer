@@ -238,7 +238,7 @@ export const createSearchController = ({
     if (hasSongs) {
       html += '<div class="search-group-title">歌曲</div>';
       songs.forEach((song) => {
-        const cover = getCoverSrc(song.cover_image);
+        const cover = getCoverSrc(song);
         html += `
           <div class="search-item" data-type="song" data-file-path="${song.file_path}">
             <img class="search-item-icon" src="${cover}" />
@@ -255,7 +255,7 @@ export const createSearchController = ({
     if (hasAlbums) {
       html += '<div class="search-group-title">专辑</div>';
       albums.forEach((song) => {
-        const cover = getCoverSrc(song.cover_image);
+        const cover = getCoverSrc(song);
         html += `
           <div class="search-item" data-type="song" data-file-path="${song.file_path}">
             <img class="search-item-icon" src="${cover}" />
@@ -272,7 +272,7 @@ export const createSearchController = ({
     if (hasArtists) {
       html += '<div class="search-group-title">艺术家</div>';
       artists.forEach((song) => {
-        const cover = getCoverSrc(song.cover_image);
+        const cover = getCoverSrc(song);
         html += `
           <div class="search-item" data-type="song" data-file-path="${song.file_path}">
             <img class="search-item-icon" src="${cover}" />
@@ -291,7 +291,7 @@ export const createSearchController = ({
       lyrics.forEach(({ song, matches }) => {
         if (matches && matches.length > 0) {
           const line = matches[0];
-          const cover = getCoverSrc(song.cover_image);
+          const cover = getCoverSrc(song);
           const timeMin = Math.floor(line.time / 60);
           const timeSec = (Math.floor(line.time) % 60).toString().padStart(2, '0');
           const previewText = line.text ? highlightText(line.text, query) : '';
@@ -317,7 +317,7 @@ export const createSearchController = ({
     if (hasOthers) {
       html += '<div class="search-group-title">其他元数据匹配</div>';
       others.forEach(({ song, fieldLabel }) => {
-        const cover = getCoverSrc(song.cover_image);
+        const cover = getCoverSrc(song);
         html += `
           <div class="search-item" data-type="song" data-file-path="${song.file_path}">
             <img class="search-item-icon" src="${cover}" />
@@ -365,7 +365,10 @@ export const createSearchController = ({
     const listEl = document.getElementById('music-list');
     if (!listEl) return;
     const toolbarEl = document.getElementById('content-toolbar');
-    if (toolbarEl) toolbarEl.innerHTML = '';
+    if (toolbarEl) {
+      toolbarEl.innerHTML = '';
+      toolbarEl.className = 'content-toolbar'; // 重置 className，移除 luna-toolbar 等残留类
+    }
 
     listEl.innerHTML = `
       <div class="search-container">
@@ -474,20 +477,6 @@ export const createSearchController = ({
           resultsContainer.classList.remove('page-enter');
           void resultsContainer.offsetWidth;
           resultsContainer.classList.add('page-enter');
-          // Stagger search result items
-          requestAnimationFrame(() => {
-            const items = resultsContainer.querySelectorAll('.search-result-item');
-            items.forEach((el, i) => {
-              el.style.opacity = '0';
-              el.style.transform = 'translate3d(0, 24px, 0)';
-              el.style.transition = 'none';
-              requestAnimationFrame(() => {
-                el.style.transition = `opacity 0.7s cubic-bezier(0.25, 0.1, 0.25, 1) ${0.06 + i * 0.04}s, transform 0.7s cubic-bezier(0.25, 0.1, 0.25, 1) ${0.06 + i * 0.04}s`;
-                el.style.opacity = '1';
-                el.style.transform = 'translate3d(0, 0, 0)';
-              });
-            });
-          });
         }
       });
     });

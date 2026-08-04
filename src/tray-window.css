@@ -1,0 +1,165 @@
+:root {
+  --tray-bg: rgba(25, 25, 30, 0.75);
+  --tray-border: rgba(255, 255, 255, 0.1);
+  --text-primary: #ffffff;
+  --text-secondary: rgba(255, 255, 255, 0.6);
+  --accent: #10b981;
+}
+
+/* Light theme overrides (can be toggled if theme is passed, but dark is safe for tray) */
+@media (prefers-color-scheme: light) {
+  /* You can add light theme overrides here if needed */
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  background-color: transparent;
+  font-family: var(--font-family, system-ui, -apple-system, sans-serif);
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.tray-container {
+  width: 100vw;
+  height: 100vh;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  background: #ffffff;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+  padding: 12px;
+  color: #333333;
+}
+
+.cover-wrapper {
+  width: 120px;
+  height: 120px;
+  flex-shrink: 0;
+  margin: 0 auto 8px auto;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+  cursor: pointer;
+  transition: transform 0.2s ease;
+}
+
+.cover-wrapper:hover {
+  transform: scale(1.02);
+}
+
+#tray-cover {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.info-wrapper {
+  text-align: center;
+  margin-bottom: 8px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.tray-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #333333;
+  margin-bottom: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tray-artist {
+  font-size: 11px;
+  color: #666666;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.controls-wrapper {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 16px;
+}
+
+.control-btn {
+  background: transparent;
+  border: none;
+  color: #333333;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
+  border-radius: 50%;
+  transition: background-color 0.2s ease, transform 0.1s ease;
+}
+
+.control-btn svg {
+  width: 20px;
+  height: 20px;
+}
+
+.control-btn:hover {
+  background-color: rgba(0, 0, 0, 0.05);
+}
+
+.control-btn:active {
+  transform: scale(0.92);
+}
+
+.play-btn {
+  background-color: var(--accent);
+  color: #fff;
+  padding: 10px;
+}
+
+.play-btn svg {
+  width: 24px;
+  height: 24px;
+}
+
+.play-btn:hover {
+  background-color: color-mix(in srgb, var(--accent) 80%, white);
+}
+
+.tray-footer {
+  display: flex;
+  gap: 12px;
+  margin-top: 8px;
+  border-top: 1px solid #e0e0e0;
+  padding-top: 8px;
+}
+
+.footer-btn {
+  background: transparent;
+  border: none;
+  color: #666666;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.2s, background 0.2s;
+}
+.footer-btn svg {
+  width: 18px;
+  height: 18px;
+}
+.footer-btn:hover {
+  color: #333333;
+  background: rgba(0,0,0,0.05);
+}

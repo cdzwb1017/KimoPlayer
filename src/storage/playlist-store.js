@@ -8,8 +8,26 @@ export function getPlaylists() {
   }
 }
 
+/**
+ * 保存歌单。localStorage 配额满时 setItem 会抛异常，
+ * 先剥离体积最大的 cover_image 字段重试一次，仍失败则放弃并告警，
+ * 避免播放/编辑流程被存储异常打断。
+ */
 export function savePlaylists(playlists) {
-  localStorage.setItem(PLAYLISTS_KEY, JSON.stringify(playlists));
+  try {
+    localStorage.setItem(PLAYLISTS_KEY, JSON.stringify(playlists));
+  } catch (e) {
+    try {
+      const slim = playlists.map((p) => ({
+        ...p,
+        songs: (p.songs || []).map((s) => ({ ...s, cover_image: undefined })),
+      }));
+      localStorage.setItem(PLAYLISTS_KEY, JSON.stringify(slim));
+      console.warn('[PlaylistStore] 存储空间不足，已剥离封面字段保存');
+    } catch (e2) {
+      console.error('[PlaylistStore] Failed to save playlists:', e2);
+    }
+  }
 }
 
 export function generatePlaylistId() {

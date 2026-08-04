@@ -14,7 +14,7 @@ export function updateLyricLineEndTimes(lines) {
     if (index < lines.length - 1) {
       const nextTime = lines[index + 1].time;
       line.endTime = line.isInterlude
-        ? nextTime - 0.05
+        ? (Number.isFinite(line.end) ? line.end : nextTime - 0.05)
         : Math.max(realWordEnd + 0.3, Math.min(nextTime + 0.6, line.time + 8.0));
     } else {
       line.endTime = realWordEnd + 0.6;

@@ -1,11 +1,13 @@
 import { emit, listen } from '@tauri-apps/api/event';
 import { invoke } from '@tauri-apps/api/core';
 import { hideCommentsPanel } from '../features/comments-panel.js';
+import { getStoredDesktopLyricsFont, getStoredInterfaceFont, resolveDesktopLyricsFontFamily } from './interface-font.js';
 
 const THEME_PRESETS = ['follow-app', 'aurora', 'cyber', 'sunset', 'ocean', 'white'];
 
 const getStyle = () => {
   const dynamicColor = document.documentElement.style.getPropertyValue('--dynamic-color-a') || '0, 180, 216';
+  const fontObj = getStoredDesktopLyricsFont();
   return {
     fontSize: Number(localStorage.getItem('kimo-desktop-lyrics-font-size') || 34),
     opacity: Number(localStorage.getItem('kimo-desktop-lyrics-opacity') || 0.96),
@@ -16,15 +18,44 @@ const getStyle = () => {
     stroke: localStorage.getItem('kimo-desktop-lyrics-stroke') !== 'false',
     theme: localStorage.getItem('kimo-desktop-lyrics-theme') || 'follow-app',
     appTheme: localStorage.getItem('kimo-theme') || 'light',
-    align: localStorage.getItem('kimo-desktop-lyrics-align') || 'center',
+    align: localStorage.getItem('kimo-desktop-lyrics-align') || 'left',
+    lineMode: localStorage.getItem('kimo-desktop-lyrics-line-mode') || 'single',
+    lineLayout: localStorage.getItem('kimo-desktop-lyrics-layout') || 'stacked',
+    rubyPosition: localStorage.getItem('kimo-lyrics-ruby-position') || 'above',
     dynamicColor: dynamicColor.trim(),
+    customColor: localStorage.getItem('kimo-desktop-lyrics-custom-color') === 'true',
+    activeColor: localStorage.getItem('kimo-desktop-lyrics-color-active') || '',
+    inactiveColor: localStorage.getItem('kimo-desktop-lyrics-color-inactive') || '',
+    fontMode: fontObj.mode,
+    // 用户字体路径：user 模式取自身；follow 模式下若界面字体是用户字体也一并传入，
+    // 让桌面窗口注册 FontFace（否则 family 存在但窗口未注册会静默回退 system-ui）
+    fontCustomPath: fontObj.mode.startsWith('user:')
+      ? fontObj.mode.slice(5)
+      : (fontObj.mode === 'follow'
+        ? (getStoredInterfaceFont().mode.startsWith('user:') ? getStoredInterfaceFont().mode.slice(5) : fontObj.customPath)
+        : fontObj.customPath),
+    fontFamily: resolveDesktopLyricsFontFamily(fontObj.mode, fontObj.customPath),
   };
 };
 
+let _instance = null;
+
 export function createDesktopLyricsController({ showToast, player }) {
+  if (_instance) {
+    if (player) _instance.setPlayer(player);
+    return _instance;
+  }
   let currentKey = '';
   let latestLine = null;
   let activePlayer = player || null;
+  let lastSyncAt = 0;
+  let lastSyncedText = '';
+  let lastKaraokeAt = 0;
+  let pendingVisible = null;
+  let visibleChain = Promise.resolve(); // setVisible invoke 串行链（防首次创建竞态）
+  let enabledCache = localStorage.getItem('kimo-desktop-lyrics-enabled') === 'true';
+  const now = () => performance.now();
+  const isEnabledCache = () => enabledCache;
 
   const setPlayer = (p) => {
     activePlayer = p;
@@ -35,29 +66,44 @@ export function createDesktopLyricsController({ showToast, player }) {
   };
 
     const setVisible = async (visible, { silent = false } = {}) => {
-    localStorage.setItem('kimo-desktop-lyrics-enabled', visible ? 'true' : 'false');
-    emit('desktop-lyrics-visibility-changed', { visible }).catch(() => {});
-    try {
-      await invoke('set_desktop_lyrics_visible', { visible });
-      if (visible) {
-        hideCommentsPanel();
-        currentKey = '';
-        await updateStyle();
-        setTimeout(() => {
-          if (latestLine) sync(latestLine);
-        }, 240);
-      }
-      if (!silent) showToast(`桌面歌词已${visible ? '开启' : '关闭'}`);
-    } catch (error) {
-      console.error('[DesktopLyrics] Failed to change visibility:', error);
-      if (!silent) showToast('桌面歌词操作失败');
-    }
-  };
+      // 进行中防抖：同一目标的 invoke 未完成时不重复触发
+      if (pendingVisible === visible) return;
+      pendingVisible = visible;
+      localStorage.setItem('kimo-desktop-lyrics-enabled', visible ? 'true' : 'false');
+      enabledCache = visible; // 同步缓存，避免每帧读 localStorage
+      emit('desktop-lyrics-visibility-changed', { visible }).catch(() => {});
+      // 串行化：首次创建窗口的 invoke 可能耗时数百 ms，快速 开→关 若并发，
+      // 关闭 invoke 会先到 Rust 侧（窗口未注册直接 Ok），随后创建完成弹出幽灵窗口
+      visibleChain = visibleChain.then(async () => {
+        await invoke('set_desktop_lyrics_visible', { visible });
+        if (visible) {
+          hideCommentsPanel();
+          currentKey = '';
+          await updateStyle();
+          setTimeout(() => {
+            if (latestLine) sync(latestLine);
+          }, 240);
+        }
+        if (!silent) showToast(`桌面歌词已${visible ? '开启' : '关闭'}`);
+      }).catch((error) => {
+        console.error('[DesktopLyrics] Failed to change visibility:', error);
+        if (!silent) showToast('桌面歌词操作失败');
+      }).finally(() => {
+        pendingVisible = null;
+      });
+      await visibleChain;
+    };
 
-  const sync = ({ text, translation, words, currentTime, lineStart, lineEnd }) => {
-    latestLine = { text, translation, words, currentTime, lineStart, lineEnd };
-    if (localStorage.getItem('kimo-desktop-lyrics-enabled') !== 'true') return;
+  const sync = ({ text, translation, words, currentTime, lineStart, lineEnd, nextText, nextTranslation }) => {
+    if (!isEnabledCache()) return;
+    latestLine = { text, translation, words, currentTime, lineStart, lineEnd, nextText, nextTranslation };
+    // 节流：桌面歌词更新最多 20fps（省 2/3 IPC）；暂停/停止时豁免，保证最后状态立即送达
+    // 行切换（text 变化）也豁免：双行「两句一组」状态机依赖 update 先于 karaoke 到达（IPC 保序）
     const isPlaying = activePlayer ? !activePlayer.audio?.paused : false;
+    const lineChanged = text !== lastSyncedText;
+    if (isPlaying && !lineChanged && now() - lastSyncAt < 50) return;
+    lastSyncedText = text;
+    lastSyncAt = now();
     emit('desktop-lyrics-update', {
       text,
       translation,
@@ -65,21 +111,26 @@ export function createDesktopLyricsController({ showToast, player }) {
       currentTime,
       lineStart,
       lineEnd,
-      style: getStyle(),
+      nextText,
+      nextTranslation,
       isPlaying,
     }).catch(() => {});
   };
 
-  const syncKaraokeProgress = ({ html, charC, totalChars, text, translation }) => {
-    if (localStorage.getItem('kimo-desktop-lyrics-enabled') !== 'true') return;
+  const syncKaraokeProgress = ({ html, charC, totalChars, text, translation, nextText, nextTranslation }) => {
+    if (!isEnabledCache()) return;
+    // 节流：走字进度提升至 60fps 实时对齐迷你歌词
     const isPlaying = activePlayer ? !activePlayer.audio?.paused : false;
+    if (isPlaying && now() - lastKaraokeAt < 16) return;
+    lastKaraokeAt = now();
     emit('desktop-lyrics-karaoke', {
       html,
       charC,
       totalChars,
       text,
       translation,
-      style: getStyle(),
+      nextText,
+      nextTranslation,
       isPlaying,
     }).catch(() => {});
   };
@@ -96,7 +147,7 @@ export function createDesktopLyricsController({ showToast, player }) {
     } else {
       const isPlaying = activePlayer ? !activePlayer.audio?.paused : false;
       emit('desktop-lyrics-update', {
-        text: 'KiomPlayer',
+        text: 'KimoPlayer',
         style: getStyle(),
         isPlaying,
       }).catch(() => {});
@@ -172,12 +223,28 @@ export function createDesktopLyricsController({ showToast, player }) {
         showToast(`桌面歌词已${locked ? '锁定(穿透)' : '解锁'}`);
         break;
       }
+      case 'toggle-line-mode': {
+        const curMode = localStorage.getItem('kimo-desktop-lyrics-line-mode') || 'single';
+        const nextMode = curMode === 'double' ? 'single' : 'double';
+        localStorage.setItem('kimo-desktop-lyrics-line-mode', nextMode);
+        const lineModeGroup = document.getElementById('settings-desktop-lyrics-line-mode-group');
+        if (lineModeGroup) {
+          lineModeGroup.setAttribute('data-active-idx', nextMode === 'double' ? '1' : '0');
+          lineModeGroup.querySelectorAll('.setting-radio-btn').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.val === nextMode);
+          });
+        }
+        updateStyle();
+        showToast(`桌面歌词已切换至: ${nextMode === 'double' ? '双行模式' : '单行模式'}`);
+        break;
+      }
       case 'close':
         setVisible(false);
         break;
     }
   });
 
-  return { getStyle, setVisible, sync, syncKaraokeProgress, updateStyle, setPlayer, notifyPlaybackState };
+  _instance = { getStyle, setVisible, sync, syncKaraokeProgress, updateStyle, setPlayer, notifyPlaybackState };
+  return _instance;
 }
 
